@@ -46,6 +46,8 @@ test/
 - After any code change, run the relevant tests before finishing the task
 - Use only the latest stable versions of libraries and dependencies
 - If a newer stable version is available, update to it immediately
+- Be proactive: if a requested change is clear and safe, implement it immediately instead of asking for confirmation
+- Default to making the code changes directly, not just describing them
 - Use strict TypeScript — no `any` types
 - Follow NestJS module pattern: each feature gets its own module
 - Keep controllers thin, business logic in services

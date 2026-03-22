@@ -12,10 +12,21 @@ import {
   type QueueConsumer,
 } from './queue/queue-consumer';
 import { AssistantWorkerProcessorService } from './worker/assistant-worker-processor.service';
+import { AssistantWorkerConfigService } from './worker/assistant-worker-config.service';
+import { AssistantWorkerConversationService } from './worker/assistant-worker-conversation.service';
+import { AssistantLlmProviderService } from './worker/assistant-llm-provider.service';
+import { AssistantLlmProviderStatusService } from './worker/assistant-llm-provider-status.service';
+import { AssistantWorkerPromptService } from './worker/assistant-worker-prompt.service';
+import { AssistantWorkerPromptTemplateService } from './worker/assistant-worker-prompt-template.service';
 import { AssistantWorkerRuntimeContextService } from './worker/assistant-worker-runtime-context.service';
 import { CallbackDeliveryService } from './worker/callback-delivery.service';
 import { ASSISTANT_LLM_PROVIDER } from './worker/assistant-llm-provider';
+import { DeepseekChatService } from './worker/deepseek-chat.service';
+import { DeepseekProviderStatusService } from './worker/deepseek-provider-status.service';
 import { GrokResponsesService } from './worker/grok-responses.service';
+import { OllamaChatService } from './worker/ollama-chat.service';
+import { OllamaProviderStatusService } from './worker/ollama-provider-status.service';
+import { XaiProviderStatusService } from './worker/xai-provider-status.service';
 import { AssistantWorkerRootController } from './root.controller';
 import { AssistantWorkerStatusController } from './status.controller';
 
@@ -31,14 +42,25 @@ import { AssistantWorkerStatusController } from './status.controller';
     AssistantWorkerMetricsService,
     HttpRequestMetricsInterceptor,
     AssistantWorkerProcessorService,
+    AssistantWorkerConfigService,
+    AssistantWorkerConversationService,
+    AssistantLlmProviderService,
+    AssistantLlmProviderStatusService,
+    DeepseekChatService,
+    DeepseekProviderStatusService,
+    AssistantWorkerPromptService,
+    AssistantWorkerPromptTemplateService,
     AssistantWorkerRuntimeContextService,
     CallbackDeliveryService,
     FileQueueConsumerService,
     GrokResponsesService,
+    OllamaChatService,
+    OllamaProviderStatusService,
+    XaiProviderStatusService,
     RedisQueueConsumerService,
     {
       provide: ASSISTANT_LLM_PROVIDER,
-      useExisting: GrokResponsesService,
+      useExisting: AssistantLlmProviderService,
     },
     {
       provide: APP_INTERCEPTOR,

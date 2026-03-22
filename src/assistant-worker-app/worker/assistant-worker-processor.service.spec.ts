@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AssistantWorkerMetricsService } from '../observability/assistant-worker-metrics.service';
 import { FileQueueConsumerService } from '../queue/file-queue-consumer.service';
+import { AssistantWorkerConversationService } from './assistant-worker-conversation.service';
 import type { AssistantLlmProvider } from './assistant-llm-provider';
 import { AssistantWorkerProcessorService } from './assistant-worker-processor.service';
 import { CallbackDeliveryService } from './callback-delivery.service';
@@ -26,10 +27,22 @@ describe('AssistantWorkerProcessorService', () => {
     const callbackDeliveryService = {
       send: jest.fn().mockResolvedValue(undefined),
     } as unknown as CallbackDeliveryService;
+    const conversationService = {
+      appendExchange: jest.fn().mockResolvedValue(undefined),
+      read: jest.fn().mockResolvedValue({
+        chat: 'direct',
+        contact: 'alex',
+        context: '',
+        direction: 'api',
+        messages: [],
+        updated_at: null,
+      }),
+    } as unknown as AssistantWorkerConversationService;
     const llmProvider = {
-      generateReply: jest.fn().mockResolvedValue('hello from grok'),
-      modelName: jest.fn().mockReturnValue('grok-4'),
-      providerName: jest.fn().mockReturnValue('grok'),
+      generateReply: jest.fn().mockResolvedValue({
+        context: 'Greeting completed.',
+        message: 'hello from grok',
+      }),
     } as unknown as AssistantLlmProvider;
     const configService = new ConfigService({
       FILE_QUEUE_DIR: queueDir,
@@ -38,6 +51,7 @@ describe('AssistantWorkerProcessorService', () => {
     const metricsService = new AssistantWorkerMetricsService();
     const fileQueueConsumerService = new FileQueueConsumerService(configService);
     const service = new AssistantWorkerProcessorService(
+      conversationService,
       callbackDeliveryService,
       configService,
       metricsService,
@@ -50,6 +64,15 @@ describe('AssistantWorkerProcessorService', () => {
     expect(callbackDeliveryService.send).toHaveBeenCalledWith(
       'http://example.test/callback',
       'hello from grok',
+    );
+    expect(conversationService.appendExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contact: 'alex',
+      }),
+      {
+        context: 'Greeting completed.',
+        message: 'hello from grok',
+      },
     );
     expect(await fileQueueConsumerService.depth()).toBe(0);
   });

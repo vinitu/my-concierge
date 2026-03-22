@@ -15,10 +15,54 @@ export class AssistantWorkerOpenApiController {
       paths: {
         '/': {
           get: {
-            summary: 'Get worker root endpoint',
+            summary: 'Get worker settings page',
             responses: {
               '200': {
-                description: 'Service entrypoint summary',
+                description: 'HTML settings page',
+              },
+            },
+          },
+        },
+        '/config': {
+          get: {
+            summary: 'Get worker runtime config',
+            responses: {
+              '200': {
+                description: 'Current worker config',
+              },
+            },
+          },
+          put: {
+            summary: 'Update worker runtime config',
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      memory_window: { type: 'integer', minimum: 1, maximum: 20 },
+                      model: { type: 'string' },
+                      provider: { type: 'string', enum: ['deepseek', 'xai', 'ollama'] },
+                    },
+                    required: ['provider', 'model', 'memory_window'],
+                  },
+                },
+              },
+            },
+            responses: {
+              '200': {
+                description: 'Updated worker config',
+              },
+            },
+          },
+        },
+        '/provider-status': {
+          get: {
+            summary: 'Get current LLM provider status',
+            responses: {
+              '200': {
+                description: 'Current provider configuration and reachability status',
               },
             },
           },
