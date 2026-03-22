@@ -146,11 +146,17 @@ describe('assistant-worker (e2e)', () => {
   });
 
   it('returns worker metrics', async () => {
+    await request(app.getHttpServer()).get('/status');
+
     const response = await request(app.getHttpServer()).get('/metrics');
 
     expect(response.status).toBe(200);
-    expect(response.text).toContain('assistant_worker_jobs_processed_total');
-    expect(response.text).toContain('assistant_worker_callback_requests_total');
+    expect(response.text).toContain('http_request_time_ms');
+    expect(response.text).toContain(
+      'route="/status",service="assistant-worker",response_code="200"',
+    );
+    expect(response.text).toContain('processed_jobs_total{service="assistant-worker"}');
+    expect(response.text).toContain('callback_requests_total{service="assistant-worker",status=');
   });
 
   it('returns worker OpenAPI schema', async () => {

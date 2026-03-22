@@ -16,10 +16,11 @@ It consists of `assistant-api`, `queue`, and `assistant-worker`.
 
 ```mermaid
 flowchart LR
-    GW["gateways"] <--> API["assistant-api"]
-    Scheduler["scheduler"] <--> API
+    GW["gateways"] --> API["assistant-api"]
+    Scheduler["scheduler"] --> API
     API --> Q["queue"]
     Q --> Worker["assistant-worker"]
+    Worker --> GW
 ```
 
 ## Internal Components
@@ -27,6 +28,13 @@ flowchart LR
 - `assistant-api`
 - `queue`
 - `assistant-worker`
+
+## Direction Rules
+
+- `assistant-api` only accepts requests and writes them to `queue`.
+- `assistant-api` does not send replies to gateways.
+- `scheduler` only triggers new work and does not receive replies from `assistant`.
+- `assistant-worker` is the component that sends callback replies to gateways.
 
 ## Endpoints
 

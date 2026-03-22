@@ -17,8 +17,8 @@
 
 ```mermaid
 flowchart LR
-    GW["gateways"] <--> API["assistant-api"]
-    Scheduler["scheduler"] <--> API
+    GW["gateways"] --> API["assistant-api"]
+    Scheduler["scheduler"] --> API
     API --> Q["queue"]
 ```
 
@@ -37,6 +37,7 @@ flowchart LR
 - Run assistant business logic
 - Call LLM providers for conversation processing
 - Send callback messages
+- Send replies back to gateways
 
 ## Queue Adapter
 
@@ -51,7 +52,7 @@ flowchart LR
 
 | Metric | Type | Labels | Description |
 |---------|---------|---------|-------------|
-| `assistant_api_conversations_accepted_total` | `counter` | none | Total number of accepted conversation requests |
-| `assistant_api_queue_messages` | `gauge` | none | Current number of messages in the queue |
-| `assistant_api_status_requests_total` | `counter` | none | Total number of status endpoint requests |
-| `assistant_api_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |
+| `http_request_time_ms` | `histogram` | `route`, `service`, `response_code` | HTTP request duration in milliseconds |
+| `accepted_messages_total` | `counter` | `service` | Total number of accepted conversation requests |
+| `queue_messages` | `gauge` | `service` | Current number of messages in the queue |
+| `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |

@@ -64,21 +64,17 @@ The current source of truth is the code for these services and the project docum
 - Default local runtime is Docker Compose
 - The system is prepared for home deployment and future horizontal scaling
 
-## Service Structure
+## Services
 
-- [`assistant`](./docs/services/assistant.md): core backend component
-  - [`assistant-api`](./docs/services/assistant-api.md): receives inbound requests from channels, validates payloads, enqueues work, and returns acceptance responses
-  - [`queue`](./docs/services/queue.md): buffers work between `assistant-api` and `assistant-worker`
-  - [`assistant-worker`](./docs/services/assistant-worker.md): reads queued jobs, executes background processing, and sends callback replies to the originating channel
-- `gateways`: channel adapters that accept inbound user traffic and forward it into `assistant`
-  - [`gateway-web`](./docs/services/gateway-web.md): serves the browser chat UI and accepts WebSocket messages from the browser
-  - [`gateway-telegram`](./docs/services/gateway-telegram.md): accepts inbound Telegram messages
-  - [`gateway-email`](./docs/services/gateway-email.md): accepts inbound email messages
-- [`scheduler`](./docs/services/scheduler.md): creates scheduled requests and sends them into `assistant`
+### Structure
+
+- [assistant](./docs/services/assistant.md): core backend component that includes [assistant-api](./docs/services/assistant-api.md), [queue](./docs/services/queue.md), and [assistant-worker](./docs/services/assistant-worker.md)
+- gateway: channel-facing layer that includes [gateway-web](./docs/services/gateway-web.md), [gateway-telegram](./docs/services/gateway-telegram.md), and [gateway-email](./docs/services/gateway-email.md)
+- [scheduler](./docs/services/scheduler.md): scheduled trigger component that only sends requests into `assistant`
 
 ```mermaid
 flowchart LR
-    Scheduler["scheduler"] <--> Assistant
+    Scheduler["scheduler"] --> Assistant
     Browser["Browser"] --> GW["gateway-web"]
     Telegram["Telegram"] --> GT["gateway-telegram"]
     Email["Email"] --> GE["gateway-email"]
@@ -94,14 +90,46 @@ flowchart LR
     end
 ```
 
+### assistant-api
+
+- [assistant-api](./docs/services/assistant-api.md): receives inbound requests, validates them, enqueues work, and exposes operational endpoints without sending replies back to gateways
+
+### assistant-worker
+
+- [assistant-worker](./docs/services/assistant-worker.md): processes queued jobs, sends callback replies, and exposes operational endpoints
+
+### assistant
+
+- [assistant](./docs/services/assistant.md): groups `assistant-api`, `queue`, and `assistant-worker` into the core backend component
+
+### queue
+
+- [queue](./docs/services/queue.md): transports work from `assistant-api` to `assistant-worker`
+
+### gateway-web
+
+- [gateway-web](./docs/services/gateway-web.md): serves the browser chat UI and bridges browser traffic to `assistant`
+
+### gateway-telegram
+
+- [gateway-telegram](./docs/services/gateway-telegram.md): planned Telegram adapter for inbound messages and assistant replies
+
+### gateway-email
+
+- [gateway-email](./docs/services/gateway-email.md): planned Email adapter for inbound messages and assistant replies
+
+### scheduler
+
+- [scheduler](./docs/services/scheduler.md): planned scheduled trigger component that only sends requests into `assistant`
+
+### swagger
+
+- [swagger](./docs/services/swagger.md): serves one shared Swagger UI for the runtime services
+
 ## Metrics
 
 Detailed metrics documentation lives in [docs/operations/metrics.md](./docs/operations/metrics.md).
 It contains the metrics flow diagram and per-service metric tables.
-
-## Swagger
-
-Detailed Swagger documentation lives in [docs/services/swagger.md](./docs/services/swagger.md).
 
 ## Local Ports
 

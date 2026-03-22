@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConversationController } from './conversation.controller';
 import { AssistantApiMetricsController } from './observability/assistant-api-metrics.controller';
 import { AssistantApiMetricsService } from './observability/assistant-api-metrics.service';
+import { HttpRequestMetricsInterceptor } from './observability/http-request-metrics.interceptor';
 import { AssistantApiOpenApiController } from './openapi.controller';
 import { AssistantApiRootController } from './root.controller';
 import { QueueService } from './queue/queue.service';
@@ -26,10 +28,15 @@ import {
   ],
   providers: [
     AssistantApiMetricsService,
+    HttpRequestMetricsInterceptor,
     FileQueueAdapter,
     MemoryQueueAdapter,
     RedisQueueAdapter,
     QueueService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpRequestMetricsInterceptor,
+    },
     {
       provide: QUEUE_ADAPTER,
       inject: [ConfigService, FileQueueAdapter, MemoryQueueAdapter, RedisQueueAdapter],

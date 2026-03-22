@@ -22,13 +22,13 @@ export class ConversationController {
   ) {}
 
   @Post('conversation/:direction/:chat/:contact')
-  @HttpCode(200)
+  @HttpCode(202)
   async acceptConversation(
     @Param('direction') direction: string,
     @Param('chat') chat: string,
     @Param('contact') contact: string,
     @Body() body: ConversationBody,
-  ): Promise<{ response: string }> {
+  ): Promise<{ status: string }> {
     const message = body.message?.trim() ?? '';
     const callbackUrl = body.callback_url?.trim() ?? '';
 
@@ -52,7 +52,7 @@ export class ConversationController {
     await this.metricsService.refreshQueueDepth();
 
     return {
-      response: 'Message accepted',
+      status: 'accepted',
     };
   }
 }

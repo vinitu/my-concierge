@@ -27,8 +27,8 @@ flowchart LR
 
 - `queue` does not expose its own Prometheus endpoint in this repository.
 - Queue depth is surfaced through:
-  - `assistant_api_queue_messages`
-  - `assistant_worker_queue_messages`
+  - `queue_messages{service="assistant-api"}`
+  - `queue_messages{service="assistant-worker"}`
 
 ## Rules
 

@@ -12,13 +12,14 @@ TODO: this service is documented as part of the target architecture but is not i
 
 - Run jobs on a cron schedule
 - Call `assistant-api`
+- Stop after the job is accepted for queueing
 - Expose operational endpoints
 
 ## Planned Relations
 
 ```mermaid
 flowchart LR
-    Scheduler["scheduler"] <--> API["assistant-api"]
+    Scheduler["scheduler"] --> API["assistant-api"]
 ```
 
 ## Planned Endpoints
@@ -33,4 +34,5 @@ flowchart LR
 
 - The scheduler stays thin.
 - It does not run assistant business logic.
+- It does not send replies to gateways.
 - In Kubernetes, scheduled jobs should use `CronJob`.

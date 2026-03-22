@@ -24,28 +24,28 @@ flowchart LR
 
 | Metric | Type | Labels | Description |
 |---------|---------|---------|-------------|
-| `gateway_web_active_websocket_sessions` | `gauge` | none | Current number of active WebSocket sessions |
-| `gateway_web_incoming_messages_total` | `counter` | none | Total number of incoming WebSocket messages |
-| `gateway_web_callbacks_total` | `counter` | `delivered` | Total number of callback deliveries |
-| `gateway_web_assistant_api_requests_total` | `counter` | `status` | Total number of requests from `gateway-web` to `assistant-api` |
-| `gateway_web_status_requests_total` | `counter` | none | Total number of status endpoint requests |
-| `gateway_web_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |
+| `http_request_time_ms` | `histogram` | `route`, `service`, `response_code` | HTTP request duration in milliseconds |
+| `websocket_active_sessions` | `gauge` | `service` | Current number of active WebSocket sessions |
+| `incoming_messages_total` | `counter` | `service`, `transport` | Total number of incoming messages |
+| `callback_deliveries_total` | `counter` | `delivered`, `service` | Total number of callback deliveries |
+| `upstream_requests_total` | `counter` | `service`, `status`, `upstream` | Total number of upstream HTTP requests |
+| `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |
 
 ## `assistant-api`
 
 | Metric | Type | Labels | Description |
 |---------|---------|---------|-------------|
-| `assistant_api_conversations_accepted_total` | `counter` | none | Total number of accepted conversation requests |
-| `assistant_api_queue_messages` | `gauge` | none | Current number of messages in the queue |
-| `assistant_api_status_requests_total` | `counter` | none | Total number of status endpoint requests |
-| `assistant_api_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |
+| `http_request_time_ms` | `histogram` | `route`, `service`, `response_code` | HTTP request duration in milliseconds |
+| `accepted_messages_total` | `counter` | `service` | Total number of accepted conversation requests |
+| `queue_messages` | `gauge` | `service` | Current number of messages in the queue |
+| `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |
 
 ## `assistant-worker`
 
 | Metric | Type | Labels | Description |
 |---------|---------|---------|-------------|
-| `assistant_worker_jobs_processed_total` | `counter` | none | Total number of processed queue jobs |
-| `assistant_worker_callback_requests_total` | `counter` | `status` | Total number of callback requests |
-| `assistant_worker_queue_messages` | `gauge` | none | Current number of queue files visible to `assistant-worker` |
-| `assistant_worker_status_requests_total` | `counter` | none | Total number of status endpoint requests |
-| `assistant_worker_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |
+| `http_request_time_ms` | `histogram` | `route`, `service`, `response_code` | HTTP request duration in milliseconds |
+| `processed_jobs_total` | `counter` | `service` | Total number of processed queue jobs |
+| `callback_requests_total` | `counter` | `service`, `status` | Total number of callback requests |
+| `queue_messages` | `gauge` | `service` | Current number of queue files visible to `assistant-worker` |
+| `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |
