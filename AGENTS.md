@@ -44,6 +44,8 @@ test/
 - All code must be covered by tests
 - Write tests for all new features (unit + e2e)
 - After any code change, run the relevant tests before finishing the task
+- Use only the latest stable versions of libraries and dependencies
+- If a newer stable version is available, update to it immediately
 - Use strict TypeScript — no `any` types
 - Follow NestJS module pattern: each feature gets its own module
 - Keep controllers thin, business logic in services
