@@ -35,12 +35,15 @@ test/
 | `npm run build` | Build the project |
 | `npm run test` | Run unit tests |
 | `npm run test:e2e` | Run e2e tests |
+| `npm run test:all` | Run unit and e2e tests |
 | `npm run lint` | Lint the code |
 | `npm run format` | Format with Prettier |
 
 ## Development guidelines
 
+- All code must be covered by tests
 - Write tests for all new features (unit + e2e)
+- After any code change, run the relevant tests before finishing the task
 - Use strict TypeScript — no `any` types
 - Follow NestJS module pattern: each feature gets its own module
 - Keep controllers thin, business logic in services
