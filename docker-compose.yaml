@@ -35,12 +35,17 @@ services:
       - queue
     environment:
       APP_ROLE: assistant-worker
+      ASSISTANT_DATADIR: ${ASSISTANT_DATADIR:-/app/runtime}
       NODE_ENV: production
       PORT: 3000
       QUEUE_ADAPTER: redis
       REDIS_URL: redis://queue:6379
       REDIS_QUEUE_NAME: assistant:queue
-      WORKER_POLL_INTERVAL_MS: 500
+      WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-500}
+      XAI_API_KEY: ${XAI_API_KEY}
+      XAI_BASE_URL: ${XAI_BASE_URL:-https://api.x.ai/v1}
+      XAI_MODEL: ${XAI_MODEL:-grok-4}
+      XAI_TIMEOUT_MS: ${XAI_TIMEOUT_MS:-360000}
     ports:
       - "3001:3000"
 

@@ -9,6 +9,7 @@ It reads accepted requests from the queue, loads the assistant runtime context f
 
 This document describes the first worker version.
 In this version, `assistant-worker` is only an LLM chat executor and does not execute local skills or local tools.
+The first configured LLM provider is Grok through the xAI Responses API.
 
 ## Responsibilities
 
@@ -136,6 +137,18 @@ The request should include:
 - assistant identity from `IDENTITY.md`
 - relevant memory from `memory/`
 - the queued message and channel metadata
+
+## LLM Provider Configuration
+
+V1 uses Grok through the xAI Responses API.
+
+Main environment variables:
+
+- `XAI_API_KEY`: required xAI API key
+- `XAI_BASE_URL`: xAI API base URL, default `https://api.x.ai/v1`
+- `XAI_MODEL`: Grok model alias, default `grok-4`
+- `XAI_TIMEOUT_MS`: request timeout in milliseconds, default `360000`
+- `ASSISTANT_DATADIR`: worker runtime context directory, default `./runtime`
 
 ## First Version Scope
 

@@ -12,6 +12,10 @@ import {
   type QueueConsumer,
 } from '../queue/queue-consumer';
 import { CallbackDeliveryService } from './callback-delivery.service';
+import {
+  ASSISTANT_LLM_PROVIDER,
+  type AssistantLlmProvider,
+} from './assistant-llm-provider';
 
 @Injectable()
 export class AssistantWorkerProcessorService
@@ -24,7 +28,10 @@ export class AssistantWorkerProcessorService
     private readonly callbackDeliveryService: CallbackDeliveryService,
     private readonly configService: ConfigService,
     private readonly metricsService: AssistantWorkerMetricsService,
-    @Inject(WORKER_QUEUE_CONSUMER) private readonly queueConsumer: QueueConsumer,
+    @Inject(ASSISTANT_LLM_PROVIDER)
+    private readonly llmProvider: AssistantLlmProvider,
+    @Inject(WORKER_QUEUE_CONSUMER)
+    private readonly queueConsumer: QueueConsumer,
   ) {}
 
   onModuleInit(): void {
@@ -77,7 +84,7 @@ export class AssistantWorkerProcessorService
   }
 
   private async handleMessage(item: ProcessingQueueMessage): Promise<void> {
-    const reply = `I received your message: ${item.message}`;
+    const reply = await this.llmProvider.generateReply(item);
 
     try {
       await this.callbackDeliveryService.send(item.callback_url, reply);
