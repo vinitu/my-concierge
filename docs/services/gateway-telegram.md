@@ -4,20 +4,32 @@
 
 Receive Telegram events and send Telegram replies.
 
-## Responsibilities
+## Status
 
-- Accept Telegram inbound events
+TODO: this service is documented as part of the target architecture but is not implemented in this repository yet.
+
+## Planned Responsibilities
+
+- Accept inbound Telegram events
 - Convert them to `assistant-api` requests
 - Expose callback endpoints for Telegram replies
-- Expose `GET /status`
-- Expose `GET /metrics`
+- Expose operational endpoints
 
-## Main Endpoints
+## Planned Relations
 
-- `POST /inbound/telegram`
-- `POST /callbacks/assistant`
-- `GET /status`
-- `GET /metrics`
+```mermaid
+flowchart LR
+    Telegram["Telegram"] <--> Gateway["gateway-telegram"]
+    Gateway <--> API["assistant-api"]
+```
+
+## Planned Endpoints
+
+- TODO
+
+## Planned Metrics
+
+- TODO
 
 ## Rules
 

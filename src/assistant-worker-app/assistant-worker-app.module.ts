@@ -11,6 +11,7 @@ import {
 } from './queue/queue-consumer';
 import { AssistantWorkerProcessorService } from './worker/assistant-worker-processor.service';
 import { CallbackDeliveryService } from './worker/callback-delivery.service';
+import { AssistantWorkerRootController } from './root.controller';
 import { AssistantWorkerStatusController } from './status.controller';
 
 @Module({
@@ -18,6 +19,7 @@ import { AssistantWorkerStatusController } from './status.controller';
   controllers: [
     AssistantWorkerMetricsController,
     AssistantWorkerOpenApiController,
+    AssistantWorkerRootController,
     AssistantWorkerStatusController,
   ],
   providers: [

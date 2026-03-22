@@ -34,6 +34,18 @@ describe('assistant-api (e2e)', () => {
     await app.close();
   });
 
+  it('returns the service root endpoint', async () => {
+    const response = await request(app.getHttpServer()).get('/');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      docs: '/openapi.json',
+      metrics: '/metrics',
+      service: 'assistant-api',
+      status: '/status',
+    });
+  });
+
   it('accepts a conversation and writes it into the file queue', async () => {
     const response = await request(app.getHttpServer())
       .post('/conversation/api/direct/alex')
@@ -87,5 +99,6 @@ describe('assistant-api (e2e)', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.info.title).toBe('assistant-api');
+    expect(response.body.paths['/']).toBeDefined();
   });
 });

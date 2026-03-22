@@ -4,6 +4,7 @@ import { ConversationController } from './conversation.controller';
 import { AssistantApiMetricsController } from './observability/assistant-api-metrics.controller';
 import { AssistantApiMetricsService } from './observability/assistant-api-metrics.service';
 import { AssistantApiOpenApiController } from './openapi.controller';
+import { AssistantApiRootController } from './root.controller';
 import { QueueService } from './queue/queue.service';
 import { FileQueueAdapter } from './queue/file-queue.adapter';
 import { MemoryQueueAdapter } from './queue/memory-queue.adapter';
@@ -19,6 +20,7 @@ import {
   controllers: [
     AssistantApiMetricsController,
     AssistantApiOpenApiController,
+    AssistantApiRootController,
     AssistantApiStatusController,
     ConversationController,
   ],
