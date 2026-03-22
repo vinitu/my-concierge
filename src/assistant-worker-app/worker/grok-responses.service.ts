@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
+import type { AssistantLlmProvider } from './assistant-llm-provider';
 import {
   AssistantWorkerRuntimeContextService,
   type AssistantWorkerRuntimeContext,
@@ -26,11 +27,19 @@ interface XaiResponseBody {
 }
 
 @Injectable()
-export class GrokResponsesService {
+export class GrokResponsesService implements AssistantLlmProvider {
   constructor(
     private readonly configService: ConfigService,
     private readonly runtimeContextService: AssistantWorkerRuntimeContextService,
   ) {}
+
+  modelName(): string {
+    return this.configService.get<string>('XAI_MODEL', 'grok-4');
+  }
+
+  providerName(): string {
+    return 'grok';
+  }
 
   async generateReply(message: QueueMessage): Promise<string> {
     const apiKey = this.configService.get<string>('XAI_API_KEY', '').trim();
@@ -40,7 +49,7 @@ export class GrokResponsesService {
     }
 
     const baseUrl = this.configService.get<string>('XAI_BASE_URL', 'https://api.x.ai/v1');
-    const model = this.configService.get<string>('XAI_MODEL', 'grok-4');
+    const model = this.modelName();
     const timeoutMs = Number.parseInt(
       this.configService.get<string>('XAI_TIMEOUT_MS', '360000'),
       10,

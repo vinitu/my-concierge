@@ -7,6 +7,7 @@ Describe the default local runtime.
 ## Main Services
 
 - `assistant-api`
+- `assistant-worker`
 - `gateway-web`
 
 ## Current Local Example
@@ -62,7 +63,7 @@ Default `ASSISTANT_DATADIR` in the local Docker Compose setup:
 browser -> gateway-web -> assistant-api -> redis queue -> assistant-worker -> callback
 ```
 
-## Future Full Runtime
+## Current Runtime Coverage
 
-- The full documented runtime still includes `assistant-worker`, `queue`, channel gateways, `scheduler`, and `swagger`.
-- Those services are not implemented in this repository yet.
+- `assistant-api`, `assistant-worker`, `queue`, `gateway-web`, and `swagger` are implemented in this repository.
+- `gateway-telegram`, `gateway-email`, and `scheduler` are still planned services.

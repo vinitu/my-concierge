@@ -56,7 +56,7 @@ The current source of truth is the code for these services and the project docum
 - Queue-based asynchronous flow between `assistant-api` and `assistant-worker`
 - `assistant-api` accepts requests, validates them, enqueues jobs, and acknowledges them
 - `assistant-api` supports env-based queue adapters and currently uses Redis by default through `QUEUE_ADAPTER=redis`
-- `assistant-worker` reads queued jobs, sends them to Grok, and returns callback replies
+- `assistant-worker` reads queued jobs, loads runtime context from `runtime/`, sends them to Grok through a provider interface, and returns callback replies
 - `gateway-web` provides the browser chat UI and WebSocket transport
 - `gateway-web` exposes `/`, `WS /ws`, `/callbacks/assistant/:contact`, `/status`, `/metrics`, and `/openapi.json`
 - `assistant-api`, `assistant-worker`, and `gateway-web` expose `/status`, `/metrics`, and OpenAPI documentation
@@ -205,8 +205,8 @@ make down
 
 The local runtime is named `assistant`.
 It is split into `assistant-api` and `assistant-worker`.
-Both parts should start inside the working directory that contains the runtime files.
-Both parts read the core runtime files before serving API traffic or processing queued work.
+The repository contains a separate runtime `datadir` in `runtime/`.
+`assistant-worker` reads the core runtime files from this directory before processing queued work.
 
 Expected runtime files and folders:
 

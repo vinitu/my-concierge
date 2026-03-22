@@ -11,15 +11,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { AssistantWorkerAppModule } from '../src/assistant-worker-app/assistant-worker-app.module';
-import { GrokResponsesService } from '../src/assistant-worker-app/worker/grok-responses.service';
+import { ASSISTANT_LLM_PROVIDER } from '../src/assistant-worker-app/worker/assistant-llm-provider';
 
 describe('assistant-worker (e2e)', () => {
   let app: NestExpressApplication;
   let callbackMessages: string[] = [];
   let callbackServer: ReturnType<typeof createServer>;
   let callbackUrl = '';
-  const grokResponsesService = {
+  const llmProvider = {
     generateReply: jest.fn().mockResolvedValue('hello from grok'),
+    modelName: jest.fn().mockReturnValue('grok-4'),
+    providerName: jest.fn().mockReturnValue('grok'),
   };
   let queueDir: string;
 
@@ -55,8 +57,8 @@ describe('assistant-worker (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AssistantWorkerAppModule],
     })
-      .overrideProvider(GrokResponsesService)
-      .useValue(grokResponsesService)
+      .overrideProvider(ASSISTANT_LLM_PROVIDER)
+      .useValue(llmProvider)
       .overrideProvider(ConfigService)
       .useValue(
         new ConfigService({

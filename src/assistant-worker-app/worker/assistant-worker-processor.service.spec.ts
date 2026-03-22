@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AssistantWorkerMetricsService } from '../observability/assistant-worker-metrics.service';
 import { FileQueueConsumerService } from '../queue/file-queue-consumer.service';
+import type { AssistantLlmProvider } from './assistant-llm-provider';
 import { AssistantWorkerProcessorService } from './assistant-worker-processor.service';
 import { CallbackDeliveryService } from './callback-delivery.service';
-import { GrokResponsesService } from './grok-responses.service';
 
 describe('AssistantWorkerProcessorService', () => {
   it('reads a file queue message and sends a callback', async () => {
@@ -26,9 +26,11 @@ describe('AssistantWorkerProcessorService', () => {
     const callbackDeliveryService = {
       send: jest.fn().mockResolvedValue(undefined),
     } as unknown as CallbackDeliveryService;
-    const grokResponsesService = {
+    const llmProvider = {
       generateReply: jest.fn().mockResolvedValue('hello from grok'),
-    } as unknown as GrokResponsesService;
+      modelName: jest.fn().mockReturnValue('grok-4'),
+      providerName: jest.fn().mockReturnValue('grok'),
+    } as unknown as AssistantLlmProvider;
     const configService = new ConfigService({
       FILE_QUEUE_DIR: queueDir,
       WORKER_POLL_INTERVAL_MS: '1000',
@@ -38,8 +40,8 @@ describe('AssistantWorkerProcessorService', () => {
     const service = new AssistantWorkerProcessorService(
       callbackDeliveryService,
       configService,
-      grokResponsesService,
       metricsService,
+      llmProvider,
       fileQueueConsumerService,
     );
 

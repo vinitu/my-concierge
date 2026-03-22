@@ -7,8 +7,8 @@ Describe how the project should be stored in the repository.
 ## Current Layout Model
 
 The project stays in one repository.
-Right now, `gateway-web` and `assistant-api` are implemented.
-To keep the first version simple, both implemented services live in the repository root.
+Right now, `gateway-web`, `assistant-api`, and `assistant-worker` are implemented.
+To keep the first version simple, the implemented services live in the repository root.
 
 ## Current Top-Level Layout
 
@@ -48,11 +48,21 @@ my-concierge/
     contracts/
     deployment/
     operations/
+
+  runtime/
+    AGENTS.md
+    SOUL.md
+    IDENTITY.md
+    skills/
+    memory/
+    data/
+    logs/
+    cache/
 ```
 
 ## Why The Current Layout Is Small
 
-- There are only two real services today.
+- There are only a few real services today.
 - The code stays easy to read.
 - There is no extra monorepo framework yet.
 - The repository does not create shared packages before they are needed.

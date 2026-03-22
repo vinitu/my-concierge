@@ -37,7 +37,9 @@ Describe the main components and their boundaries.
 
 - Reads jobs from the queue
 - Runs assistant business logic
-- Calls LLM providers and shared integrations
+- Loads assistant runtime context from `datadir`
+- Calls LLM providers through one shared provider interface
+- Uses Grok as the first configured provider in V1
 - Sends callback requests
 - Exposes `GET /status`
 - Exposes `GET /metrics`
@@ -91,3 +93,4 @@ Describe the main components and their boundaries.
 - `assistant-api` and `assistant-worker` communicate only through the queue.
 - `assistant-api` does not send replies to gateways.
 - `scheduler` only triggers work and does not receive assistant replies.
+- LLM provider selection must stay behind one worker-facing interface.

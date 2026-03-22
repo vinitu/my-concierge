@@ -12,7 +12,10 @@ import {
   type QueueConsumer,
 } from '../queue/queue-consumer';
 import { CallbackDeliveryService } from './callback-delivery.service';
-import { GrokResponsesService } from './grok-responses.service';
+import {
+  ASSISTANT_LLM_PROVIDER,
+  type AssistantLlmProvider,
+} from './assistant-llm-provider';
 
 @Injectable()
 export class AssistantWorkerProcessorService
@@ -24,9 +27,11 @@ export class AssistantWorkerProcessorService
   constructor(
     private readonly callbackDeliveryService: CallbackDeliveryService,
     private readonly configService: ConfigService,
-    private readonly grokResponsesService: GrokResponsesService,
     private readonly metricsService: AssistantWorkerMetricsService,
-    @Inject(WORKER_QUEUE_CONSUMER) private readonly queueConsumer: QueueConsumer,
+    @Inject(ASSISTANT_LLM_PROVIDER)
+    private readonly llmProvider: AssistantLlmProvider,
+    @Inject(WORKER_QUEUE_CONSUMER)
+    private readonly queueConsumer: QueueConsumer,
   ) {}
 
   onModuleInit(): void {
@@ -79,7 +84,7 @@ export class AssistantWorkerProcessorService
   }
 
   private async handleMessage(item: ProcessingQueueMessage): Promise<void> {
-    const reply = await this.grokResponsesService.generateReply(item);
+    const reply = await this.llmProvider.generateReply(item);
 
     try {
       await this.callbackDeliveryService.send(item.callback_url, reply);
