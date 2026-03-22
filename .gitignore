@@ -11,6 +11,10 @@ yarn-error.log*
 pnpm-debug.log*
 runtime/memory/*
 !runtime/memory/README.md
+runtime/config/*
+!runtime/config/README.md
+runtime/conversations/*
+!runtime/conversations/README.md
 runtime/data
 runtime/logs
 runtime/cache

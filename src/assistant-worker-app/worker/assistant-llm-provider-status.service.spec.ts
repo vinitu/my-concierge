@@ -1,5 +1,6 @@
 import { AssistantLlmProviderStatusService } from './assistant-llm-provider-status.service';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
+import { DeepseekProviderStatusService } from './deepseek-provider-status.service';
 import { OllamaProviderStatusService } from './ollama-provider-status.service';
 import { XaiProviderStatusService } from './xai-provider-status.service';
 
@@ -9,6 +10,16 @@ describe('AssistantLlmProviderStatusService', () => {
       {
         read: jest.fn().mockResolvedValue({ provider: 'xai' }),
       } as unknown as AssistantWorkerConfigService,
+      {
+        getStatus: jest.fn().mockResolvedValue({
+          apiKeyConfigured: true,
+          message: 'deepseek ready',
+          model: 'deepseek-chat',
+          provider: 'deepseek',
+          reachable: true,
+          status: 'ready',
+        }),
+      } as unknown as DeepseekProviderStatusService,
       {
         getStatus: jest.fn().mockResolvedValue({
           apiKeyConfigured: null,
@@ -48,6 +59,16 @@ describe('AssistantLlmProviderStatusService', () => {
       } as unknown as AssistantWorkerConfigService,
       {
         getStatus: jest.fn().mockResolvedValue({
+          apiKeyConfigured: true,
+          message: 'deepseek ready',
+          model: 'deepseek-chat',
+          provider: 'deepseek',
+          reachable: true,
+          status: 'ready',
+        }),
+      } as unknown as DeepseekProviderStatusService,
+      {
+        getStatus: jest.fn().mockResolvedValue({
           apiKeyConfigured: null,
           message: 'ollama ready',
           model: 'gemma3:1b',
@@ -73,6 +94,53 @@ describe('AssistantLlmProviderStatusService', () => {
       message: 'ollama ready',
       model: 'gemma3:1b',
       provider: 'ollama',
+      reachable: true,
+      status: 'ready',
+    });
+  });
+
+  it('returns deepseek status when deepseek is selected', async () => {
+    const service = new AssistantLlmProviderStatusService(
+      {
+        read: jest.fn().mockResolvedValue({ provider: 'deepseek' }),
+      } as unknown as AssistantWorkerConfigService,
+      {
+        getStatus: jest.fn().mockResolvedValue({
+          apiKeyConfigured: true,
+          message: 'deepseek ready',
+          model: 'deepseek-chat',
+          provider: 'deepseek',
+          reachable: true,
+          status: 'ready',
+        }),
+      } as unknown as DeepseekProviderStatusService,
+      {
+        getStatus: jest.fn().mockResolvedValue({
+          apiKeyConfigured: null,
+          message: 'ollama ready',
+          model: 'gemma3:1b',
+          provider: 'ollama',
+          reachable: true,
+          status: 'ready',
+        }),
+      } as unknown as OllamaProviderStatusService,
+      {
+        getStatus: jest.fn().mockResolvedValue({
+          apiKeyConfigured: true,
+          message: 'xai ready',
+          model: 'grok-4',
+          provider: 'xai',
+          reachable: true,
+          status: 'ready',
+        }),
+      } as unknown as XaiProviderStatusService,
+    );
+
+    await expect(service.getStatus()).resolves.toEqual({
+      apiKeyConfigured: true,
+      message: 'deepseek ready',
+      model: 'deepseek-chat',
+      provider: 'deepseek',
       reachable: true,
       status: 'ready',
     });

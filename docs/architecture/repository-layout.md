@@ -50,11 +50,13 @@ my-concierge/
     operations/
 
   runtime/
-    AGENTS.md
-    SOUL.md
-    IDENTITY.md
+    SYSTEM.js
+    SOUL.js
+    IDENTITY.js
+    prompts/
     skills/
     memory/
+    conversations/
     config/
     data/
     logs/

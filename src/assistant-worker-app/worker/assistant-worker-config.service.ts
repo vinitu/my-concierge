@@ -7,16 +7,24 @@ import {
 } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AssistantWorkerProvider } from './assistant-llm-provider';
+import {
+  defaultModelForProvider,
+  STATIC_PROVIDER_MODELS,
+} from './assistant-llm-model-catalog';
 
 export interface AssistantWorkerConfig {
+  model: string;
+  memory_window: number;
   provider: AssistantWorkerProvider;
 }
 
 const DEFAULT_WORKER_CONFIG: AssistantWorkerConfig = {
+  memory_window: 3,
+  model: defaultModelForProvider('xai'),
   provider: 'xai',
 };
 
-const SUPPORTED_WORKER_PROVIDERS: AssistantWorkerProvider[] = ['xai', 'ollama'];
+const SUPPORTED_WORKER_PROVIDERS: AssistantWorkerProvider[] = ['xai', 'ollama', 'deepseek'];
 
 @Injectable()
 export class AssistantWorkerConfigService {
@@ -30,6 +38,11 @@ export class AssistantWorkerConfigService {
       const parsed = JSON.parse(content) as Partial<AssistantWorkerConfig>;
 
       return {
+        model: this.normalizeModel(
+          this.normalizeProvider(parsed.provider),
+          parsed.model,
+        ),
+        memory_window: this.normalizeMemoryWindow(parsed.memory_window),
         provider: this.normalizeProvider(parsed.provider),
       };
     } catch (error) {
@@ -43,8 +56,11 @@ export class AssistantWorkerConfigService {
   }
 
   async write(config: AssistantWorkerConfig): Promise<AssistantWorkerConfig> {
+    const provider = this.normalizeProvider(config.provider);
     const normalizedConfig: AssistantWorkerConfig = {
-      provider: this.normalizeProvider(config.provider),
+      model: this.normalizeModel(provider, config.model),
+      memory_window: this.normalizeMemoryWindow(config.memory_window),
+      provider,
     };
 
     await mkdir(this.configDirectory(), { recursive: true });
@@ -77,6 +93,38 @@ export class AssistantWorkerConfigService {
     }
 
     return DEFAULT_WORKER_CONFIG.provider;
+  }
+
+  private normalizeModel(provider: AssistantWorkerProvider, value: unknown): string {
+    if (typeof value === 'string' && value.trim()) {
+      const normalized = value.trim();
+
+      if (provider === 'ollama') {
+        return normalized;
+      }
+
+      if (STATIC_PROVIDER_MODELS[provider].includes(normalized)) {
+        return normalized;
+      }
+    }
+
+    return defaultModelForProvider(provider);
+  }
+
+  private normalizeMemoryWindow(value: unknown): number {
+    if (typeof value === 'number' && Number.isInteger(value)) {
+      return Math.min(20, Math.max(1, value));
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number.parseInt(value.trim(), 10);
+
+      if (Number.isInteger(parsed)) {
+        return Math.min(20, Math.max(1, parsed));
+      }
+    }
+
+    return DEFAULT_WORKER_CONFIG.memory_window;
   }
 
   private isMissingPath(error: unknown): boolean {

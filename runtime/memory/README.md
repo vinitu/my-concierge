@@ -1,9 +1,4 @@
-# Runtime Memory
-
-Store assistant memory files in this directory.
-
-Examples:
-
-- preferences
-- recurring tasks
-- important household context
+- Store persistent facts for the assistant in this directory.
+- Use markdown or text files with simple bullet facts.
+- Examples: preferences, recurring tasks, important household context.
+- These files are read by `assistant-worker` and included in the LLM prompt as history facts.

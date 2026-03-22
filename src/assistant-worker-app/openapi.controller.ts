@@ -41,9 +41,11 @@ export class AssistantWorkerOpenApiController {
                   schema: {
                     type: 'object',
                     properties: {
-                      provider: { type: 'string', enum: ['xai', 'ollama'] },
+                      memory_window: { type: 'integer', minimum: 1, maximum: 20 },
+                      model: { type: 'string' },
+                      provider: { type: 'string', enum: ['deepseek', 'xai', 'ollama'] },
                     },
-                    required: ['provider'],
+                    required: ['provider', 'model', 'memory_window'],
                   },
                 },
               },

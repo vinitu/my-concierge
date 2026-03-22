@@ -4,6 +4,7 @@ import {
   AssistantWorkerConfigService,
   type AssistantWorkerConfig,
 } from './assistant-worker-config.service';
+import { DeepseekProviderStatusService } from './deepseek-provider-status.service';
 import { OllamaProviderStatusService } from './ollama-provider-status.service';
 import { XaiProviderStatusService } from './xai-provider-status.service';
 
@@ -11,6 +12,7 @@ import { XaiProviderStatusService } from './xai-provider-status.service';
 export class AssistantLlmProviderStatusService {
   constructor(
     private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
+    private readonly deepseekProviderStatusService: DeepseekProviderStatusService,
     private readonly ollamaProviderStatusService: OllamaProviderStatusService,
     private readonly xaiProviderStatusService: XaiProviderStatusService,
   ) {}
@@ -22,7 +24,11 @@ export class AssistantLlmProviderStatusService {
 
   private selectProvider(
     config: AssistantWorkerConfig,
-  ): OllamaProviderStatusService | XaiProviderStatusService {
+  ): DeepseekProviderStatusService | OllamaProviderStatusService | XaiProviderStatusService {
+    if (config.provider === 'deepseek') {
+      return this.deepseekProviderStatusService;
+    }
+
     if (config.provider === 'xai') {
       return this.xaiProviderStatusService;
     }

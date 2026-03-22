@@ -5,9 +5,9 @@ import type { AssistantWorkerRuntimeContext } from './assistant-worker-runtime-c
 import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
 import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
 import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
-import { OllamaChatService } from './ollama-chat.service';
+import { DeepseekChatService } from './deepseek-chat.service';
 
-describe('OllamaChatService', () => {
+describe('DeepseekChatService', () => {
   const runtimeContext: AssistantWorkerRuntimeContext = {
     agents: '["agent rules"]',
     datadir: '/runtime',
@@ -16,9 +16,7 @@ describe('OllamaChatService', () => {
     soul: `[
   "Stay calm in the dialogue.",
   "Preserve a natural conversational tone.",
-  "Be direct and practical.",
-  "Keep responses concise by default.",
-  "Be helpful without unnecessary explanation."
+  "Be direct and practical."
 ]`,
   };
   const queueMessage: QueueMessage = {
@@ -33,25 +31,29 @@ describe('OllamaChatService', () => {
     jest.restoreAllMocks();
   });
 
-  it('sends a non-streaming chat request to Ollama and returns assistant text', async () => {
+  it('sends an OpenAI-compatible chat request to DeepSeek and returns assistant text', async () => {
     const runtimeContextService = {
       load: jest.fn().mockResolvedValue(runtimeContext),
     } as unknown as AssistantWorkerRuntimeContextService;
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       json: async () => ({
-        message: {
-          content: '{"message":"Everything looks normal.","context":"Home status is normal."}',
-        },
+        choices: [
+          {
+            message: {
+              content: '{"message":"Everything looks normal.","context":"The active topic is current house status."}',
+            },
+          },
+        ],
       }),
       ok: true,
     } as Response);
-    const service = new OllamaChatService(
+    const service = new DeepseekChatService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'deepseek-r1:latest', provider: 'ollama' }),
+        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'deepseek-reasoner', provider: 'deepseek' }),
       } as unknown as AssistantWorkerConfigService,
       new ConfigService({
         ASSISTANT_DATADIR: '/runtime',
-        OLLAMA_BASE_URL: 'http://host.docker.internal:11434',
+        DEEPSEEK_API_KEY: 'test-key',
       }),
       new AssistantWorkerPromptTemplateService(
         new ConfigService({
@@ -75,16 +77,17 @@ describe('OllamaChatService', () => {
         message: queueMessage,
       }),
     ).resolves.toEqual({
-      context: 'Home status is normal.',
+      context: 'The active topic is current house status.',
       message: 'Everything looks normal.',
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://host.docker.internal:11434/api/chat',
+      'https://api.deepseek.com/chat/completions',
       expect.objectContaining({
-        headers: {
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-key',
           'Content-Type': 'application/json',
-        },
+        }),
         method: 'POST',
       }),
     );
@@ -95,28 +98,19 @@ describe('OllamaChatService', () => {
       throw new Error('fetch body is missing');
     }
 
-    expect(JSON.parse(init.body).model).toBe('deepseek-r1:latest');
+    expect(JSON.parse(init.body).model).toBe('deepseek-reasoner');
   });
 
-  it('rejects non-json assistant replies from Ollama', async () => {
+  it('fails fast when DEEPSEEK_API_KEY is missing', async () => {
     const runtimeContextService = {
       load: jest.fn().mockResolvedValue(runtimeContext),
     } as unknown as AssistantWorkerRuntimeContextService;
-    jest.spyOn(globalThis, 'fetch').mockResolvedValue({
-      json: async () => ({
-        message: {
-          content: 'Everything looks normal.',
-        },
-      }),
-      ok: true,
-    } as Response);
-    const service = new OllamaChatService(
+    const service = new DeepseekChatService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'gemma3:1b', provider: 'ollama' }),
+        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'deepseek-chat', provider: 'deepseek' }),
       } as unknown as AssistantWorkerConfigService,
       new ConfigService({
         ASSISTANT_DATADIR: '/runtime',
-        OLLAMA_BASE_URL: 'http://host.docker.internal:11434',
       }),
       new AssistantWorkerPromptTemplateService(
         new ConfigService({
@@ -139,6 +133,6 @@ describe('OllamaChatService', () => {
         },
         message: queueMessage,
       }),
-    ).rejects.toThrow('LLM response must be valid JSON');
+    ).rejects.toThrow('DEEPSEEK_API_KEY is required for assistant-worker');
   });
 });

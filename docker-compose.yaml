@@ -42,6 +42,10 @@ services:
       REDIS_URL: redis://queue:6379
       REDIS_QUEUE_NAME: assistant:queue
       WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-500}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      DEEPSEEK_TIMEOUT_MS: ${DEEPSEEK_TIMEOUT_MS:-360000}
       XAI_API_KEY: ${XAI_API_KEY}
       XAI_BASE_URL: ${XAI_BASE_URL:-https://api.x.ai/v1}
       XAI_MODEL: ${XAI_MODEL:-grok-4}
@@ -51,6 +55,8 @@ services:
       OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-360000}
     ports:
       - "3001:3000"
+    volumes:
+      - ./runtime:/app/runtime
 
   gateway-telegram:
     image: myconcierge-gateway-telegram:local

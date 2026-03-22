@@ -17,6 +17,8 @@ describe('AssistantWorkerConfigService', () => {
     );
 
     await expect(service.read()).resolves.toEqual({
+      model: 'grok-4',
+      memory_window: 3,
       provider: 'xai',
     });
 
@@ -33,7 +35,9 @@ describe('AssistantWorkerConfigService', () => {
       }),
     );
 
-    await expect(service.write({ provider: 'xai' })).resolves.toEqual({
+    await expect(service.write({ memory_window: 3, model: 'grok-4', provider: 'xai' })).resolves.toEqual({
+      model: 'grok-4',
+      memory_window: 3,
       provider: 'xai',
     });
 
@@ -50,8 +54,16 @@ describe('AssistantWorkerConfigService', () => {
       }),
     );
 
-    await expect(service.write({ provider: 'OLLAMA' as never })).resolves.toEqual({
+    await expect(service.write({ memory_window: 9, model: 'deepseek-r1:latest', provider: 'OLLAMA' as never })).resolves.toEqual({
+      model: 'deepseek-r1:latest',
+      memory_window: 9,
       provider: 'ollama',
+    });
+
+    await expect(service.write({ memory_window: 9, model: 'deepseek-reasoner', provider: 'DEEPSEEK' as never })).resolves.toEqual({
+      model: 'deepseek-reasoner',
+      memory_window: 9,
+      provider: 'deepseek',
     });
   });
 });

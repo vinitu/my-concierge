@@ -58,7 +58,8 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - Docker Compose is the default deployment mode.
 - A queue is required between API intake and worker execution.
 - One shared Swagger UI is preferred over multiple Swagger UI services.
-- The runtime reads `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `skills/`, and `memory/` from a separate `datadir`.
+- The runtime reads `SYSTEM.js`, `SOUL.js`, `IDENTITY.js`, `skills/`, and `memory/` from a separate `datadir`.
+- The runtime reserves `conversations/` in the same `datadir` for conversation history and future context retention.
 
 ### Done checks
 - The documentation is split into overview, architecture, services, contracts, deployment, and operations.

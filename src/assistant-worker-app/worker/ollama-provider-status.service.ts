@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { AssistantLlmProviderStatus } from './assistant-llm-provider-status';
+import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 
 interface OllamaTagsResponse {
   models?: Array<{
@@ -11,11 +12,46 @@ interface OllamaTagsResponse {
 
 @Injectable()
 export class OllamaProviderStatusService {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  async listAvailableModels(): Promise<string[]> {
+    const baseUrl = this.configService.get<string>('OLLAMA_BASE_URL', 'http://host.docker.internal:11434');
+    const timeoutMs = Number.parseInt(
+      this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
+      10,
+    );
+
+    try {
+      const response = await fetch(`${baseUrl}/api/tags`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const body = (await response.json()) as OllamaTagsResponse;
+      const models = (body.models ?? [])
+        .flatMap((entry) => [entry.name, entry.model])
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+
+      return [...new Set(models)];
+    } catch {
+      return [];
+    }
+  }
 
   async getStatus(): Promise<AssistantLlmProviderStatus> {
     const baseUrl = this.configService.get<string>('OLLAMA_BASE_URL', 'http://host.docker.internal:11434');
-    const model = this.configService.get<string>('OLLAMA_MODEL', 'gemma3:1b');
+    const config = await this.assistantWorkerConfigService.read();
+    const model =
+      config.provider === 'ollama'
+        ? config.model
+        : this.configService.get<string>('OLLAMA_MODEL', 'gemma3:1b');
     const timeoutMs = Number.parseInt(
       this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
       10,
@@ -41,9 +77,7 @@ export class OllamaProviderStatusService {
       }
 
       const body = (await response.json()) as OllamaTagsResponse;
-      const hasModel = (body.models ?? []).some(
-        (entry) => entry.name === model || entry.model === model,
-      );
+      const hasModel = (body.models ?? []).some((entry) => entry.name === model || entry.model === model);
 
       if (!hasModel) {
         return {

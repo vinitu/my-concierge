@@ -15,16 +15,20 @@ import { AssistantWorkerConfigService } from './assistant-worker-config.service'
 import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
 import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 
-interface OllamaChatResponse {
-  error?: string;
-  message?: {
-    content?: string;
+interface DeepseekChatCompletionResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+  error?: {
+    message?: string;
   };
 }
 
 @Injectable()
-export class OllamaChatService implements AssistantLlmProvider {
-  private readonly logger = new Logger(OllamaChatService.name);
+export class DeepseekChatService implements AssistantLlmProvider {
+  private readonly logger = new Logger(DeepseekChatService.name);
 
   constructor(
     private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
@@ -35,16 +39,22 @@ export class OllamaChatService implements AssistantLlmProvider {
 
   private async modelName(): Promise<string> {
     const config = await this.assistantWorkerConfigService.read();
-    return config.provider === 'ollama'
+    return config.provider === 'deepseek'
       ? config.model
-      : this.configService.get<string>('OLLAMA_MODEL', 'gemma3:1b');
+      : this.configService.get<string>('DEEPSEEK_MODEL', 'deepseek-chat');
   }
 
   async generateReply(input: AssistantLlmGenerateInput): Promise<AssistantLlmGenerateResult> {
-    const baseUrl = this.configService.get<string>('OLLAMA_BASE_URL', 'http://host.docker.internal:11434');
+    const apiKey = this.configService.get<string>('DEEPSEEK_API_KEY', '').trim();
+
+    if (!apiKey) {
+      throw new Error('DEEPSEEK_API_KEY is required for assistant-worker');
+    }
+
+    const baseUrl = this.configService.get<string>('DEEPSEEK_BASE_URL', 'https://api.deepseek.com');
     const model = await this.modelName();
     const timeoutMs = Number.parseInt(
-      this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
+      this.configService.get<string>('DEEPSEEK_TIMEOUT_MS', '360000'),
       10,
     );
     const runtimeContext = await this.runtimeContextService.load();
@@ -62,10 +72,13 @@ export class OllamaChatService implements AssistantLlmProvider {
       model,
       stream: false,
     };
-    this.logger.debug(`Ollama reply request: ${JSON.stringify(requestBody)}`);
-    const response = await fetch(`${baseUrl}/api/chat`, {
+
+    this.logger.debug(`DeepSeek reply request: ${JSON.stringify(requestBody)}`);
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
@@ -74,20 +87,20 @@ export class OllamaChatService implements AssistantLlmProvider {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(`Ollama API returned ${response.status}: ${errorBody}`);
+      throw new Error(`DeepSeek API returned ${response.status}: ${errorBody}`);
     }
 
-    const body = (await response.json()) as OllamaChatResponse;
-    const content = body.message?.content?.trim();
+    const body = (await response.json()) as DeepseekChatCompletionResponse;
+    const content = body.choices?.[0]?.message?.content?.trim();
 
     if (content) {
       return parseAssistantLlmResult(content);
     }
 
-    if (body.error) {
-      throw new Error(`Ollama API error: ${body.error}`);
+    if (body.error?.message) {
+      throw new Error(`DeepSeek API error: ${body.error.message}`);
     }
 
-    throw new Error('Ollama API response did not contain assistant text');
+    throw new Error('DeepSeek API response did not contain assistant text');
   }
 }

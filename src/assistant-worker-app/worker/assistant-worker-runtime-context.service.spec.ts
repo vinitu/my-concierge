@@ -14,9 +14,9 @@ describe('AssistantWorkerRuntimeContextService', () => {
     const memoryDir = join(datadir, 'memory', 'notes');
 
     await mkdir(memoryDir, { recursive: true });
-    await writeFile(join(datadir, 'AGENTS.md'), 'agent rules', 'utf8');
-    await writeFile(join(datadir, 'SOUL.md'), 'assistant soul', 'utf8');
-    await writeFile(join(datadir, 'IDENTITY.md'), 'assistant identity', 'utf8');
+    await writeFile(join(datadir, 'SYSTEM.js'), '["agent rules"]', 'utf8');
+    await writeFile(join(datadir, 'SOUL.js'), '["Stay calm in the dialogue."]', 'utf8');
+    await writeFile(join(datadir, 'IDENTITY.js'), '["assistant identity"]', 'utf8');
     await writeFile(join(memoryDir, 'todo.md'), 'remember this', 'utf8');
 
     const service = new AssistantWorkerRuntimeContextService(
@@ -26,16 +26,16 @@ describe('AssistantWorkerRuntimeContextService', () => {
     );
 
     await expect(service.load()).resolves.toEqual({
-      agents: 'agent rules',
+      agents: '["agent rules"]',
       datadir,
-      identity: 'assistant identity',
+      identity: '["assistant identity"]',
       memory: [
         {
           content: 'remember this',
           path: 'memory/notes/todo.md',
         },
       ],
-      soul: 'assistant soul',
+      soul: '["Stay calm in the dialogue."]',
     });
   });
 

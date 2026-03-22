@@ -22,7 +22,10 @@ describe('assistant-worker (e2e)', () => {
   let callbackUrl = '';
   let datadir: string;
   const llmProvider = {
-    generateReply: jest.fn().mockResolvedValue('hello from grok'),
+    generateReply: jest.fn().mockResolvedValue({
+      context: 'Greeting completed.',
+      message: 'hello from grok',
+    }),
   };
   const providerStatus = {
     getStatus: jest.fn().mockResolvedValue({
@@ -113,8 +116,10 @@ describe('assistant-worker (e2e)', () => {
     expect(response.status).toBe(200);
     expect(response.text).toContain('assistant-worker');
     expect(response.text).toContain('runtime/config/worker.json');
+    expect(response.text).toContain('<option value="deepseek">deepseek</option>');
     expect(response.text).toContain('<option value="xai" selected>');
     expect(response.text).toContain('<option value="ollama">ollama</option>');
+    expect(response.text).toContain('value="3"');
     expect(response.text).toContain('Credential: <span id="provider-credential">missing</span>');
     expect(response.text).toContain('Reachability: <span id="provider-reachable">not working</span>');
   });
@@ -124,20 +129,32 @@ describe('assistant-worker (e2e)', () => {
 
     expect(getResponse.status).toBe(200);
     expect(getResponse.body).toEqual({
+      model: 'grok-4',
+      memory_window: 3,
       provider: 'xai',
     });
 
     const putResponse = await request(app.getHttpServer()).put('/config').send({
-      provider: 'ollama',
+      model: 'deepseek-chat',
+      memory_window: 5,
+      provider: 'deepseek',
     });
 
     expect(putResponse.status).toBe(200);
     expect(putResponse.body).toEqual({
-      provider: 'ollama',
+      model: 'deepseek-chat',
+      memory_window: 5,
+      provider: 'deepseek',
     });
 
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
-      '"provider": "ollama"',
+      '"memory_window": 5',
+    );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"provider": "deepseek"',
+    );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"model": "deepseek-chat"',
     );
   });
 
@@ -164,6 +181,20 @@ describe('assistant-worker (e2e)', () => {
 
     expect(callbackMessages).toHaveLength(1);
     expect(callbackMessages[0]).toContain('hello from grok');
+    const conversationPath = join(datadir, 'conversations', 'api', 'direct', 'alex.json');
+    let storedConversation = '';
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      try {
+        storedConversation = await readFile(conversationPath, 'utf8');
+        break;
+      } catch {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+    }
+
+    expect(storedConversation).toContain('"messages"');
+    expect(storedConversation).toContain('"context": "Greeting completed."');
 
     let files = await readdir(queueDir);
 
@@ -206,6 +237,26 @@ describe('assistant-worker (e2e)', () => {
   });
 
   it('returns worker metrics', async () => {
+    await writeFile(
+      join(queueDir, 'metrics.json'),
+      JSON.stringify({
+        callback_url: callbackUrl,
+        chat: 'direct',
+        contact: 'alex',
+        direction: 'api',
+        message: 'metrics job',
+      }),
+      'utf8',
+    );
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      if (callbackMessages.length > 0) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
     await request(app.getHttpServer()).get('/status');
 
     const response = await request(app.getHttpServer()).get('/metrics');

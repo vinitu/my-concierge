@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 import { XaiProviderStatusService } from './xai-provider-status.service';
 
 describe('XaiProviderStatusService', () => {
@@ -7,12 +8,17 @@ describe('XaiProviderStatusService', () => {
   });
 
   it('returns missing_key when XAI_API_KEY is not configured', async () => {
-    const service = new XaiProviderStatusService(new ConfigService({}));
+    const service = new XaiProviderStatusService(
+      {
+        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'grok-4-latest', provider: 'xai' }),
+      } as unknown as AssistantWorkerConfigService,
+      new ConfigService({}),
+    );
 
     await expect(service.getStatus()).resolves.toEqual({
       apiKeyConfigured: false,
       message: 'XAI_API_KEY is not configured',
-      model: 'grok-4',
+      model: 'grok-4-latest',
       provider: 'xai',
       reachable: false,
       status: 'missing_key',
@@ -24,6 +30,9 @@ describe('XaiProviderStatusService', () => {
       ok: true,
     } as Response);
     const service = new XaiProviderStatusService(
+      {
+        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'grok-4-latest', provider: 'xai' }),
+      } as unknown as AssistantWorkerConfigService,
       new ConfigService({
         XAI_API_KEY: 'test-key',
       }),
@@ -32,7 +41,7 @@ describe('XaiProviderStatusService', () => {
     await expect(service.getStatus()).resolves.toEqual({
       apiKeyConfigured: true,
       message: 'xAI API is reachable',
-      model: 'grok-4',
+      model: 'grok-4-latest',
       provider: 'xai',
       reachable: true,
       status: 'ready',
@@ -56,6 +65,9 @@ describe('XaiProviderStatusService', () => {
       text: async () => 'invalid api key',
     } as Response);
     const service = new XaiProviderStatusService(
+      {
+        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'grok-4-latest', provider: 'xai' }),
+      } as unknown as AssistantWorkerConfigService,
       new ConfigService({
         XAI_API_KEY: 'bad-key',
       }),
@@ -64,7 +76,7 @@ describe('XaiProviderStatusService', () => {
     await expect(service.getStatus()).resolves.toEqual({
       apiKeyConfigured: true,
       message: 'xAI check failed with 401: invalid api key',
-      model: 'grok-4',
+      model: 'grok-4-latest',
       provider: 'xai',
       reachable: false,
       status: 'error',
