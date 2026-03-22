@@ -6,6 +6,7 @@ import { AssistantWorkerMetricsService } from '../observability/assistant-worker
 import { FileQueueConsumerService } from '../queue/file-queue-consumer.service';
 import { AssistantWorkerProcessorService } from './assistant-worker-processor.service';
 import { CallbackDeliveryService } from './callback-delivery.service';
+import { GrokResponsesService } from './grok-responses.service';
 
 describe('AssistantWorkerProcessorService', () => {
   it('reads a file queue message and sends a callback', async () => {
@@ -25,6 +26,9 @@ describe('AssistantWorkerProcessorService', () => {
     const callbackDeliveryService = {
       send: jest.fn().mockResolvedValue(undefined),
     } as unknown as CallbackDeliveryService;
+    const grokResponsesService = {
+      generateReply: jest.fn().mockResolvedValue('hello from grok'),
+    } as unknown as GrokResponsesService;
     const configService = new ConfigService({
       FILE_QUEUE_DIR: queueDir,
       WORKER_POLL_INTERVAL_MS: '1000',
@@ -34,6 +38,7 @@ describe('AssistantWorkerProcessorService', () => {
     const service = new AssistantWorkerProcessorService(
       callbackDeliveryService,
       configService,
+      grokResponsesService,
       metricsService,
       fileQueueConsumerService,
     );
@@ -42,7 +47,7 @@ describe('AssistantWorkerProcessorService', () => {
 
     expect(callbackDeliveryService.send).toHaveBeenCalledWith(
       'http://example.test/callback',
-      'I received your message: hello',
+      'hello from grok',
     );
     expect(await fileQueueConsumerService.depth()).toBe(0);
   });

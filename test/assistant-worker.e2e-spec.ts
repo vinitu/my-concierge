@@ -11,12 +11,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { AssistantWorkerAppModule } from '../src/assistant-worker-app/assistant-worker-app.module';
+import { GrokResponsesService } from '../src/assistant-worker-app/worker/grok-responses.service';
 
 describe('assistant-worker (e2e)', () => {
   let app: NestExpressApplication;
   let callbackMessages: string[] = [];
   let callbackServer: ReturnType<typeof createServer>;
   let callbackUrl = '';
+  const grokResponsesService = {
+    generateReply: jest.fn().mockResolvedValue('hello from grok'),
+  };
   let queueDir: string;
 
   beforeAll(async () => {
@@ -51,6 +55,8 @@ describe('assistant-worker (e2e)', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AssistantWorkerAppModule],
     })
+      .overrideProvider(GrokResponsesService)
+      .useValue(grokResponsesService)
       .overrideProvider(ConfigService)
       .useValue(
         new ConfigService({
@@ -81,6 +87,7 @@ describe('assistant-worker (e2e)', () => {
 
   beforeEach(() => {
     callbackMessages = [];
+    jest.clearAllMocks();
   });
 
   it('returns the service root endpoint', async () => {
@@ -117,7 +124,7 @@ describe('assistant-worker (e2e)', () => {
     }
 
     expect(callbackMessages).toHaveLength(1);
-    expect(callbackMessages[0]).toContain('I received your message: Hello worker');
+    expect(callbackMessages[0]).toContain('hello from grok');
 
     let files = await readdir(queueDir);
 

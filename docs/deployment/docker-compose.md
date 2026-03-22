@@ -17,9 +17,38 @@ Describe the default local runtime.
 - `queue` uses Redis in the current local example
 - `assistant-api` uses `QUEUE_ADAPTER=redis`
 - `assistant-worker` uses `QUEUE_ADAPTER=redis`
+- `assistant-worker` uses Grok through the xAI Responses API
+- Docker Compose reads local values from `.env`
 - `make build` builds the local `gateway-web` image
 - `make up` starts the local example stack
 - `make down` stops it
+
+## Required Environment
+
+Before starting the local stack:
+
+```bash
+make env
+```
+
+Then fill at least:
+
+- `XAI_API_KEY`
+
+Available variables in `.env.example`:
+
+- `XAI_API_KEY`
+- `XAI_BASE_URL`
+- `XAI_MODEL`
+- `XAI_TIMEOUT_MS`
+- `ASSISTANT_DATADIR`
+- `WORKER_POLL_INTERVAL_MS`
+
+Default `ASSISTANT_DATADIR` in the local Docker Compose setup:
+
+```text
+/app/runtime
+```
 
 ## Port Model
 
