@@ -141,6 +141,23 @@ flowchart LR
 - the UI lets you switch between the schemas
 - in Docker Compose, Swagger UI is exposed on `http://localhost:8088`
 
+## Local Ports
+
+| Host port | Service | Purpose |
+|---------|-------------|---------|
+| `3000` | `assistant-api` | HTTP API, `/status`, `/metrics`, `/openapi.json` |
+| `3001` | `assistant-worker` | Worker `/status`, `/metrics`, `/openapi.json` |
+| `6379` | `queue` | Redis queue |
+| `8080` | `gateway-web` | Web chat UI, WebSocket, callbacks, `/openapi.json` |
+| `8081` | `gateway-telegram` | Telegram gateway |
+| `8082` | `gateway-email` | Email gateway |
+| `8088` | `swagger` | Shared Swagger UI |
+
+Notes:
+
+- `scheduler` does not publish a host port in the current local `docker-compose`.
+- All app containers use internal port `3000`.
+
 ## Documentation Structure
 
 - `docs/requirements.md`: high-level requirements
