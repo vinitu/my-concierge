@@ -11,6 +11,7 @@ import {
   WORKER_QUEUE_CONSUMER,
   type QueueConsumer,
 } from '../queue/queue-consumer';
+import { AssistantWorkerConversationService } from './assistant-worker-conversation.service';
 import { CallbackDeliveryService } from './callback-delivery.service';
 import {
   ASSISTANT_LLM_PROVIDER,
@@ -25,6 +26,7 @@ export class AssistantWorkerProcessorService
   private processing = false;
 
   constructor(
+    private readonly conversationService: AssistantWorkerConversationService,
     private readonly callbackDeliveryService: CallbackDeliveryService,
     private readonly configService: ConfigService,
     private readonly metricsService: AssistantWorkerMetricsService,
@@ -84,10 +86,15 @@ export class AssistantWorkerProcessorService
   }
 
   private async handleMessage(item: ProcessingQueueMessage): Promise<void> {
-    const reply = await this.llmProvider.generateReply(item);
+    const conversation = await this.conversationService.read(item);
+    const result = await this.llmProvider.generateReply({
+      conversation,
+      message: item,
+    });
 
     try {
-      await this.callbackDeliveryService.send(item.callback_url, reply);
+      await this.callbackDeliveryService.send(item.callback_url, result.message);
+      await this.conversationService.appendExchange(item, result);
     } catch {
       throw item;
     }

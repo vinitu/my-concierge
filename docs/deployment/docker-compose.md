@@ -18,7 +18,8 @@ Describe the default local runtime.
 - `queue` uses Redis in the current local example
 - `assistant-api` uses `QUEUE_ADAPTER=redis`
 - `assistant-worker` uses `QUEUE_ADAPTER=redis`
-- `assistant-worker` can use either xAI or local Ollama
+- `assistant-worker` can use DeepSeek, xAI, or local Ollama
+- `assistant-worker` mounts `./runtime` into the container as `/app/runtime`
 - Docker Compose reads local values from `.env`
 - `make build` builds the local `gateway-web` image
 - `make up` starts the local example stack
@@ -34,6 +35,10 @@ make env
 
 Then fill the provider settings you want to use.
 
+For `deepseek`:
+
+- `DEEPSEEK_API_KEY`
+
 For `xai`:
 
 - `XAI_API_KEY`
@@ -45,6 +50,10 @@ For local Ollama:
 
 Available variables in `.env.example`:
 
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_BASE_URL`
+- `DEEPSEEK_MODEL`
+- `DEEPSEEK_TIMEOUT_MS`
 - `XAI_API_KEY`
 - `XAI_BASE_URL`
 - `XAI_MODEL`
@@ -59,6 +68,12 @@ Default `ASSISTANT_DATADIR` in the local Docker Compose setup:
 
 ```text
 /app/runtime
+```
+
+Runtime volume in the local Docker Compose setup:
+
+```text
+./runtime:/app/runtime
 ```
 
 Default `OLLAMA_BASE_URL` in the local Docker Compose setup:

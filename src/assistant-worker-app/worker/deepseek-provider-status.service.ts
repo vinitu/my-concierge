@@ -4,34 +4,34 @@ import type { AssistantLlmProviderStatus } from './assistant-llm-provider-status
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 
 @Injectable()
-export class XaiProviderStatusService {
+export class DeepseekProviderStatusService {
   constructor(
     private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
     private readonly configService: ConfigService,
   ) {}
 
   async getStatus(): Promise<AssistantLlmProviderStatus> {
-    const apiKey = this.configService.get<string>('XAI_API_KEY', '').trim();
+    const apiKey = this.configService.get<string>('DEEPSEEK_API_KEY', '').trim();
     const config = await this.assistantWorkerConfigService.read();
     const model =
-      config.provider === 'xai'
+      config.provider === 'deepseek'
         ? config.model
-        : this.configService.get<string>('XAI_MODEL', 'grok-4');
+        : this.configService.get<string>('DEEPSEEK_MODEL', 'deepseek-chat');
 
     if (!apiKey) {
       return {
         apiKeyConfigured: false,
-        message: 'XAI_API_KEY is not configured',
+        message: 'DEEPSEEK_API_KEY is not configured',
         model,
-        provider: 'xai',
+        provider: 'deepseek',
         reachable: false,
         status: 'missing_key',
       };
     }
 
-    const baseUrl = this.configService.get<string>('XAI_BASE_URL', 'https://api.x.ai/v1');
+    const baseUrl = this.configService.get<string>('DEEPSEEK_BASE_URL', 'https://api.deepseek.com');
     const timeoutMs = Number.parseInt(
-      this.configService.get<string>('XAI_TIMEOUT_MS', '360000'),
+      this.configService.get<string>('DEEPSEEK_TIMEOUT_MS', '360000'),
       10,
     );
 
@@ -49,9 +49,9 @@ export class XaiProviderStatusService {
 
         return {
           apiKeyConfigured: true,
-          message: `xAI check failed with ${response.status}: ${body}`,
+          message: `DeepSeek check failed with ${response.status}: ${body}`,
           model,
-          provider: 'xai',
+          provider: 'deepseek',
           reachable: false,
           status: 'error',
         };
@@ -59,20 +59,20 @@ export class XaiProviderStatusService {
 
       return {
         apiKeyConfigured: true,
-        message: 'xAI API is reachable',
+        message: 'DeepSeek API is reachable',
         model,
-        provider: 'xai',
+        provider: 'deepseek',
         reachable: true,
         status: 'ready',
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown xAI error';
+      const message = error instanceof Error ? error.message : 'unknown DeepSeek error';
 
       return {
         apiKeyConfigured: true,
-        message: `xAI check failed: ${message}`,
+        message: `DeepSeek check failed: ${message}`,
         model,
-        provider: 'xai',
+        provider: 'deepseek',
         reachable: false,
         status: 'error',
       };

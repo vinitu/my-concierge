@@ -1,3 +1,5 @@
 {
-  "provider": "xai"
+  "model": "deepseek-chat",
+  "memory_window": 3,
+  "provider": "deepseek"
 }

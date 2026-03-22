@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 import { OllamaProviderStatusService } from './ollama-provider-status.service';
 
 describe('OllamaProviderStatusService', () => {
@@ -18,9 +19,11 @@ describe('OllamaProviderStatusService', () => {
       ok: true,
     } as Response);
     const service = new OllamaProviderStatusService(
+      {
+        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'gemma3:1b', provider: 'ollama' }),
+      } as unknown as AssistantWorkerConfigService,
       new ConfigService({
         OLLAMA_BASE_URL: 'http://host.docker.internal:11434',
-        OLLAMA_MODEL: 'gemma3:1b',
       }),
     );
 
@@ -46,8 +49,10 @@ describe('OllamaProviderStatusService', () => {
       ok: true,
     } as Response);
     const service = new OllamaProviderStatusService(
+      {
+        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'gemma3:1b', provider: 'ollama' }),
+      } as unknown as AssistantWorkerConfigService,
       new ConfigService({
-        OLLAMA_MODEL: 'gemma3:1b',
       }),
     );
 
@@ -59,5 +64,28 @@ describe('OllamaProviderStatusService', () => {
       reachable: false,
       status: 'error',
     });
+  });
+
+  it('lists available Ollama models', async () => {
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue({
+      json: async () => ({
+        models: [
+          { name: 'gemma3:1b' },
+          { model: 'deepseek-r1:latest' },
+        ],
+      }),
+      ok: true,
+    } as Response);
+    const service = new OllamaProviderStatusService(
+      {
+        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'gemma3:1b', provider: 'ollama' }),
+      } as unknown as AssistantWorkerConfigService,
+      new ConfigService({}),
+    );
+
+    await expect(service.listAvailableModels()).resolves.toEqual([
+      'gemma3:1b',
+      'deepseek-r1:latest',
+    ]);
   });
 });

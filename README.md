@@ -44,6 +44,7 @@ The current source of truth is the code for these services and the project docum
 - [Data flow](./docs/architecture/data-flow.md)
 - [Repository layout](./docs/architecture/repository-layout.md)
 - [Application endpoints](./docs/contracts/application-endpoints.md)
+- [assistant-worker system prompt](./docs/contracts/assistant-worker-system-prompt.md)
 - [Docker Compose](./docs/deployment/docker-compose.md)
 - [Assistant](./docs/services/assistant.md)
 - [Metrics](./docs/operations/metrics.md)
@@ -56,7 +57,7 @@ The current source of truth is the code for these services and the project docum
 - Queue-based asynchronous flow between `assistant-api` and `assistant-worker`
 - `assistant-api` accepts requests, validates them, enqueues jobs, and acknowledges them
 - `assistant-api` supports env-based queue adapters and currently uses Redis by default through `QUEUE_ADAPTER=redis`
-- `assistant-worker` reads queued jobs, loads runtime context from `runtime/`, sends them to the configured provider (`xai` or `ollama`), returns callback replies, and exposes a worker settings page with provider status
+- `assistant-worker` reads queued jobs, loads runtime context from `runtime/`, sends them to the configured provider (`deepseek`, `xai`, or `ollama`), returns callback replies, and exposes a worker settings page with provider status
 - `gateway-web` provides the browser chat UI and WebSocket transport
 - `gateway-web` exposes `/`, `WS /ws`, `/callbacks/assistant/:contact`, `/status`, `/metrics`, and `/openapi.json`
 - `assistant-api`, `assistant-worker`, and `gateway-web` expose `/status`, `/metrics`, and OpenAPI documentation
@@ -78,6 +79,7 @@ flowchart LR
     Browser["Browser"] --> GW["gateway-web"]
     Telegram["Telegram"] --> GT["gateway-telegram"]
     Email["Email"] --> GE["gateway-email"]
+    Assistant --> DeepSeek["deepseek"]
     Assistant --> XAI["xai"]
     Assistant --> Ollama["ollama"]
 
@@ -161,6 +163,9 @@ make env
 
 3. Configure one provider in `.env`.
 
+For `deepseek`:
+- `DEEPSEEK_API_KEY`
+
 For `xai`:
 - `XAI_API_KEY`
 
@@ -168,7 +173,7 @@ For local Ollama:
 - `OLLAMA_BASE_URL=http://host.docker.internal:11434`
 - `OLLAMA_MODEL=gemma3:1b`
 
-4. If you want Ollama instead of xAI, open [http://localhost:3001/](http://localhost:3001/) after startup and switch the worker provider to `ollama`.
+4. If you want `deepseek` or `ollama` instead of `xai`, open [http://localhost:3001/](http://localhost:3001/) after startup and switch the worker provider there.
 
 5. Start the local stack:
 
@@ -218,15 +223,18 @@ The local runtime is named `assistant`.
 It is split into `assistant-api` and `assistant-worker`.
 The repository contains a separate runtime `datadir` in `runtime/`.
 `assistant-worker` reads the core runtime files from this directory before processing queued work.
+In Docker Compose, `assistant-worker` mounts it as a bind volume: `./runtime:/app/runtime`.
 
 Expected runtime files and folders:
 
-- `runtime/AGENTS.md`
-- `runtime/SOUL.md`
-- `runtime/IDENTITY.md`
+- `runtime/SYSTEM.js`
+- `runtime/SOUL.js`
+- `runtime/IDENTITY.js`
 - `runtime/skills/`
 - `runtime/memory/`
-- `runtime/config/worker.json`
+- `runtime/conversations/`
+- `runtime/prompts/`
+- `runtime/config/`
 
 The repository already includes a starter `datadir` in [runtime/](/Users/vinitu/Projects/vinitu/my-concierge/runtime) with placeholder instruction files.
 

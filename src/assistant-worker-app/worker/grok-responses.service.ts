@@ -1,8 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
-import type { AssistantLlmProvider } from './assistant-llm-provider';
-import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
+import type {
+  AssistantLlmGenerateInput,
+  AssistantLlmProvider,
+} from './assistant-llm-provider';
+import {
+  parseAssistantLlmResult,
+  type AssistantLlmGenerateResult,
+} from './assistant-llm-response-parser';
+import { AssistantWorkerConfigService } from './assistant-worker-config.service';
+import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
 import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 
 interface XaiOutputContentItem {
@@ -26,17 +36,23 @@ interface XaiResponseBody {
 
 @Injectable()
 export class GrokResponsesService implements AssistantLlmProvider {
+  private readonly logger = new Logger(GrokResponsesService.name);
+
   constructor(
+    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
     private readonly configService: ConfigService,
-    private readonly promptService: AssistantWorkerPromptService,
+    private readonly promptTemplateService: AssistantWorkerPromptTemplateService,
     private readonly runtimeContextService: AssistantWorkerRuntimeContextService,
   ) {}
 
-  private modelName(): string {
-    return this.configService.get<string>('XAI_MODEL', 'grok-4');
+  private async modelName(): Promise<string> {
+    const config = await this.assistantWorkerConfigService.read();
+    return config.provider === 'xai'
+      ? config.model
+      : this.configService.get<string>('XAI_MODEL', 'grok-4');
   }
 
-  async generateReply(message: QueueMessage): Promise<string> {
+  async generateReply(input: AssistantLlmGenerateInput): Promise<AssistantLlmGenerateResult> {
     const apiKey = this.configService.get<string>('XAI_API_KEY', '').trim();
 
     if (!apiKey) {
@@ -44,32 +60,34 @@ export class GrokResponsesService implements AssistantLlmProvider {
     }
 
     const baseUrl = this.configService.get<string>('XAI_BASE_URL', 'https://api.x.ai/v1');
-    const model = this.modelName();
+    const model = await this.modelName();
     const timeoutMs = Number.parseInt(
       this.configService.get<string>('XAI_TIMEOUT_MS', '360000'),
       10,
     );
     const runtimeContext = await this.runtimeContextService.load();
+    const systemPrompt = await this.promptTemplateService.renderAssistantSystemPrompt(
+      input,
+      runtimeContext,
+    );
+    const requestBody = {
+      input: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+      ],
+      model,
+      store: false,
+    };
+    this.logger.debug(`xAI reply request: ${JSON.stringify(requestBody)}`);
     const response = await fetch(`${baseUrl}/responses`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        input: [
-          {
-            role: 'system',
-            content: this.promptService.buildSystemPrompt(runtimeContext),
-          },
-          {
-            role: 'user',
-            content: this.promptService.buildUserPrompt(message),
-          },
-        ],
-        model,
-        store: false,
-      }),
+      body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(timeoutMs),
     });
 
@@ -79,8 +97,9 @@ export class GrokResponsesService implements AssistantLlmProvider {
     }
 
     const body = (await response.json()) as XaiResponseBody;
-    return this.extractAssistantText(body);
+    return parseAssistantLlmResult(this.extractAssistantText(body));
   }
+
   private extractAssistantText(body: XaiResponseBody): string {
     if (typeof body.output_text === 'string' && body.output_text.trim()) {
       return body.output_text.trim();

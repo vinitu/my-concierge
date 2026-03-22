@@ -6,14 +6,21 @@ import {
   Put,
 } from '@nestjs/common';
 import type { AssistantLlmProviderStatus } from './worker/assistant-llm-provider-status';
+import {
+  defaultModelForProvider,
+  STATIC_PROVIDER_MODELS,
+} from './worker/assistant-llm-model-catalog';
 import { AssistantLlmProviderStatusService } from './worker/assistant-llm-provider-status.service';
 import type { AssistantWorkerProvider } from './worker/assistant-llm-provider';
 import {
   AssistantWorkerConfigService,
   type AssistantWorkerConfig,
 } from './worker/assistant-worker-config.service';
+import { OllamaProviderStatusService } from './worker/ollama-provider-status.service';
 
 interface UpdateWorkerConfigBody {
+  model?: string;
+  memory_window?: number | string;
   provider?: AssistantWorkerProvider | string;
 }
 
@@ -22,6 +29,7 @@ export class AssistantWorkerRootController {
   constructor(
     private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
     private readonly assistantLlmProviderStatusService: AssistantLlmProviderStatusService,
+    private readonly ollamaProviderStatusService: OllamaProviderStatusService,
   ) {}
 
   @Get()
@@ -29,6 +37,7 @@ export class AssistantWorkerRootController {
   async getRoot(): Promise<string> {
     const config = await this.assistantWorkerConfigService.read();
     const providerStatus = await this.assistantLlmProviderStatusService.getStatus();
+    const providerModels = await this.providerModels(config);
 
     return `<!doctype html>
 <html lang="en">
@@ -93,10 +102,10 @@ export class AssistantWorkerRootController {
         margin: 20px 0 8px;
         font-weight: 600;
       }
-      select, button {
+      select, input, button {
         font: inherit;
       }
-      select {
+      select, input[type="number"] {
         width: 100%;
         padding: 12px 14px;
         border-radius: 10px;
@@ -192,9 +201,24 @@ export class AssistantWorkerRootController {
         <form id="config-form">
           <label for="provider">LLM provider</label>
           <select id="provider" name="provider">
+            <option value="deepseek"${config.provider === 'deepseek' ? ' selected' : ''}>deepseek</option>
             <option value="xai"${config.provider === 'xai' ? ' selected' : ''}>xai</option>
             <option value="ollama"${config.provider === 'ollama' ? ' selected' : ''}>ollama</option>
           </select>
+          <label for="model">Model</label>
+          <select id="model" name="model">${this.renderModelOptions(
+            providerModels[config.provider] ?? [config.model],
+            config.model,
+          )}</select>
+          <label for="memory-window">Remember messages</label>
+          <input
+            id="memory-window"
+            name="memory_window"
+            type="number"
+            min="1"
+            max="20"
+            value="${String(config.memory_window)}"
+          />
           <button type="submit">Save settings</button>
         </form>
         <div id="status"></div>
@@ -202,6 +226,8 @@ export class AssistantWorkerRootController {
           <div class="status-card">
             <strong>provider status</strong>
             <div>Selected provider: <span id="provider-value">${this.escapeHtml(config.provider)}</span></div>
+            <div>Selected model: <span id="selected-model-value">${this.escapeHtml(config.model)}</span></div>
+            <div>Memory window: <span id="memory-window-value">${String(config.memory_window)}</span></div>
             <div>Provider id: <span id="provider-id">${this.escapeHtml(providerStatus.provider)}</span></div>
             <div>Configured model: <span id="provider-model">${this.escapeHtml(providerStatus.model)}</span></div>
             <div>Credential: <span id="provider-credential">${this.renderCredential(providerStatus)}</span></div>
@@ -219,19 +245,51 @@ export class AssistantWorkerRootController {
       </section>
     </main>
     <script>
+      const providerModels = ${JSON.stringify(providerModels)};
       const form = document.getElementById('config-form');
+      const providerField = document.getElementById('provider');
+      const modelField = document.getElementById('model');
       const status = document.getElementById('status');
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+
+      function renderModelOptions(provider, selectedModel) {
+        const models = providerModels[provider] && providerModels[provider].length > 0
+          ? providerModels[provider]
+          : [selectedModel];
+
+        modelField.innerHTML = models
+          .map((model) => '<option value="' + escapeHtml(model) + '"' + (model === selectedModel ? ' selected' : '') + '>' + escapeHtml(model) + '</option>')
+          .join('');
+      }
+
+      providerField.addEventListener('change', () => {
+        const provider = providerField.value;
+        const models = providerModels[provider] && providerModels[provider].length > 0
+          ? providerModels[provider]
+          : [''];
+        renderModelOptions(provider, models[0] || '');
+      });
 
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
 
         const provider = document.getElementById('provider').value;
+        const model = document.getElementById('model').value;
+        const memoryWindow = document.getElementById('memory-window').value;
         status.textContent = 'Saving...';
 
         const response = await fetch('/config', {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ provider }),
+          body: JSON.stringify({ memory_window: memoryWindow, model, provider }),
         });
 
         if (!response.ok) {
@@ -240,9 +298,13 @@ export class AssistantWorkerRootController {
         }
 
         const payload = await response.json();
-        status.textContent = 'Saved provider: ' + payload.provider;
+        status.textContent = 'Saved provider: ' + payload.provider + ', model: ' + payload.model + ', memory window: ' + payload.memory_window;
         document.getElementById('provider-value').textContent = payload.provider;
+        document.getElementById('selected-model-value').textContent = payload.model;
         document.getElementById('provider').value = payload.provider;
+        renderModelOptions(payload.provider, payload.model);
+        document.getElementById('memory-window-value').textContent = String(payload.memory_window);
+        document.getElementById('memory-window').value = String(payload.memory_window);
         await refreshProviderStatus();
       });
 
@@ -286,9 +348,67 @@ export class AssistantWorkerRootController {
 
   @Put('config')
   async updateConfig(@Body() body: UpdateWorkerConfigBody): Promise<AssistantWorkerConfig> {
+    const provider = this.normalizeProvider(body.provider);
+
     return this.assistantWorkerConfigService.write({
-      provider: body.provider?.trim().toLowerCase() === 'ollama' ? 'ollama' : 'xai',
+      model:
+        typeof body.model === 'string' && body.model.trim()
+          ? body.model.trim()
+          : defaultModelForProvider(provider),
+      memory_window:
+        typeof body.memory_window === 'number'
+          ? body.memory_window
+          : typeof body.memory_window === 'string'
+            ? Number.parseInt(body.memory_window, 10)
+            : 3,
+      provider,
     });
+  }
+
+  private normalizeProvider(value: AssistantWorkerProvider | string | undefined): AssistantWorkerProvider {
+    const normalized = value?.trim().toLowerCase();
+
+    if (normalized === 'deepseek' || normalized === 'ollama' || normalized === 'xai') {
+      return normalized;
+    }
+
+    return 'xai';
+  }
+
+  private async providerModels(
+    config: AssistantWorkerConfig,
+  ): Promise<Record<AssistantWorkerProvider, string[]>> {
+    const ollamaModels = await this.ollamaProviderStatusService.listAvailableModels();
+
+    return {
+      deepseek: [...STATIC_PROVIDER_MODELS.deepseek],
+      ollama: this.mergeModels(
+        ollamaModels.length > 0 ? ollamaModels : STATIC_PROVIDER_MODELS.ollama,
+        config.provider === 'ollama' ? config.model : null,
+      ),
+      xai: [...STATIC_PROVIDER_MODELS.xai],
+    };
+  }
+
+  private mergeModels(models: string[], currentModel: string | null): string[] {
+    const next = [...models];
+
+    if (currentModel && !next.includes(currentModel)) {
+      next.unshift(currentModel);
+    }
+
+    return next;
+  }
+
+  private renderModelOptions(models: string[], selectedModel: string): string {
+    return models
+      .map(
+        (model) =>
+          `<option value="${this.escapeHtml(model)}"${
+            model === selectedModel ? ' selected' : ''
+          }>${this.escapeHtml(model)}</option>`,
+      )
+      .join('');
   }
 
   private escapeHtml(value: string): string {

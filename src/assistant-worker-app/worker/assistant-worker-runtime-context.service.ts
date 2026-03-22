@@ -30,11 +30,11 @@ export class AssistantWorkerRuntimeContextService {
     );
 
     return {
-      agents: await this.readOptionalFile(join(datadir, 'AGENTS.md')),
+      agents: await this.readOptionalFile(join(datadir, 'SYSTEM.js')),
       datadir,
-      identity: await this.readOptionalFile(join(datadir, 'IDENTITY.md')),
+      identity: await this.readOptionalFile(join(datadir, 'IDENTITY.js')),
       memory: await this.readMemoryDirectory(datadir),
-      soul: await this.readOptionalFile(join(datadir, 'SOUL.md')),
+      soul: await this.readOptionalFile(join(datadir, 'SOUL.js')),
     };
   }
 
