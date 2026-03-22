@@ -103,9 +103,9 @@ If more services are implemented in the same repository later, `gateway-web` may
 
 | Metric | Type | Labels | Description |
 |---------|---------|---------|-------------|
-| `gateway_web_active_websocket_sessions` | `gauge` | none | Current number of active WebSocket sessions |
-| `gateway_web_incoming_messages_total` | `counter` | none | Total number of incoming WebSocket messages |
-| `gateway_web_callbacks_total` | `counter` | `delivered` | Total number of callback deliveries |
-| `gateway_web_assistant_api_requests_total` | `counter` | `status` | Total number of requests from `gateway-web` to `assistant-api` |
-| `gateway_web_status_requests_total` | `counter` | none | Total number of status endpoint requests |
-| `gateway_web_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |
+| `http_request_time_ms` | `histogram` | `route`, `service`, `response_code` | HTTP request duration in milliseconds |
+| `websocket_active_sessions` | `gauge` | `service` | Current number of active WebSocket sessions |
+| `incoming_messages_total` | `counter` | `service`, `transport` | Total number of incoming messages |
+| `callback_deliveries_total` | `counter` | `delivered`, `service` | Total number of callback deliveries |
+| `upstream_requests_total` | `counter` | `service`, `status`, `upstream` | Total number of upstream HTTP requests |
+| `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |

@@ -73,6 +73,7 @@ Describe the main components and their boundaries.
 
 - Runs cron-based jobs
 - Calls `assistant-api`
+- Stops after the job is accepted for queueing
 - Exposes `GET /status`
 - Exposes `GET /metrics`
 
@@ -88,3 +89,5 @@ Describe the main components and their boundaries.
 - `assistant-api` stays thin.
 - Assistant business logic lives in `assistant-worker`.
 - `assistant-api` and `assistant-worker` communicate only through the queue.
+- `assistant-api` does not send replies to gateways.
+- `scheduler` only triggers work and does not receive assistant replies.

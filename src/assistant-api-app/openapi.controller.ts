@@ -62,8 +62,8 @@ export class AssistantApiOpenApiController {
               },
             },
             responses: {
-              '200': {
-                description: 'Message accepted and placed into the queue',
+              '202': {
+                description: 'Message accepted for asynchronous processing',
               },
               '400': {
                 description: 'Invalid request body',

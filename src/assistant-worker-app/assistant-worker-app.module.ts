@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { AssistantWorkerMetricsController } from './observability/assistant-worker-metrics.controller';
 import { AssistantWorkerMetricsService } from './observability/assistant-worker-metrics.service';
+import { HttpRequestMetricsInterceptor } from './observability/http-request-metrics.interceptor';
 import { AssistantWorkerOpenApiController } from './openapi.controller';
 import { FileQueueConsumerService } from './queue/file-queue-consumer.service';
 import { RedisQueueConsumerService } from './queue/redis-queue-consumer.service';
@@ -24,10 +26,15 @@ import { AssistantWorkerStatusController } from './status.controller';
   ],
   providers: [
     AssistantWorkerMetricsService,
+    HttpRequestMetricsInterceptor,
     AssistantWorkerProcessorService,
     CallbackDeliveryService,
     FileQueueConsumerService,
     RedisQueueConsumerService,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpRequestMetricsInterceptor,
+    },
     {
       provide: WORKER_QUEUE_CONSUMER,
       inject: [ConfigService, FileQueueConsumerService, RedisQueueConsumerService],

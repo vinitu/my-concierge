@@ -54,9 +54,9 @@ describe('assistant-api (e2e)', () => {
         message: 'Turn on the kitchen lights',
       });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(202);
     expect(response.body).toEqual({
-      response: 'Message accepted',
+      status: 'accepted',
     });
 
     const files = await readdir(queueDir);
@@ -87,11 +87,15 @@ describe('assistant-api (e2e)', () => {
   });
 
   it('returns metrics including queue depth', async () => {
+    await request(app.getHttpServer()).get('/status');
+
     const response = await request(app.getHttpServer()).get('/metrics');
 
     expect(response.status).toBe(200);
-    expect(response.text).toContain('assistant_api_queue_messages');
-    expect(response.text).toContain('assistant_api_conversations_accepted_total');
+    expect(response.text).toContain('http_request_time_ms');
+    expect(response.text).toContain('route="/status",service="assistant-api",response_code="200"');
+    expect(response.text).toContain('queue_messages{service="assistant-api"}');
+    expect(response.text).toContain('accepted_messages_total{service="assistant-api"}');
   });
 
   it('returns the assistant-api OpenAPI schema', async () => {

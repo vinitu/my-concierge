@@ -41,8 +41,8 @@ flowchart LR
 
 | Metric | Type | Labels | Description |
 |---------|---------|---------|-------------|
-| `assistant_worker_jobs_processed_total` | `counter` | none | Total number of processed queue jobs |
-| `assistant_worker_callback_requests_total` | `counter` | `status` | Total number of callback requests |
-| `assistant_worker_queue_messages` | `gauge` | none | Current number of queue files visible to `assistant-worker` |
-| `assistant_worker_status_requests_total` | `counter` | none | Total number of status endpoint requests |
-| `assistant_worker_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |
+| `http_request_time_ms` | `histogram` | `route`, `service`, `response_code` | HTTP request duration in milliseconds |
+| `processed_jobs_total` | `counter` | `service` | Total number of processed queue jobs |
+| `callback_requests_total` | `counter` | `service`, `status` | Total number of callback requests |
+| `queue_messages` | `gauge` | `service` | Current number of queue files visible to `assistant-worker` |
+| `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |

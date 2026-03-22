@@ -56,10 +56,14 @@ describe('gateway-web (e2e)', () => {
   });
 
   it('returns Prometheus metrics', async () => {
+    await request(app.getHttpServer()).get('/status');
+
     const response = await request(app.getHttpServer()).get('/metrics');
 
     expect(response.status).toBe(200);
-    expect(response.text).toContain('gateway_web_metrics_requests_total');
+    expect(response.text).toContain('http_request_time_ms');
+    expect(response.text).toContain('route="/status",service="gateway-web",response_code="200"');
+    expect(response.text).toContain('endpoint_requests_total{endpoint="/metrics",service="gateway-web"}');
   });
 
   it('returns gateway-web OpenAPI schema', async () => {
