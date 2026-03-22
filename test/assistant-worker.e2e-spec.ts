@@ -83,6 +83,18 @@ describe('assistant-worker (e2e)', () => {
     callbackMessages = [];
   });
 
+  it('returns the service root endpoint', async () => {
+    const response = await request(app.getHttpServer()).get('/');
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      docs: '/openapi.json',
+      metrics: '/metrics',
+      service: 'assistant-worker',
+      status: '/status',
+    });
+  });
+
   it('processes a queued file and sends a callback message', async () => {
     await writeFile(
       join(queueDir, '001.json'),
@@ -107,7 +119,17 @@ describe('assistant-worker (e2e)', () => {
     expect(callbackMessages).toHaveLength(1);
     expect(callbackMessages[0]).toContain('I received your message: Hello worker');
 
-    const files = await readdir(queueDir);
+    let files = await readdir(queueDir);
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (files.length === 0) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      files = await readdir(queueDir);
+    }
+
     expect(files).toHaveLength(0);
   });
 
@@ -136,5 +158,6 @@ describe('assistant-worker (e2e)', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.info.title).toBe('assistant-worker');
+    expect(response.body.paths['/']).toBeDefined();
   });
 });

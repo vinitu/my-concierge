@@ -11,9 +11,24 @@ Transport work from `assistant-api` to `assistant-worker`.
 - Support more than one worker instance
 - Expose queue depth to metrics
 
-## Main Endpoints
+## Relations
+
+```mermaid
+flowchart LR
+    API["assistant-api"] --> Q["queue"]
+    Q --> Worker["assistant-worker"]
+```
+
+## Endpoints
 
 - No project HTTP endpoints
+
+## Metrics
+
+- `queue` does not expose its own Prometheus endpoint in this repository.
+- Queue depth is surfaced through:
+  - `assistant_api_queue_messages`
+  - `assistant_worker_queue_messages`
 
 ## Rules
 

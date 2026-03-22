@@ -4,17 +4,30 @@
 
 Run cron-based tasks and trigger `assistant-api`.
 
-## Responsibilities
+## Status
+
+TODO: this service is documented as part of the target architecture but is not implemented in this repository yet.
+
+## Planned Responsibilities
 
 - Run jobs on a cron schedule
 - Call `assistant-api`
-- Expose `GET /status`
-- Expose `GET /metrics`
+- Expose operational endpoints
 
-## Main Endpoints
+## Planned Relations
 
-- `GET /status`
-- `GET /metrics`
+```mermaid
+flowchart LR
+    Scheduler["scheduler"] <--> API["assistant-api"]
+```
+
+## Planned Endpoints
+
+- TODO
+
+## Planned Metrics
+
+- TODO
 
 ## Rules
 

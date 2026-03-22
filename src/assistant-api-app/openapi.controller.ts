@@ -13,6 +13,16 @@ export class AssistantApiOpenApiController {
           'HTTP intake service for assistant conversations. It validates requests, writes jobs to the queue, and exposes operational endpoints.',
       },
       paths: {
+        '/': {
+          get: {
+            summary: 'Get assistant-api root endpoint',
+            responses: {
+              '200': {
+                description: 'Service entrypoint summary',
+              },
+            },
+          },
+        },
         '/conversation/{direction}/{chat}/{contact}': {
           post: {
             summary: 'Accept a conversation event',

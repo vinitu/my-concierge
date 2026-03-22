@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`assistant-worker` is the queued execution service.
+`assistant-worker` is the queued execution service inside `assistant`.
 
 ## Responsibilities
 
@@ -10,17 +10,26 @@
 - Read jobs from Redis queue in the current implementation
 - Build a simple reply from the accepted message
 - Send callback messages
-- Expose `GET /status`
-- Expose `GET /metrics`
-- Expose `GET /openapi.json`
+- Expose operational endpoints
 
-## Main Endpoints
+## Relations
 
-- `GET /status`
-- `GET /metrics`
-- `GET /openapi.json`
+```mermaid
+flowchart LR
+    Q["queue"] --> Worker["assistant-worker"]
+    Worker --> GW["originating gateway callback endpoint"]
+```
 
-## Worker Rules
+## Endpoints
+
+| Endpoint | Purpose |
+|---------|---------|
+| `GET /` | Service entrypoint summary |
+| `GET /status` | Worker readiness |
+| `GET /metrics` | Prometheus metrics |
+| `GET /openapi.json` | OpenAPI schema |
+
+## Rules
 
 - The worker does not accept public conversation requests.
 - The worker reads work only from the queue.
@@ -30,6 +39,10 @@
 
 ## Metrics
 
-- Worker job counters
-- Worker job duration
-- Callback success and failure metrics
+| Metric | Type | Labels | Description |
+|---------|---------|---------|-------------|
+| `assistant_worker_jobs_processed_total` | `counter` | none | Total number of processed queue jobs |
+| `assistant_worker_callback_requests_total` | `counter` | `status` | Total number of callback requests |
+| `assistant_worker_queue_messages` | `gauge` | none | Current number of queue files visible to `assistant-worker` |
+| `assistant_worker_status_requests_total` | `counter` | none | Total number of status endpoint requests |
+| `assistant_worker_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |

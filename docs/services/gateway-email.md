@@ -4,20 +4,32 @@
 
 Receive Email events and send Email replies.
 
-## Responsibilities
+## Status
 
-- Accept Email inbound events
+TODO: this service is documented as part of the target architecture but is not implemented in this repository yet.
+
+## Planned Responsibilities
+
+- Accept inbound Email events
 - Convert them to `assistant-api` requests
 - Expose callback endpoints for Email replies
-- Expose `GET /status`
-- Expose `GET /metrics`
+- Expose operational endpoints
 
-## Main Endpoints
+## Planned Relations
 
-- `POST /inbound/email`
-- `POST /callbacks/assistant`
-- `GET /status`
-- `GET /metrics`
+```mermaid
+flowchart LR
+    Email["Email provider"] <--> Gateway["gateway-email"]
+    Gateway <--> API["assistant-api"]
+```
+
+## Planned Endpoints
+
+- TODO
+
+## Planned Metrics
+
+- TODO
 
 ## Rules
 

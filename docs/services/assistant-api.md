@@ -2,31 +2,41 @@
 
 ## Purpose
 
-`assistant-api` is the public intake service.
+`assistant-api` is the public intake service inside `assistant`.
 
 ## Responsibilities
 
-- Accept conversation requests
-- Validate path and body
+- Accept inbound conversation requests
+- Validate request path and body
 - Write accepted work to the queue
 - Select the queue adapter from environment variables
 - Return immediate acceptance responses
-- Expose `GET /status`
-- Expose `GET /metrics`
-- Expose `GET /openapi.json`
+- Expose operational endpoints
+
+## Relations
+
+```mermaid
+flowchart LR
+    GW["gateways"] <--> API["assistant-api"]
+    Scheduler["scheduler"] <--> API
+    API --> Q["queue"]
+```
+
+## Endpoints
+
+| Endpoint | Purpose |
+|---------|---------|
+| `GET /` | Service entrypoint summary |
+| `POST /conversation/{direction}/{chat}/{contact}` | Accept a conversation event |
+| `GET /status` | Service readiness |
+| `GET /metrics` | Prometheus metrics |
+| `GET /openapi.json` | OpenAPI schema |
 
 ## Must Not Do
 
 - Run assistant business logic
 - Call LLM providers for conversation processing
 - Send callback messages
-
-## Main Endpoints
-
-- `POST /conversation/<direction>/<chat>/<contact>`
-- `GET /status`
-- `GET /metrics`
-- `GET /openapi.json`
 
 ## Queue Adapter
 
@@ -39,11 +49,9 @@
 
 ## Metrics
 
-- Request counters
-- Queue depth
-- Startup metrics
-
-## Status
-
-- Reports API readiness
-- Should be simple and fast
+| Metric | Type | Labels | Description |
+|---------|---------|---------|-------------|
+| `assistant_api_conversations_accepted_total` | `counter` | none | Total number of accepted conversation requests |
+| `assistant_api_queue_messages` | `gauge` | none | Current number of messages in the queue |
+| `assistant_api_status_requests_total` | `counter` | none | Total number of status endpoint requests |
+| `assistant_api_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |
