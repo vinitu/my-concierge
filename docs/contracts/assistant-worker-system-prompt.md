@@ -4,9 +4,9 @@
 
 Describe what `assistant-worker` sends to the LLM as the runtime system prompt and what response format `assistant-worker` expects back.
 
-The editable runtime templates live in:
+The repository prompt template lives in:
 
-- [`runtime/prompts/user-prompt.md`](/Users/vinitu/Projects/vinitu/my-concierge/runtime/prompts/user-prompt.md)
+- [`prompts/user-prompt.md`](/Users/vinitu/Projects/vinitu/my-concierge/prompts/user-prompt.md)
 
 ## Prompt Layers
 
@@ -20,7 +20,7 @@ For each queued request, `assistant-worker` builds one composed system prompt wi
    - behavior instructions
    - identity statements
 2. conversation state
-   - `context` from `runtime/conversations/{direction}/{chat}/{contact}.json`
+   - `context` from `runtime/assistant-worker/conversations/{direction}/{chat}/{contact}.json`
    - recent full messages from the same conversation JSON
 3. current request
    - the current queued user request as JSON

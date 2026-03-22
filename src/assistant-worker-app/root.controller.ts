@@ -197,7 +197,7 @@ export class AssistantWorkerRootController {
     <main>
       <section class="panel">
         <h1>assistant-worker</h1>
-        <p>Edit the runtime worker settings stored in <code>runtime/config/worker.json</code>.</p>
+        <p>Edit the runtime worker settings stored in <code>runtime/assistant-worker/config/worker.json</code>.</p>
         <form id="config-form">
           <label for="provider">LLM provider</label>
           <select id="provider" name="provider">

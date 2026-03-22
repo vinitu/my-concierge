@@ -1,19 +1,27 @@
 import { Test } from '@nestjs/testing';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { mkdtemp, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { io, type Socket } from 'socket.io-client';
 import request from 'supertest';
 import { AssistantApiClientService } from '../src/assistant-api/assistant-api-client.service';
 import { AppModule } from '../src/app.module';
+import { GATEWAY_WEB_SESSION_COOKIE } from '../src/chat/gateway-web-session';
 
 describe('gateway-web (e2e)', () => {
   let app: NestExpressApplication;
+  let gatewayWebRuntimeDirectory: string;
   let serverUrl: string;
   const assistantApiClientService = {
     sendConversation: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeAll(async () => {
+    gatewayWebRuntimeDirectory = await mkdtemp(join(tmpdir(), 'gateway-web-runtime-'));
+    process.env.GATEWAY_WEB_RUNTIME_DIR = gatewayWebRuntimeDirectory;
+
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
@@ -22,7 +30,9 @@ describe('gateway-web (e2e)', () => {
       .compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>();
-    app.useStaticAssets(`${process.cwd()}/public`);
+    app.useStaticAssets(`${process.cwd()}/public`, {
+      index: false,
+    });
     await app.listen(0);
 
     const address = app.getHttpServer().address() as AddressInfo;
@@ -30,6 +40,7 @@ describe('gateway-web (e2e)', () => {
   });
 
   afterAll(async () => {
+    delete process.env.GATEWAY_WEB_RUNTIME_DIR;
     await app.close();
   });
 
@@ -42,6 +53,10 @@ describe('gateway-web (e2e)', () => {
 
     expect(response.status).toBe(200);
     expect(response.text).toContain('MyConcierge');
+    expect(response.text).toContain('session-name-label');
+    expect(response.headers['set-cookie']).toEqual(
+      expect.arrayContaining([expect.stringContaining(`${GATEWAY_WEB_SESSION_COOKIE}=`)]),
+    );
   });
 
   it('returns service status', async () => {
@@ -77,7 +92,18 @@ describe('gateway-web (e2e)', () => {
   });
 
   it('accepts WebSocket chat messages and forwards them to assistant-api', async () => {
+    const pageResponse = await request(app.getHttpServer()).get('/');
+    const sessionCookie = pageResponse.headers['set-cookie'][0];
+    const sessionId = sessionCookie.match(
+      new RegExp(`${GATEWAY_WEB_SESSION_COOKIE}=([^;]+)`),
+    )?.[1];
+    expect(sessionId).toBeDefined();
+
     const client = io(serverUrl, {
+      auth: { sessionId },
+      extraHeaders: {
+        Cookie: sessionCookie,
+      },
       path: '/ws',
       transports: ['websocket'],
     });
@@ -94,7 +120,7 @@ describe('gateway-web (e2e)', () => {
 
       setTimeout(() => {
         expect(assistantApiClientService.sendConversation).toHaveBeenCalledWith({
-          contact: expect.any(String),
+          contact: sessionId,
           message: 'hello assistant',
         });
         client.close();
@@ -105,7 +131,18 @@ describe('gateway-web (e2e)', () => {
   });
 
   it('delivers callback messages back to the WebSocket session', async () => {
+    const pageResponse = await request(app.getHttpServer()).get('/');
+    const sessionCookie = pageResponse.headers['set-cookie'][0];
+    const sessionId = sessionCookie.match(
+      new RegExp(`${GATEWAY_WEB_SESSION_COOKIE}=([^;]+)`),
+    )?.[1];
+    expect(sessionId).toBeDefined();
+
     const client = io(serverUrl, {
+      auth: { sessionId },
+      extraHeaders: {
+        Cookie: sessionCookie,
+      },
       path: '/ws',
       transports: ['websocket'],
     });
@@ -117,9 +154,8 @@ describe('gateway-web (e2e)', () => {
       }, 5000);
 
       client.on('connect', async () => {
-        const contact = client.id;
         await request(app.getHttpServer())
-          .post(`/callbacks/assistant/${contact}`)
+          .post(`/callbacks/assistant/${sessionId}`)
           .send({ message: 'assistant reply' })
           .expect(200);
       });
@@ -129,6 +165,84 @@ describe('gateway-web (e2e)', () => {
         expect(payload).toEqual({ message: 'assistant reply' });
         client.close();
         resolve();
+      });
+    });
+  });
+
+  it('persists gateway-web chat history in its runtime directory', async () => {
+    const pageResponse = await request(app.getHttpServer()).get('/');
+    const sessionCookie = pageResponse.headers['set-cookie'][0];
+    const sessionId = sessionCookie.match(
+      new RegExp(`${GATEWAY_WEB_SESSION_COOKIE}=([^;]+)`),
+    )?.[1] as string;
+    const client = io(serverUrl, {
+      auth: { sessionId },
+      extraHeaders: {
+        Cookie: sessionCookie,
+      },
+      path: '/ws',
+      transports: ['websocket'],
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        client.close();
+        reject(new Error('history timeout'));
+      }, 5000);
+
+      client.on('connect', async () => {
+        client.emit('chat.message', { message: 'hello assistant' });
+        await new Promise((innerResolve) => setTimeout(innerResolve, 100));
+        await request(app.getHttpServer())
+          .post(`/callbacks/assistant/${sessionId}`)
+          .send({ message: 'assistant reply' })
+          .expect(200);
+      });
+
+      client.on('assistant.message', async () => {
+        try {
+          let stored = {
+            messages: [],
+          } as {
+            messages: Array<{ content: string; role: string }>;
+          };
+
+          for (let attempt = 0; attempt < 20; attempt += 1) {
+            stored = JSON.parse(
+              await readFile(
+                join(gatewayWebRuntimeDirectory, 'conversations', `${sessionId}.json`),
+                'utf8',
+              ),
+            ) as {
+              messages: Array<{ content: string; role: string }>;
+            };
+
+            if (
+              stored.messages.some(
+                (entry) => entry.role === 'user' && entry.content === 'hello assistant',
+              ) &&
+              stored.messages.some(
+                (entry) => entry.role === 'assistant' && entry.content === 'assistant reply',
+              )
+            ) {
+              break;
+            }
+
+            await new Promise((innerResolve) => setTimeout(innerResolve, 50));
+          }
+
+          expect(stored.messages).toEqual([
+            expect.objectContaining({ content: 'hello assistant', role: 'user' }),
+            expect.objectContaining({ content: 'assistant reply', role: 'assistant' }),
+          ]);
+          clearTimeout(timeout);
+          client.close();
+          resolve();
+        } catch (error) {
+          clearTimeout(timeout);
+          client.close();
+          reject(error);
+        }
       });
     });
   });

@@ -1,4 +1,12 @@
+const bootstrap = window.__MYCONCIERGE_BOOTSTRAP__ ?? {
+  history: [],
+  sessionId: 'unknown',
+};
+const sessionId = bootstrap.sessionId;
 const socket = io({
+  auth: {
+    sessionId,
+  },
   path: '/ws',
   transports: ['websocket'],
 });
@@ -8,6 +16,7 @@ const form = document.getElementById('chat-form');
 const input = document.getElementById('message-input');
 const connectionStatus = document.getElementById('connection-status');
 const connectionStatusLabel = document.getElementById('connection-status-label');
+const sessionNameLabel = document.getElementById('session-name-label');
 const maxComposerHeight = 180;
 
 function resizeInput() {
@@ -35,6 +44,12 @@ function setConnectionStatus(status) {
 
 socket.on('connect', () => {
   setConnectionStatus('connected');
+});
+
+socket.on('session.ready', (payload) => {
+  if (payload?.sessionId) {
+    sessionNameLabel.textContent = payload.sessionId;
+  }
 });
 
 socket.on('connect_error', () => {
@@ -81,4 +96,8 @@ input.addEventListener('input', () => {
 });
 
 setConnectionStatus('connecting');
+sessionNameLabel.textContent = sessionId;
+for (const entry of bootstrap.history) {
+  appendMessage(entry.role, entry.content);
+}
 resizeInput();

@@ -30,17 +30,17 @@ describe('AssistantWorkerPromptTemplateService', () => {
 ]`,
   };
 
-  it('renders assistant system prompt from runtime template', async () => {
-    const datadir = await mkdtemp(join(tmpdir(), 'assistant-worker-prompts-'));
-    await mkdir(join(datadir, 'prompts'), { recursive: true });
+  it('renders assistant system prompt from repository template', async () => {
+    const promptsdir = await mkdtemp(join(tmpdir(), 'assistant-worker-prompts-'));
+    await mkdir(promptsdir, { recursive: true });
     await writeFile(
-      join(datadir, 'prompts', 'user-prompt.md'),
+      join(promptsdir, 'user-prompt.md'),
       'HEADER\n{{request}}\nFOOTER\n',
       'utf8',
     );
     const service = new AssistantWorkerPromptTemplateService(
       new ConfigService({
-        ASSISTANT_DATADIR: datadir,
+        ASSISTANT_PROMPTS_DIR: promptsdir,
       }),
       new AssistantWorkerPromptService(),
     );

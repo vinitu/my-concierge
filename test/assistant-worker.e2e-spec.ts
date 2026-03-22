@@ -115,7 +115,7 @@ describe('assistant-worker (e2e)', () => {
 
     expect(response.status).toBe(200);
     expect(response.text).toContain('assistant-worker');
-    expect(response.text).toContain('runtime/config/worker.json');
+    expect(response.text).toContain('runtime/assistant-worker/config/worker.json');
     expect(response.text).toContain('<option value="deepseek">deepseek</option>');
     expect(response.text).toContain('<option value="xai" selected>');
     expect(response.text).toContain('<option value="ollama">ollama</option>');
@@ -124,7 +124,7 @@ describe('assistant-worker (e2e)', () => {
     expect(response.text).toContain('Reachability: <span id="provider-reachable">not working</span>');
   });
 
-  it('returns worker config and stores updates in runtime/config/worker.json', async () => {
+  it('returns worker config and stores updates in runtime/assistant-worker/config/worker.json', async () => {
     const getResponse = await request(app.getHttpServer()).get('/config');
 
     expect(getResponse.status).toBe(200);

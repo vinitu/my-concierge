@@ -3,21 +3,21 @@
 ## Purpose
 
 `assistant-worker` is the queued execution service inside `assistant`.
-It reads accepted requests from the queue, loads the assistant runtime context from `datadir`, sends the request to the configured LLM provider, and sends the final result back to the originating gateway through a callback.
+It reads accepted requests from the queue, loads the assistant runtime context from the runtime directory, sends the request to the configured LLM provider, and sends the final result back to the originating gateway through a callback.
 
 ## Status
 
 This document describes the first worker version.
 In this version, `assistant-worker` is only an LLM chat executor and does not execute local skills or local tools.
 The first supported LLM providers are Grok through the xAI Responses API and local Ollama.
-The worker settings page is exposed on `/`, stores config in `runtime/config/worker.json`, and shows the current provider status.
+The worker settings page is exposed on `/`, stores config in `runtime/assistant-worker/config/worker.json`, and shows the current provider status.
 This file is runtime state and is created locally by the worker.
 
 ## Responsibilities
 
 - Read accepted jobs from the queue
-- Read the assistant runtime context from `datadir`
-- Load `SYSTEM.js`, `SOUL.js`, `IDENTITY.js`, prompt templates, and conversation state
+- Read the assistant runtime context from the runtime directory
+- Load `SYSTEM.js`, `SOUL.js`, `IDENTITY.js`, the repository prompt template, and conversation state
 - Build the worker prompt from runtime context and queued input
 - Form requests to the configured LLM provider
 - Receive the final assistant answer from the LLM
@@ -29,32 +29,33 @@ This file is runtime state and is created locally by the worker.
 ```mermaid
 flowchart LR
     Q["queue"] --> Worker["assistant-worker"]
-    Datadir["datadir"] --> Worker
+    RuntimeDir["runtime directory"] --> Worker
     Worker --> LLM["LLM provider"]
     Worker --> GW["originating gateway callback endpoint"]
 ```
 
 ## Runtime Context
 
-`assistant-worker` starts from the same `datadir` as the rest of `assistant`.
-In V1 it treats this directory as the source of runtime identity, behavior rules, prompt templates, configuration, and conversation state.
+`assistant-worker` starts from the same runtime directory as the rest of `assistant`.
+In V1 it treats this directory as the source of runtime identity, behavior rules, configuration, and conversation state.
+The worker prompt template is stored in the repository, not in the runtime directory.
 
 Expected layout:
 
 ```text
 runtime/
-  SYSTEM.js
-  SOUL.js
-  IDENTITY.js
-  prompts/
-  skills/
-  memory/
-  conversations/
-  config/
-    worker.json
-  data/
-  logs/
-  cache/
+  assistant-worker/
+    SYSTEM.js
+    SOUL.js
+    IDENTITY.js
+    skills/
+    memory/
+    conversations/
+    config/
+      worker.json
+    data/
+    logs/
+    cache/
 ```
 
 ### Runtime Files
@@ -62,7 +63,6 @@ runtime/
 - `SYSTEM.js`: operating rules and execution constraints
 - `SOUL.js`: tone, behavior, and boundaries
 - `IDENTITY.js`: assistant identity and role
-- `prompts/`: editable system prompt templates
 - `memory/`: reserved runtime memory directory for future versions
 - `conversations/`: runtime conversation state files
 - `config/worker.json`: worker runtime settings
@@ -79,7 +79,7 @@ It is prepared in the runtime, but it is not sent to the LLM yet.
 
 The first version works like this:
 
-- memory is stored as regular text or markdown files inside `runtime/memory/`
+- memory is stored as regular text or markdown files inside `runtime/assistant-worker/memory/`
 - the files are maintained manually by the user or by future tooling
 - `assistant-worker` keeps this directory as reserved runtime memory input
 - the loaded memory is not appended to the provider prompt in the current version
@@ -97,7 +97,8 @@ Recommended structure:
 
 ```text
 runtime/
-  memory/
+  assistant-worker/
+    memory/
     profile.md
     preferences.md
     household.md
@@ -119,14 +120,14 @@ Recommended content types:
 
 ### Memory Loading Rules
 
-- keep `runtime/memory/` available in the runtime layout
+- keep `runtime/assistant-worker/memory/` available in the runtime layout
 - allow files to be prepared there manually
 - keep memory read-only during normal job execution in V1
 - do not append memory files to the current LLM request
 
 ```mermaid
 flowchart TD
-    MemoryDir["runtime/memory/"] --> Files["memory files"]
+    MemoryDir["runtime/assistant-worker/memory/"] --> Files["memory files"]
     Files --> Loader["assistant-worker runtime loader"]
     Loader --> Context["reserved runtime memory"]
 ```
@@ -136,7 +137,7 @@ flowchart TD
 What V1 does:
 
 - keep a reserved runtime directory for future durable facts
-- allow memory files to be prepared in the datadir
+- allow memory files to be prepared in the runtime directory
 
 What V1 does not do:
 
@@ -154,13 +155,13 @@ Later versions may add selective retrieval, summarization, and memory writing wo
 `assistant-worker` stores runtime conversation state in:
 
 ```text
-runtime/conversations/{direction}/{chat}/{contact}.json
+runtime/assistant-worker/conversations/{direction}/{chat}/{contact}.json
 ```
 
 Example:
 
 ```text
-runtime/conversations/api/direct/alex.json
+runtime/assistant-worker/conversations/api/direct/alex.json
 ```
 
 ### Conversation File Format
@@ -195,7 +196,7 @@ runtime/conversations/api/direct/alex.json
 ### Conversation Rules
 
 - one file per `{direction}/{chat}/{contact}`
-- `messages` stores only the last `memory_window` full messages from `runtime/config/worker.json`
+- `messages` stores only the last `memory_window` full messages from `runtime/assistant-worker/config/worker.json`
 - each new exchange pushes older messages out of the configured recent-message window
 - `context` stores compressed working memory beyond the recent message window
 - `context` should preserve the active topic, important entities, and unresolved questions when relevant
@@ -232,16 +233,16 @@ sequenceDiagram
     Worker->>Conv: save returned context
 ```
 
-## Datadir Loading Flow
+## Runtime Directory Loading Flow
 
 ```mermaid
 flowchart TD
-    Start["assistant-worker starts"] --> ReadDir["read datadir path"]
+    Start["assistant-worker starts"] --> ReadDir["read runtime directory path"]
     ReadDir --> LoadRules["load SYSTEM.js"]
     LoadRules --> LoadSoul["load SOUL.js"]
     LoadSoul --> LoadIdentity["load IDENTITY.js"]
-    LoadIdentity --> LoadPrompts["load prompts/"]
-    LoadPrompts --> LoadConfig["load config/worker.json"]
+    LoadIdentity --> LoadPrompt["load prompts/user-prompt.md"]
+    LoadPrompt --> LoadConfig["load config/worker.json"]
     LoadConfig --> BuildContext["build worker runtime context"]
 ```
 
@@ -251,12 +252,13 @@ flowchart TD
 sequenceDiagram
     participant Queue as queue
     participant Worker as assistant-worker
-    participant Datadir as datadir
+    participant RuntimeDir as runtime directory
     participant LLM as LLM provider
     participant Gateway as gateway callback
 
     Queue->>Worker: reserve next request
-    Worker->>Datadir: read SYSTEM.js, SOUL.js, IDENTITY.js, prompts/, config/, conversations/
+    Worker->>RuntimeDir: read SYSTEM.js, SOUL.js, IDENTITY.js, config/, conversations/
+    Worker->>Worker: read prompts/user-prompt.md from repository
     Worker->>Worker: build runtime context
     Worker->>Worker: build LLM request
     Worker->>LLM: send prompt
@@ -267,8 +269,8 @@ sequenceDiagram
 ## Processing Stages
 
 1. Read the next accepted job from the queue.
-2. Read the current runtime context from `datadir`.
-3. Load and normalize assistant rules, identity, prompt templates, and worker config.
+2. Read the current runtime context from the runtime directory.
+3. Load and normalize assistant rules, identity, the repository prompt template, and worker config.
 4. Build the LLM input from:
    - queued user request
    - channel metadata from the queue message
@@ -305,7 +307,7 @@ See [queue-message.md](../contracts/queue-message.md) for the exact queued messa
 The settings are stored in:
 
 ```text
-runtime/config/worker.json
+runtime/assistant-worker/config/worker.json
 ```
 
 In V1, the stored config is:
@@ -350,7 +352,7 @@ For each queued request, `assistant-worker` sends the provider one composed prom
    - `SOUL.js`
    - `IDENTITY.js`
 2. conversation state
-   - `context` from `runtime/conversations/{direction}/{chat}/{contact}.json`
+   - `context` from `runtime/assistant-worker/conversations/{direction}/{chat}/{contact}.json`
    - recent full messages from the same conversation file
 3. current request
    - current user message from the queue item
@@ -422,9 +424,9 @@ This gives the LLM:
 
 See the dedicated prompt contract in [assistant-worker-system-prompt.md](../contracts/assistant-worker-system-prompt.md).
 
-The editable runtime templates live in:
+The repository prompt template lives in:
 
-- `runtime/prompts/user-prompt.md`
+- `prompts/user-prompt.md`
 
 ## LLM Provider Configuration
 
@@ -447,7 +449,7 @@ Main environment variables:
 - `OLLAMA_BASE_URL`: Ollama base URL, default `http://host.docker.internal:11434`
 - `OLLAMA_MODEL`: local Ollama model alias, default `gemma3:1b`
 - `OLLAMA_TIMEOUT_MS`: request timeout in milliseconds, default `360000`
-- `ASSISTANT_DATADIR`: worker runtime context directory, default `./runtime`
+- `ASSISTANT_DATADIR`: worker runtime directory path, default `./runtime/assistant-worker`
 
 For local Docker Compose on macOS, `host.docker.internal` lets the `assistant-worker` container reach the Ollama process running on the host machine.
 
@@ -463,7 +465,7 @@ V1 intentionally does not include:
 V1 is only:
 
 - queue consumer
-- `datadir` context loader
+- runtime directory context loader
 - single LLM request builder
 - single LLM response handler
 - callback sender
@@ -497,7 +499,7 @@ flowchart LR
 ## Rules
 
 - The worker reads work only from the queue.
-- The worker reads runtime identity and behavior from `datadir`.
+- The worker reads runtime identity and behavior from the runtime directory.
 - The worker is responsible for one LLM request per queued job in V1.
 - The worker sends results back only through callback endpoints.
 - One queued job should produce one final callback answer in V1.
@@ -516,10 +518,10 @@ flowchart LR
 
 Later versions may add:
 
-- conversation history in `datadir/conversations/`
+- conversation history in `runtime/assistant-worker/conversations/`
 - selective retrieval from recent conversations
 - summary files for long-running chats
-- local skill execution from `datadir/skills`
+- local skill execution from `runtime/assistant-worker/skills`
 - local tool execution
 - agent loop
   - `LLM -> skill/tool call -> local execution -> LLM -> ... -> final callback`

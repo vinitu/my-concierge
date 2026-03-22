@@ -10,49 +10,59 @@ Describe the runtime model of `assistant`.
 - `assistant` is split into `assistant-api` and `assistant-worker`.
 - A queue sits between the two runtime parts.
 - Both runtime parts start from the same repository working directory.
-- Both runtime parts load the same runtime files from a separate `datadir`.
+- Runtime parts load their own files from separate runtime directories under `./runtime`.
 
 ## Data Directory
 
-The repository contains a separate runtime `datadir` in `./runtime`.
-`assistant-worker` reads runtime context from this directory.
-In Docker Compose, this directory is mounted into the container as `/app/runtime`.
+The repository contains separate runtime directories in `./runtime`.
+`assistant-worker` reads runtime context from `./runtime/assistant-worker`.
+`gateway-web` stores browser chat state in `./runtime/gateway-web`.
+In Docker Compose, each service mounts its own runtime directory into the container as `/app/runtime`.
 
 Expected layout:
 
 ```text
 runtime/
-  SYSTEM.js
-  SOUL.js
-  IDENTITY.js
-  prompts/
-  skills/
-  memory/
-  conversations/
-  config/
-    worker.json
-  data/
-  logs/
-  cache/
+  assistant-worker/
+    SYSTEM.js
+    SOUL.js
+    IDENTITY.js
+    skills/
+    memory/
+    conversations/
+    config/
+      worker.json
+    data/
+    logs/
+    cache/
+  gateway-web/
+    conversations/
+    data/
+    logs/
+    cache/
 ```
 
 ## Runtime Files
 
-- `SYSTEM.js`: operating rules
-- `SOUL.js`: tone and boundaries
-- `IDENTITY.js`: who the assistant is
-- `prompts/`: editable prompt templates for `assistant-worker`
-- `skills/`: skill definitions
-- `memory/`: assistant memory files
-- `conversations/`: per-chat conversation runtime files
+- `runtime/assistant-worker/SYSTEM.js`: operating rules
+- `runtime/assistant-worker/SOUL.js`: tone and boundaries
+- `runtime/assistant-worker/IDENTITY.js`: who the assistant is
+- `runtime/assistant-worker/skills/`: skill definitions
+- `runtime/assistant-worker/memory/`: assistant memory files
+- `runtime/assistant-worker/conversations/`: per-chat conversation runtime files
+- `runtime/gateway-web/conversations/`: per-session browser chat history
+
+Repository-owned files:
+
+- `prompts/user-prompt.md`: the prompt template used by `assistant-worker`
 
 ## Memory
 
-In the current runtime, `memory/` is a file-based read-only memory source for `assistant-worker`.
+In the current runtime, `runtime/assistant-worker/memory/` is a file-based read-only memory source for `assistant-worker`.
 
 Current rules:
 
-- memory lives in `runtime/memory/`
+- memory lives in `runtime/assistant-worker/memory/`
 - memory is stored as regular files, typically markdown
 - `assistant-worker` keeps this directory as prepared runtime memory
 - memory is not injected into the LLM request in the current version
@@ -60,12 +70,12 @@ Current rules:
 
 ## Conversations
 
-In the current runtime, `conversations/` stores per-chat JSON state for `assistant-worker`.
+In the current runtime, `runtime/assistant-worker/conversations/` stores per-chat JSON state for `assistant-worker`.
 
 Current rules:
 
-- conversation files live in `runtime/conversations/{direction}/{chat}/{contact}.json`
-- each file stores the last `memory_window` full messages from `runtime/config/worker.json`
+- conversation files live in `runtime/assistant-worker/conversations/{direction}/{chat}/{contact}.json`
+- each file stores the last `memory_window` full messages from `runtime/assistant-worker/config/worker.json`
 - each file also stores a compact `context` summary for older conversation state
 - when old messages are evicted from the configured recent-message window, `assistant-worker` asks the active LLM provider to merge them into `context`
 
@@ -82,15 +92,18 @@ For each request, `assistant-worker` builds the provider input from:
 
 ## Startup Rules
 
-1. Read the configured `datadir` path.
+1. Read the configured runtime directory paths.
 2. Validate required runtime files and folders.
-3. Load `IDENTITY.js`, `SOUL.js`, and `SYSTEM.js`.
-4. Load `memory/`.
-5. Keep `conversations/` available for future runtime versions.
-6. Keep `skills/` available for future runtime versions.
-7. Build one shared runtime context model.
-8. Start `assistant-api`.
-9. Start `assistant-worker`.
+3. Load `runtime/assistant-worker/IDENTITY.js`, `runtime/assistant-worker/SOUL.js`, and `runtime/assistant-worker/SYSTEM.js`.
+4. Load the repository prompt template from `prompts/user-prompt.md`.
+5. Load `runtime/assistant-worker/memory/`.
+6. Keep `runtime/assistant-worker/conversations/` available for worker context.
+7. Keep `runtime/gateway-web/conversations/` available for browser chat history.
+8. Keep `runtime/assistant-worker/skills/` available for future runtime versions.
+9. Build one shared runtime context model.
+10. Start `assistant-api`.
+11. Start `assistant-worker`.
+12. Start `gateway-web`.
 
 ## Container Port Rule
 

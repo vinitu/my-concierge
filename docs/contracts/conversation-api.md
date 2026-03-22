@@ -87,4 +87,12 @@ Examples:
 
 - The client should treat `202 Accepted` as acceptance only, not as the final assistant answer.
 - The client should wait for the asynchronous callback on `callback_url`.
-- One accepted request may produce zero, one, or many callback messages over time.
+- In the current V1 flow, one accepted request produces one final callback message.
+
+## Current `gateway-web` Contact Rule
+
+For the browser flow:
+
+- `contact` is the stable browser `session_id`
+- `gateway-web` stores `session_id` in the `myconcierge_session_id` cookie
+- `gateway-web` uses that `session_id` both for the websocket session mapping and for the callback path

@@ -40,7 +40,9 @@
 
 .status-cluster {
   display: flex;
+  gap: 10px;
   justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .status-pill {
@@ -54,6 +56,24 @@
   font-size: 0.84rem;
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.status-name-pill {
+  max-width: min(52vw, 26rem);
+}
+
+.status-caption {
+  color: var(--chat-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+#session-name-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-dot {

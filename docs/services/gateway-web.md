@@ -8,9 +8,11 @@ Provide a simple Web chat UI for the local assistant.
 
 - Serve the Web chat page
 - Accept WebSocket chat messages from the browser
+- Keep a stable browser session id in cookies
 - Convert browser messages into `assistant-api` requests
 - Expose a callback endpoint for `assistant-worker`
 - Send callback messages back to the browser through WebSocket
+- Persist browser chat history in the gateway runtime directory
 - Expose `GET /status`
 - Expose `GET /metrics`
 - Expose `GET /openapi.json`
@@ -42,6 +44,7 @@ flowchart LR
 - `assistant-api-client`: sends accepted browser messages to `assistant-api`
 - `callback-controller`: accepts `assistant-worker` callback requests
 - `session-registry`: maps callback messages to the correct WebSocket connection
+- `runtime-store`: stores per-session browser chat history in `runtime/gateway-web/`
 - `status`: returns service readiness
 - `metrics`: returns Prometheus metrics
 - `openapi`: returns the gateway OpenAPI schema
@@ -51,19 +54,22 @@ flowchart LR
 1. The browser opens `GET /`.
 2. The browser opens `WS /ws`.
 3. The browser sends a chat message through WebSocket.
-4. `gateway-web` maps the WebSocket session to a chat and contact.
+4. `gateway-web` resolves the stable browser session id from the cookie and maps the WebSocket connection to it.
 5. `gateway-web` calls `assistant-api`.
 6. `assistant-api` accepts the message and writes it to the queue.
 7. `assistant-worker` processes the job.
 8. `assistant-worker` sends a callback to `POST /callbacks/assistant/:contact`.
-9. `gateway-web` finds the right WebSocket session.
-10. `gateway-web` sends the assistant message back to the browser.
+9. `gateway-web` stores the assistant reply in `runtime/gateway-web/conversations/{session_id}.json`.
+10. `gateway-web` finds the right WebSocket session.
+11. `gateway-web` sends the assistant message back to the browser.
 
 ## State Rules
 
 - `gateway-web` should keep only light session state.
 - Assistant business state should stay outside `gateway-web`.
 - WebSocket session mapping may live in memory in the first MVP.
+- Browser chat history is stored locally in `runtime/gateway-web/conversations/`.
+- The browser identity is a stable `session_id` stored in a cookie.
 - If `gateway-web` is scaled horizontally later, the session mapping will need a shared store or sticky sessions.
 
 ## Current Repository Location
@@ -97,6 +103,7 @@ If more services are implemented in the same repository later, `gateway-web` may
 - `gateway-web` talks to `assistant-api` through HTTP.
 - `assistant-worker` sends callbacks to `gateway-web`.
 - `gateway-web` maps callbacks back to the correct WebSocket session.
+- `gateway-web` uses the cookie-backed `session_id` as the browser contact identifier.
 - `gateway-web` exposes `GET /openapi.json` for the shared Swagger UI.
 
 ## Metrics

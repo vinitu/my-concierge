@@ -78,7 +78,10 @@ export class AssistantWorkerConfigService {
   }
 
   private datadir(): string {
-    return this.configService.get<string>('ASSISTANT_DATADIR', join(process.cwd(), 'runtime'));
+    return this.configService.get<string>(
+      'ASSISTANT_DATADIR',
+      join(process.cwd(), 'runtime', 'assistant-worker'),
+    );
   }
 
   private normalizeProvider(value: unknown): AssistantWorkerProvider {

@@ -56,7 +56,7 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - ./runtime:/app/runtime
+      - ./runtime/assistant-worker:/app/runtime
 
   gateway-telegram:
     image: myconcierge-gateway-telegram:local
@@ -86,8 +86,11 @@ services:
       PORT: 3000
       ASSISTANT_API_URL: http://assistant-api:3000
       CALLBACK_BASE_URL: http://gateway-web:3000
+      GATEWAY_WEB_RUNTIME_DIR: ${GATEWAY_WEB_RUNTIME_DIR:-/app/runtime}
     ports:
       - "8080:3000"
+    volumes:
+      - ./runtime/gateway-web:/app/runtime
 
   gateway-email:
     image: myconcierge-gateway-email:local

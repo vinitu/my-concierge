@@ -1,4 +1,4 @@
 - Store persistent facts for the assistant in this directory.
 - Use markdown or text files with simple bullet facts.
 - Examples: preferences, recurring tasks, important household context.
-- These files are read by `assistant-worker` and included in the LLM prompt as history facts.
+- These files are prepared for future memory retrieval and are not sent to the LLM in the current version.

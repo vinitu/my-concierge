@@ -19,7 +19,10 @@ Describe the default local runtime.
 - `assistant-api` uses `QUEUE_ADAPTER=redis`
 - `assistant-worker` uses `QUEUE_ADAPTER=redis`
 - `assistant-worker` can use DeepSeek, xAI, or local Ollama
-- `assistant-worker` mounts `./runtime` into the container as `/app/runtime`
+- `assistant-worker` mounts `./runtime/assistant-worker` into the container as `/app/runtime`
+- `gateway-web` mounts `./runtime/gateway-web` into the container as `/app/runtime`
+- `assistant-worker` reads its prompt template from `/app/prompts/user-prompt.md`
+- runtime files are provided only through the Docker Compose bind volume and are not copied into the image
 - Docker Compose reads local values from `.env`
 - `make build` builds the local `gateway-web` image
 - `make up` starts the local example stack
@@ -62,6 +65,7 @@ Available variables in `.env.example`:
 - `OLLAMA_MODEL`
 - `OLLAMA_TIMEOUT_MS`
 - `ASSISTANT_DATADIR`
+- `GATEWAY_WEB_RUNTIME_DIR`
 - `WORKER_POLL_INTERVAL_MS`
 
 Default `ASSISTANT_DATADIR` in the local Docker Compose setup:
@@ -70,10 +74,17 @@ Default `ASSISTANT_DATADIR` in the local Docker Compose setup:
 /app/runtime
 ```
 
+Default `GATEWAY_WEB_RUNTIME_DIR` in the local Docker Compose setup:
+
+```text
+/app/runtime
+```
+
 Runtime volume in the local Docker Compose setup:
 
 ```text
-./runtime:/app/runtime
+./runtime/assistant-worker:/app/runtime
+./runtime/gateway-web:/app/runtime
 ```
 
 Default `OLLAMA_BASE_URL` in the local Docker Compose setup:

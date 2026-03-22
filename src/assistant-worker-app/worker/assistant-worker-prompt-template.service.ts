@@ -41,13 +41,13 @@ export class AssistantWorkerPromptTemplateService {
     });
   }
 
-  private datadir(): string {
-    return this.configService.get<string>('ASSISTANT_DATADIR', join(process.cwd(), 'runtime'));
+  private promptsdir(): string {
+    return this.configService.get<string>('ASSISTANT_PROMPTS_DIR', join(process.cwd(), 'prompts'));
   }
 
   private async readOptionalTemplate(filename: string): Promise<string | null> {
     try {
-      return await readFile(join(this.datadir(), 'prompts', filename), 'utf8');
+      return await readFile(join(this.promptsdir(), filename), 'utf8');
     } catch (error) {
       if (
         typeof error === 'object' &&
