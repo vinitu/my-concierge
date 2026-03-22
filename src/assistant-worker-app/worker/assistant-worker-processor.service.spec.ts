@@ -28,8 +28,6 @@ describe('AssistantWorkerProcessorService', () => {
     } as unknown as CallbackDeliveryService;
     const llmProvider = {
       generateReply: jest.fn().mockResolvedValue('hello from grok'),
-      modelName: jest.fn().mockReturnValue('grok-4'),
-      providerName: jest.fn().mockReturnValue('grok'),
     } as unknown as AssistantLlmProvider;
     const configService = new ConfigService({
       FILE_QUEUE_DIR: queueDir,

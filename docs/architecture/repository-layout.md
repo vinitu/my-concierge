@@ -55,6 +55,7 @@ my-concierge/
     IDENTITY.md
     skills/
     memory/
+    config/
     data/
     logs/
     cache/

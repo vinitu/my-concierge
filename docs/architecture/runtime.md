@@ -26,6 +26,8 @@ runtime/
   IDENTITY.md
   skills/
   memory/
+  config/
+    worker.json
   data/
   logs/
   cache/

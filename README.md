@@ -56,7 +56,7 @@ The current source of truth is the code for these services and the project docum
 - Queue-based asynchronous flow between `assistant-api` and `assistant-worker`
 - `assistant-api` accepts requests, validates them, enqueues jobs, and acknowledges them
 - `assistant-api` supports env-based queue adapters and currently uses Redis by default through `QUEUE_ADAPTER=redis`
-- `assistant-worker` reads queued jobs, loads runtime context from `runtime/`, sends them to Grok through a provider interface, and returns callback replies
+- `assistant-worker` reads queued jobs, loads runtime context from `runtime/`, sends them to the configured provider (`xai` or `ollama`), returns callback replies, and exposes a worker settings page with provider status
 - `gateway-web` provides the browser chat UI and WebSocket transport
 - `gateway-web` exposes `/`, `WS /ws`, `/callbacks/assistant/:contact`, `/status`, `/metrics`, and `/openapi.json`
 - `assistant-api`, `assistant-worker`, and `gateway-web` expose `/status`, `/metrics`, and OpenAPI documentation
@@ -78,6 +78,8 @@ flowchart LR
     Browser["Browser"] --> GW["gateway-web"]
     Telegram["Telegram"] --> GT["gateway-telegram"]
     Email["Email"] --> GE["gateway-email"]
+    Assistant --> XAI["xai"]
+    Assistant --> Ollama["ollama"]
 
     GW <--> Assistant
     GT <--> Assistant
@@ -96,7 +98,7 @@ flowchart LR
 
 ### assistant-worker
 
-- [assistant-worker](./docs/services/assistant-worker.md): processes queued jobs, calls Grok, sends callback replies, and exposes operational endpoints
+- [assistant-worker](./docs/services/assistant-worker.md): processes queued jobs, calls the configured LLM provider, sends callback replies, and exposes operational endpoints plus provider status
 
 ### assistant
 
@@ -136,7 +138,7 @@ It contains the metrics flow diagram and per-service metric tables.
 | Host port | Service | Purpose |
 |---------|-------------|---------|
 | [http://localhost:3000/](http://localhost:3000/) | [`assistant-api`](./docker-compose.yaml) | HTTP API |
-| [http://localhost:3001/](http://localhost:3001/) | [`assistant-worker`](./docker-compose.yaml) | Worker service |
+| [http://localhost:3001/](http://localhost:3001/) | [`assistant-worker`](./docker-compose.yaml) | Worker settings page, provider status, and service |
 | [http://localhost:8080/](http://localhost:8080/) | [`gateway-web`](./docker-compose.yaml) | Web chat UI, WebSocket, callbacks |
 | [http://localhost:8081/](http://localhost:8081/) | [`gateway-telegram`](./docker-compose.yaml) | Telegram gateway |
 | [http://localhost:8082/](http://localhost:8082/) | [`gateway-email`](./docker-compose.yaml) | Email gateway |
@@ -157,20 +159,29 @@ Notes:
 make env
 ```
 
-3. Fill `XAI_API_KEY` in `.env`.
+3. Configure one provider in `.env`.
 
-4. Start the local stack:
+For `xai`:
+- `XAI_API_KEY`
+
+For local Ollama:
+- `OLLAMA_BASE_URL=http://host.docker.internal:11434`
+- `OLLAMA_MODEL=gemma3:1b`
+
+4. If you want Ollama instead of xAI, open [http://localhost:3001/](http://localhost:3001/) after startup and switch the worker provider to `ollama`.
+
+5. Start the local stack:
 
 ```bash
 make up
 ```
 
-5. Open the main entrypoints:
+6. Open the main entrypoints:
 
 - [http://localhost:8080/](http://localhost:8080/) for `gateway-web`
 - [http://localhost:8088/](http://localhost:8088/) for `swagger`
 
-6. Stop the stack:
+7. Stop the stack:
 
 ```bash
 make down
@@ -215,6 +226,7 @@ Expected runtime files and folders:
 - `runtime/IDENTITY.md`
 - `runtime/skills/`
 - `runtime/memory/`
+- `runtime/config/worker.json`
 
 The repository already includes a starter `datadir` in [runtime/](/Users/vinitu/Projects/vinitu/my-concierge/runtime) with placeholder instruction files.
 

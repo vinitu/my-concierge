@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
+import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
 import type { AssistantWorkerRuntimeContext } from './assistant-worker-runtime-context.service';
 import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 import { GrokResponsesService } from './grok-responses.service';
@@ -54,6 +55,7 @@ describe('GrokResponsesService', () => {
       new ConfigService({
         XAI_API_KEY: 'test-key',
       }),
+      new AssistantWorkerPromptService(),
       runtimeContextService,
     );
 
@@ -97,7 +99,11 @@ describe('GrokResponsesService', () => {
     const runtimeContextService = {
       load: jest.fn().mockResolvedValue(runtimeContext),
     } as unknown as AssistantWorkerRuntimeContextService;
-    const service = new GrokResponsesService(new ConfigService({}), runtimeContextService);
+    const service = new GrokResponsesService(
+      new ConfigService({}),
+      new AssistantWorkerPromptService(),
+      runtimeContextService,
+    );
 
     await expect(service.generateReply(queueMessage)).rejects.toThrow(
       'XAI_API_KEY is required for assistant-worker',

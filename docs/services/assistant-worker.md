@@ -9,7 +9,8 @@ It reads accepted requests from the queue, loads the assistant runtime context f
 
 This document describes the first worker version.
 In this version, `assistant-worker` is only an LLM chat executor and does not execute local skills or local tools.
-The first configured LLM provider is Grok through the xAI Responses API.
+The first supported LLM providers are Grok through the xAI Responses API and local Ollama.
+The worker settings page is exposed on `/`, stores config in `runtime/config/worker.json`, and shows the current provider status.
 
 ## Responsibilities
 
@@ -46,6 +47,8 @@ runtime/
   IDENTITY.md
   skills/
   memory/
+  config/
+    worker.json
   data/
   logs/
   cache/
@@ -57,6 +60,7 @@ runtime/
 - `SOUL.md`: tone, behavior, and boundaries
 - `IDENTITY.md`: assistant identity and role
 - `memory/`: assistant memory that may be injected into prompts
+- `config/worker.json`: worker runtime settings
 - `data/`: runtime state and working data
 - `logs/`: worker logs and execution traces
 - `cache/`: cached runtime artifacts when needed
@@ -126,6 +130,36 @@ Main fields used by the worker:
 
 See [queue-message.md](../contracts/queue-message.md) for the exact queued message shape.
 
+## Worker Settings
+
+`assistant-worker` exposes a simple settings page on `/`.
+
+The settings are stored in:
+
+```text
+runtime/config/worker.json
+```
+
+In V1, the stored config is:
+
+```json
+{
+  "provider": "xai"
+}
+```
+
+The first version supports these provider values:
+
+- `xai`
+- `ollama`
+
+The settings page also shows:
+
+- whether credentials are configured when the provider needs them
+- whether the provider API check succeeds
+- the active model name
+- the last provider status message
+
 ## LLM Request Composition
 
 The worker should build the LLM request from the runtime context, not only from the user message.
@@ -140,7 +174,10 @@ The request should include:
 
 ## LLM Provider Configuration
 
-V1 uses Grok through the xAI Responses API.
+V1 supports:
+
+- `xai`: Grok through the xAI Responses API
+- `ollama`: local Ollama through the Ollama HTTP API
 
 Main environment variables:
 
@@ -148,7 +185,12 @@ Main environment variables:
 - `XAI_BASE_URL`: xAI API base URL, default `https://api.x.ai/v1`
 - `XAI_MODEL`: Grok model alias, default `grok-4`
 - `XAI_TIMEOUT_MS`: request timeout in milliseconds, default `360000`
+- `OLLAMA_BASE_URL`: Ollama base URL, default `http://host.docker.internal:11434`
+- `OLLAMA_MODEL`: local Ollama model alias, default `gemma3:1b`
+- `OLLAMA_TIMEOUT_MS`: request timeout in milliseconds, default `360000`
 - `ASSISTANT_DATADIR`: worker runtime context directory, default `./runtime`
+
+For local Docker Compose on macOS, `host.docker.internal` lets the `assistant-worker` container reach the Ollama process running on the host machine.
 
 ## First Version Scope
 
@@ -185,7 +227,10 @@ flowchart LR
 
 | Endpoint | Purpose |
 |---------|---------|
-| `GET /` | Service entrypoint summary |
+| `GET /` | Worker settings page |
+| `GET /config` | Current worker runtime config |
+| `PUT /config` | Update worker runtime config |
+| `GET /provider-status` | Current provider credential and reachability status |
 | `GET /status` | Worker readiness |
 | `GET /metrics` | Prometheus metrics |
 | `GET /openapi.json` | OpenAPI schema |

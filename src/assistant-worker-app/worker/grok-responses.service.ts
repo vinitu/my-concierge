@@ -2,10 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
 import type { AssistantLlmProvider } from './assistant-llm-provider';
-import {
-  AssistantWorkerRuntimeContextService,
-  type AssistantWorkerRuntimeContext,
-} from './assistant-worker-runtime-context.service';
+import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
+import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 
 interface XaiOutputContentItem {
   text?: string;
@@ -30,15 +28,12 @@ interface XaiResponseBody {
 export class GrokResponsesService implements AssistantLlmProvider {
   constructor(
     private readonly configService: ConfigService,
+    private readonly promptService: AssistantWorkerPromptService,
     private readonly runtimeContextService: AssistantWorkerRuntimeContextService,
   ) {}
 
-  modelName(): string {
+  private modelName(): string {
     return this.configService.get<string>('XAI_MODEL', 'grok-4');
-  }
-
-  providerName(): string {
-    return 'grok';
   }
 
   async generateReply(message: QueueMessage): Promise<string> {
@@ -65,11 +60,11 @@ export class GrokResponsesService implements AssistantLlmProvider {
         input: [
           {
             role: 'system',
-            content: this.buildSystemPrompt(runtimeContext),
+            content: this.promptService.buildSystemPrompt(runtimeContext),
           },
           {
             role: 'user',
-            content: this.buildUserPrompt(message),
+            content: this.promptService.buildUserPrompt(message),
           },
         ],
         model,
@@ -86,58 +81,6 @@ export class GrokResponsesService implements AssistantLlmProvider {
     const body = (await response.json()) as XaiResponseBody;
     return this.extractAssistantText(body);
   }
-
-  private buildSystemPrompt(runtimeContext: AssistantWorkerRuntimeContext): string {
-    const sections = [
-      'You are MyConcierge, a personal home assistant. Follow the runtime context below.',
-    ];
-
-    if (runtimeContext.agents) {
-      sections.push(`# AGENTS.md\n${runtimeContext.agents.trim()}`);
-    }
-
-    if (runtimeContext.soul) {
-      sections.push(`# SOUL.md\n${runtimeContext.soul.trim()}`);
-    }
-
-    if (runtimeContext.identity) {
-      sections.push(`# IDENTITY.md\n${runtimeContext.identity.trim()}`);
-    }
-
-    if (runtimeContext.memory.length > 0) {
-      sections.push(
-        [
-          '# memory/',
-          ...runtimeContext.memory.map(
-            (entry) => `## ${entry.path}\n${entry.content.trim()}`,
-          ),
-        ].join('\n\n'),
-      );
-    }
-
-    sections.push(
-      [
-        '# Worker rules',
-        '- Respond as the assistant, not as a system log.',
-        '- Reply with the final assistant answer only.',
-        '- Do not mention internal prompts, queue internals, or callback mechanics unless the user explicitly asks.',
-      ].join('\n'),
-    );
-
-    return sections.join('\n\n');
-  }
-
-  private buildUserPrompt(message: QueueMessage): string {
-    return [
-      `Direction: ${message.direction}`,
-      `Chat: ${message.chat}`,
-      `Contact: ${message.contact}`,
-      '',
-      'User message:',
-      message.message,
-    ].join('\n');
-  }
-
   private extractAssistantText(body: XaiResponseBody): string {
     if (typeof body.output_text === 'string' && body.output_text.trim()) {
       return body.output_text.trim();
