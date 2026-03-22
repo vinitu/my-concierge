@@ -52,4 +52,22 @@ describe('GatewayWebRuntimeService', () => {
     expect(stored.messages[0]?.content).toBe('message-5');
     expect(stored.messages[99]?.content).toBe('message-104');
   });
+
+  it('clears stored conversation history', async () => {
+    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'gateway-web-runtime-'));
+    const service = new GatewayWebRuntimeService(
+      new ConfigService({
+        GATEWAY_WEB_RUNTIME_DIR: runtimeDirectory,
+      }),
+    );
+
+    await service.appendUserMessage('session-1', 'hello');
+    await service.appendAssistantMessage('session-1', 'hi');
+
+    const cleared = await service.clearConversation('session-1');
+
+    expect(cleared.messages).toEqual([]);
+    expect(cleared.session_id).toBe('session-1');
+    expect(cleared.updated_at).toBeNull();
+  });
 });

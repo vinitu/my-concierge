@@ -14,6 +14,7 @@ const socket = io({
 const messages = document.getElementById('messages');
 const form = document.getElementById('chat-form');
 const input = document.getElementById('message-input');
+const clearConversationButton = document.getElementById('clear-conversation-button');
 const connectionStatus = document.getElementById('connection-status');
 const connectionStatusLabel = document.getElementById('connection-status-label');
 const sessionNameLabel = document.getElementById('session-name-label');
@@ -52,6 +53,12 @@ function clearThinking() {
     thinkingMessage.remove();
     thinkingMessage = null;
   }
+}
+
+function clearMessages() {
+  clearThinking();
+  messages.innerHTML = '';
+  scrollMessagesToBottom();
 }
 
 function setConnectionStatus(status) {
@@ -126,6 +133,27 @@ form.addEventListener('submit', (event) => {
   input.value = '';
   resizeInput();
   input.focus();
+});
+
+clearConversationButton.addEventListener('click', async () => {
+  clearConversationButton.disabled = true;
+
+  try {
+    const response = await fetch('/conversation', {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      appendMessage('system', 'Failed to clear conversation');
+      return;
+    }
+
+    clearMessages();
+  } catch {
+    appendMessage('system', 'Failed to clear conversation');
+  } finally {
+    clearConversationButton.disabled = false;
+  }
 });
 
 input.addEventListener('keydown', (event) => {

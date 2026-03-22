@@ -88,6 +88,7 @@ describe('gateway-web (e2e)', () => {
     expect(response.body.info.title).toBe('gateway-web');
     expect(response.body.paths['/response/{conversationId}']).toBeDefined();
     expect(response.body.paths['/thinking/{conversationId}']).toBeDefined();
+    expect(response.body.paths['/conversation']).toBeDefined();
     expect(response.body.paths['/metrics']).toBeDefined();
     expect(response.body.paths['/status']).toBeDefined();
   });
@@ -290,5 +291,44 @@ describe('gateway-web (e2e)', () => {
         }
       });
     });
+  });
+
+  it('clears the current browser conversation', async () => {
+    const pageResponse = await request(app.getHttpServer()).get('/');
+    const sessionCookie = pageResponse.headers['set-cookie'][0];
+    const sessionId = sessionCookie.match(
+      new RegExp(`${GATEWAY_WEB_SESSION_COOKIE}=([^;]+)`),
+    )?.[1] as string;
+
+    await request(app.getHttpServer())
+      .post(`/response/${sessionId}`)
+      .set('Cookie', sessionCookie)
+      .send({ message: 'assistant reply' })
+      .expect(200);
+
+    const clearResponse = await request(app.getHttpServer())
+      .delete('/conversation')
+      .set('Cookie', sessionCookie)
+      .expect(200);
+
+    expect(clearResponse.body).toEqual({
+      cleared: true,
+      sessionId,
+    });
+
+    const stored = JSON.parse(
+      await readFile(
+        join(gatewayWebRuntimeDirectory, 'conversations', `${sessionId}.json`),
+        'utf8',
+      ),
+    ) as {
+      messages: Array<{ content: string; role: string }>;
+      session_id: string;
+      updated_at: string | null;
+    };
+
+    expect(stored.messages).toEqual([]);
+    expect(stored.session_id).toBe(sessionId);
+    expect(stored.updated_at).toBeNull();
   });
 });

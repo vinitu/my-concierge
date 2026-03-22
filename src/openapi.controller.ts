@@ -23,6 +23,16 @@ export class GatewayWebOpenApiController {
             },
           },
         },
+        '/conversation': {
+          delete: {
+            summary: 'Clear the current browser conversation history',
+            responses: {
+              '200': {
+                description: 'Conversation history cleared',
+              },
+            },
+          },
+        },
         '/response/{conversationId}': {
           post: {
             summary: 'Receive the final assistant response for a browser conversation',

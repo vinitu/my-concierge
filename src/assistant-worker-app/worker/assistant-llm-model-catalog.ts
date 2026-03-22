@@ -2,7 +2,7 @@ import type { AssistantWorkerProvider } from './assistant-llm-provider';
 
 export const STATIC_PROVIDER_MODELS: Record<AssistantWorkerProvider, string[]> = {
   deepseek: ['deepseek-chat', 'deepseek-reasoner'],
-  ollama: ['gemma3:1b'],
+  ollama: ['gemma3:1b', 'gemma3:4b', 'gemma3:12b'],
   xai: ['grok-4', 'grok-4-latest'],
 };
 
