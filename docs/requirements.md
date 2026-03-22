@@ -28,8 +28,9 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - `assistant-api` and `assistant-worker` must communicate only through a queue.
 - `assistant-api` must only validate, enqueue, and acknowledge requests.
 - `assistant-worker` must run assistant business logic.
-- The system must support DeepSeek, xAI, OpenAI, and Ollama.
-- `assistant-worker` must call LLMs through one shared integration layer.
+- The system must support Grok in the first version.
+- Later versions must support DeepSeek, OpenAI, and Ollama through the same integration model.
+- `assistant-worker` must call LLMs through one shared provider interface.
 - The system must support Telegram, Email, and Web gateway components.
 - `gateway-web` must provide a simple chat page and WebSocket transport for browser messages.
 - The system must support a Scheduler component.
@@ -57,7 +58,7 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - Docker Compose is the default deployment mode.
 - A queue is required between API intake and worker execution.
 - One shared Swagger UI is preferred over multiple Swagger UI services.
-- The runtime reads `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `skills/`, and `memory/` from the working directory.
+- The runtime reads `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `skills/`, and `memory/` from a separate `datadir`.
 
 ### Done checks
 - The documentation is split into overview, architecture, services, contracts, deployment, and operations.
@@ -72,7 +73,7 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 ### Risks
 - Weak queue contracts may cause lost or duplicated jobs.
 - Weak component boundaries may move business logic into `assistant-api`.
-- Different LLM providers may need different prompts and limits.
+- Different LLM providers may need different prompts, limits, and response parsing.
 - Poor metrics design may create too many time series.
 - Too many runtime services may break the minimal design goal.
 

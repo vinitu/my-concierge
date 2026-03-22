@@ -12,7 +12,10 @@ import {
   type QueueConsumer,
 } from './queue/queue-consumer';
 import { AssistantWorkerProcessorService } from './worker/assistant-worker-processor.service';
+import { AssistantWorkerRuntimeContextService } from './worker/assistant-worker-runtime-context.service';
 import { CallbackDeliveryService } from './worker/callback-delivery.service';
+import { ASSISTANT_LLM_PROVIDER } from './worker/assistant-llm-provider';
+import { GrokResponsesService } from './worker/grok-responses.service';
 import { AssistantWorkerRootController } from './root.controller';
 import { AssistantWorkerStatusController } from './status.controller';
 
@@ -28,9 +31,15 @@ import { AssistantWorkerStatusController } from './status.controller';
     AssistantWorkerMetricsService,
     HttpRequestMetricsInterceptor,
     AssistantWorkerProcessorService,
+    AssistantWorkerRuntimeContextService,
     CallbackDeliveryService,
     FileQueueConsumerService,
+    GrokResponsesService,
     RedisQueueConsumerService,
+    {
+      provide: ASSISTANT_LLM_PROVIDER,
+      useExisting: GrokResponsesService,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: HttpRequestMetricsInterceptor,

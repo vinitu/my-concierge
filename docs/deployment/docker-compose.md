@@ -7,6 +7,7 @@ Describe the default local runtime.
 ## Main Services
 
 - `assistant-api`
+- `assistant-worker`
 - `gateway-web`
 
 ## Current Local Example
@@ -17,9 +18,38 @@ Describe the default local runtime.
 - `queue` uses Redis in the current local example
 - `assistant-api` uses `QUEUE_ADAPTER=redis`
 - `assistant-worker` uses `QUEUE_ADAPTER=redis`
+- `assistant-worker` uses Grok through the xAI Responses API
+- Docker Compose reads local values from `.env`
 - `make build` builds the local `gateway-web` image
 - `make up` starts the local example stack
 - `make down` stops it
+
+## Required Environment
+
+Before starting the local stack:
+
+```bash
+make env
+```
+
+Then fill at least:
+
+- `XAI_API_KEY`
+
+Available variables in `.env.example`:
+
+- `XAI_API_KEY`
+- `XAI_BASE_URL`
+- `XAI_MODEL`
+- `XAI_TIMEOUT_MS`
+- `ASSISTANT_DATADIR`
+- `WORKER_POLL_INTERVAL_MS`
+
+Default `ASSISTANT_DATADIR` in the local Docker Compose setup:
+
+```text
+/app/runtime
+```
 
 ## Port Model
 
@@ -33,7 +63,7 @@ Describe the default local runtime.
 browser -> gateway-web -> assistant-api -> redis queue -> assistant-worker -> callback
 ```
 
-## Future Full Runtime
+## Current Runtime Coverage
 
-- The full documented runtime still includes `assistant-worker`, `queue`, channel gateways, `scheduler`, and `swagger`.
-- Those services are not implemented in this repository yet.
+- `assistant-api`, `assistant-worker`, `queue`, `gateway-web`, and `swagger` are implemented in this repository.
+- `gateway-telegram`, `gateway-email`, and `scheduler` are still planned services.

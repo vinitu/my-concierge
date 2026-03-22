@@ -56,7 +56,7 @@ The current source of truth is the code for these services and the project docum
 - Queue-based asynchronous flow between `assistant-api` and `assistant-worker`
 - `assistant-api` accepts requests, validates them, enqueues jobs, and acknowledges them
 - `assistant-api` supports env-based queue adapters and currently uses Redis by default through `QUEUE_ADAPTER=redis`
-- `assistant-worker` reads queued jobs and sends simple callback replies
+- `assistant-worker` reads queued jobs, loads runtime context from `runtime/`, sends them to Grok through a provider interface, and returns callback replies
 - `gateway-web` provides the browser chat UI and WebSocket transport
 - `gateway-web` exposes `/`, `WS /ws`, `/callbacks/assistant/:contact`, `/status`, `/metrics`, and `/openapi.json`
 - `assistant-api`, `assistant-worker`, and `gateway-web` expose `/status`, `/metrics`, and OpenAPI documentation
@@ -96,7 +96,7 @@ flowchart LR
 
 ### assistant-worker
 
-- [assistant-worker](./docs/services/assistant-worker.md): processes queued jobs, sends callback replies, and exposes operational endpoints
+- [assistant-worker](./docs/services/assistant-worker.md): processes queued jobs, calls Grok, sends callback replies, and exposes operational endpoints
 
 ### assistant
 
@@ -151,18 +151,26 @@ Notes:
 ## Run
 
 1. Install Docker and Docker Compose.
-2. Start the local stack:
+2. Create the local env file:
+
+```bash
+make env
+```
+
+3. Fill `XAI_API_KEY` in `.env`.
+
+4. Start the local stack:
 
 ```bash
 make up
 ```
 
-3. Open the main entrypoints:
+5. Open the main entrypoints:
 
 - [http://localhost:8080/](http://localhost:8080/) for `gateway-web`
 - [http://localhost:8088/](http://localhost:8088/) for `swagger`
 
-4. Stop the stack:
+6. Stop the stack:
 
 ```bash
 make down
@@ -179,6 +187,7 @@ make down
 
 ## Local Commands
 
+- `make env`: create `.env` from `.env.example` if it does not exist
 - `make build`: build local `assistant-api`, `assistant-worker`, and `gateway-web` Docker images
 - `make up`: start local `assistant-api`, `assistant-worker`, and `gateway-web`
 - `make down`: stop the local Docker Compose stack
@@ -196,16 +205,18 @@ make down
 
 The local runtime is named `assistant`.
 It is split into `assistant-api` and `assistant-worker`.
-Both parts should start inside the working directory that contains the runtime files.
-Both parts read the core runtime files before serving API traffic or processing queued work.
+The repository contains a separate runtime `datadir` in `runtime/`.
+`assistant-worker` reads the core runtime files from this directory before processing queued work.
 
 Expected runtime files and folders:
 
-- `AGENTS.md`
-- `SOUL.md`
-- `IDENTITY.md`
-- `skills/`
-- `memory/`
+- `runtime/AGENTS.md`
+- `runtime/SOUL.md`
+- `runtime/IDENTITY.md`
+- `runtime/skills/`
+- `runtime/memory/`
+
+The repository already includes a starter `datadir` in [runtime/](/Users/vinitu/Projects/vinitu/my-concierge/runtime) with placeholder instruction files.
 
 ## Out of Scope for First Version
 

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AssistantWorkerMetricsService } from '../observability/assistant-worker-metrics.service';
 import { FileQueueConsumerService } from '../queue/file-queue-consumer.service';
+import type { AssistantLlmProvider } from './assistant-llm-provider';
 import { AssistantWorkerProcessorService } from './assistant-worker-processor.service';
 import { CallbackDeliveryService } from './callback-delivery.service';
 
@@ -25,6 +26,11 @@ describe('AssistantWorkerProcessorService', () => {
     const callbackDeliveryService = {
       send: jest.fn().mockResolvedValue(undefined),
     } as unknown as CallbackDeliveryService;
+    const llmProvider = {
+      generateReply: jest.fn().mockResolvedValue('hello from grok'),
+      modelName: jest.fn().mockReturnValue('grok-4'),
+      providerName: jest.fn().mockReturnValue('grok'),
+    } as unknown as AssistantLlmProvider;
     const configService = new ConfigService({
       FILE_QUEUE_DIR: queueDir,
       WORKER_POLL_INTERVAL_MS: '1000',
@@ -35,6 +41,7 @@ describe('AssistantWorkerProcessorService', () => {
       callbackDeliveryService,
       configService,
       metricsService,
+      llmProvider,
       fileQueueConsumerService,
     );
 
@@ -42,7 +49,7 @@ describe('AssistantWorkerProcessorService', () => {
 
     expect(callbackDeliveryService.send).toHaveBeenCalledWith(
       'http://example.test/callback',
-      'I received your message: hello',
+      'hello from grok',
     );
     expect(await fileQueueConsumerService.depth()).toBe(0);
   });
