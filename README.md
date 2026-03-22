@@ -1,98 +1,191 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# MyConcierge
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+MyConcierge is a personal home assistant for one user.
+It is a small and minimal alternative to heavier systems like OpenClaw.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Goals
 
-## Description
+- Keep the system simple
+- Use as few resources as possible
+- Run well on home infrastructure
+- Stay easy to extend later
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Main Principles
 
-## Project setup
+- Single-user system
+- Minimal dependencies
+- Minimal runtime services
+- Clear and small architecture
+- Container-first deployment
 
-```bash
-$ npm install
+## Planned Runtime
+
+- Docker Compose as default runtime
+- Docker for single-container cases
+- Kubernetes
+- Kubernetes CronJob for scheduled tasks
+
+## Tech Direction
+
+- Node.js
+- TypeScript with strict mode
+- NestJS
+- Environment-based configuration
+- Multiple LLM providers: DeepSeek, xAI, OpenAI, and Ollama
+- Extensible LLM provider layer for future providers
+- Prometheus metrics
+
+## Repository Status
+
+This repository now contains implemented services: `gateway-web`, `assistant-api`, and `assistant-worker`.
+The rest of the system is still described by documentation.
+The current source of truth is the code for these services and the project documentation for the wider system.
+
+## Documents
+
+- [Project instructions](./AGENTS.md)
+- [Overview](./docs/overview.md)
+- [Requirements](./docs/requirements.md)
+- [Runtime architecture](./docs/architecture/runtime.md)
+- [System components](./docs/architecture/components.md)
+- [Data flow](./docs/architecture/data-flow.md)
+- [Repository layout](./docs/architecture/repository-layout.md)
+- [Application endpoints](./docs/contracts/application-endpoints.md)
+- [Docker Compose](./docs/deployment/docker-compose.md)
+
+## Current Scope
+
+- Local runtime named `assistant`
+- Split runtime parts: `assistant-api` and `assistant-worker`
+- Queue between `assistant-api` and `assistant-worker`
+- Local agent runtime that reads `AGENTS.md`, `SOUL.md`, and `IDENTITY.md`
+- Personal assistant backend
+- Minimal REST API
+- Interaction with `assistant` through `assistant-api`
+- `assistant-api` only validates, enqueues, and acknowledges requests
+- `assistant-api` is implemented in this repository root
+- `assistant-api` supports env-based queue adapters
+- `assistant-api` now uses Redis queue by default through `QUEUE_ADAPTER=redis`
+- `assistant-worker` is implemented in this repository root
+- `assistant-worker` reads Redis queue messages and sends simple callback replies
+- Asynchronous conversation flow: accept -> queue -> callback
+- `assistant-api` and `assistant-worker` each expose their own OpenAPI schema
+- One shared Swagger UI for both OpenAPI schemas
+- All runtime components expose `/status` and `/metrics`
+- Startup from a working directory with runtime files
+- Same internal port for app services in containers
+- Default local and home runtime through Docker Compose
+- Horizontal scaling for `assistant-api`, `assistant-worker`, Email, and worker processes
+- Telegram channel through `assistant-api`
+- Email channel through `assistant-api`
+- Extensible channel model for future channels
+- Simple Web chat through `gateway-web`
+- Browser communication with `gateway-web` through WebSocket
+- `gateway-web` is implemented in this repository root
+- `gateway-web` exposes `/`, `WS /ws`, `/callbacks/assistant/:contact`, `/status`, `/metrics`, and `/openapi.json`
+- Scheduled tasks through a Cron component and Kubernetes CronJob
+- Heartbeat component through `assistant-api`
+- Multi-LLM support through one shared integration layer
+- Future LLM providers can be added through the same integration layer
+- Prometheus metrics from `assistant-api`
+- Queue depth metric in `/metrics`
+- Ready for home and cluster deployment
+
+## Service Structure
+
+- `gateway-web`: simple Web chat, WebSocket entry point, callback receiver for browser replies
+- `gateway-telegram`: Telegram adapter, sends inbound messages to `assistant-api`, receives Telegram callbacks
+- `gateway-email`: Email adapter, sends inbound messages to `assistant-api`, receives Email callbacks
+- `assistant-api`: public intake service, validates requests, writes jobs to Redis queue, returns acceptance responses, selects queue adapter through env
+- `queue`: internal transport between `assistant-api` and `assistant-worker`
+- `assistant-worker`: background worker, reads Redis queue messages, sends simple callback replies, and exposes worker status and metrics
+- `scheduler`: cron-based trigger service, sends scheduled requests to `assistant-api`
+- `swagger`: one shared Swagger UI for `assistant-api` and `assistant-worker`
+- `prometheus`: collects metrics from runtime components
+
+```mermaid
+flowchart LR
+    Browser["Browser"] --> GW["gateway-web"]
+    Telegram["Telegram"] --> GT["gateway-telegram"]
+    Email["Email"] --> GE["gateway-email"]
+    Scheduler["scheduler"] --> API["assistant-api"]
+
+    GW --> API
+    GT --> API
+    GE --> API
+
+    API --> Q["queue"]
+    Q --> Worker["assistant-worker"]
+
+    Worker --> GW
+    Worker --> GT
+    Worker --> GE
+
+    Swagger["swagger"] --> API
+    Swagger --> Worker
+    Prom["prometheus"] --> API
+    Prom --> Worker
+    Prom --> GW
+    Prom --> GT
+    Prom --> GE
+    Prom --> Scheduler
 ```
 
-## Compile and run the project
+## Swagger
 
-```bash
-# development
-$ npm run start
+- `swagger` is a separate service
+- it shows one shared Swagger UI
+- it reads one OpenAPI schema from `http://localhost:3000/openapi.json`
+- it reads one OpenAPI schema from `http://localhost:3001/openapi.json`
+- it reads one OpenAPI schema from `http://localhost:8080/openapi.json`
+- the UI lets you switch between the schemas
+- in Docker Compose, Swagger UI is exposed on `http://localhost:8088`
 
-# watch mode
-$ npm run start:dev
+## Documentation Structure
 
-# production mode
-$ npm run start:prod
-```
+- `docs/requirements.md`: high-level requirements
+- `docs/architecture/`: runtime and component design
+- `docs/services/`: service-by-service docs
+- `docs/contracts/`: API and queue contracts
+- `docs/deployment/`: runtime and deployment docs
+- `docs/operations/`: observability and scaling docs
 
-## Run tests
+## Local Commands
 
-```bash
-# unit tests
-$ npm run test
+- `make build`: build local `assistant-api`, `assistant-worker`, and `gateway-web` Docker images
+- `make up`: start local `assistant-api`, `assistant-worker`, and `gateway-web`
+- `make down`: stop the local Docker Compose stack
+- `npm run build`: build the NestJS service
+- `npm test`: run unit tests
+- `npm run test:e2e`: run e2e tests
 
-# e2e tests
-$ npm run test:e2e
+## GitHub Automation
 
-# test coverage
-$ npm run test:cov
-```
+- `CI`: runs `npm ci`, `npm run build`, `npm run test:all`, `docker compose config`, and `docker compose build assistant-api assistant-worker gateway-web`
+- `CD`: builds and publishes `gateway-web` to `ghcr.io/<owner>/my-concierge-gateway-web` on push to `main`
 
-## Deployment
+## Runtime Directory
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+The local runtime is named `assistant`.
+It is split into `assistant-api` and `assistant-worker`.
+Both parts should start inside the working directory that contains the runtime files.
+Both parts read the core runtime files before serving API traffic or processing queued work.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Expected runtime files and folders:
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+- `AGENTS.md`
+- `SOUL.md`
+- `IDENTITY.md`
+- `skills/`
+- `memory/`
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Out of Scope for First Version
 
-## Resources
+- Multi-user support
+- Authentication and authorization
+- Complex UI
+- Large infrastructure setup
 
-Check out a few resources that may come in handy when working with NestJS:
+## Next Step
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Build the first MVP around one real user workflow and keep the system small.

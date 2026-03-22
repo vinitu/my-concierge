@@ -1,0 +1,119 @@
+services:
+  queue:
+    image: redis:7-alpine
+    container_name: myconcierge-queue
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+
+  assistant-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myconcierge-assistant-api:local
+    container_name: myconcierge-assistant-api
+    restart: unless-stopped
+    environment:
+      APP_ROLE: assistant-api
+      NODE_ENV: production
+      PORT: 3000
+      QUEUE_ADAPTER: redis
+      REDIS_URL: redis://queue:6379
+      REDIS_QUEUE_NAME: assistant:queue
+    ports:
+      - "3000:3000"
+    depends_on:
+      - queue
+
+  assistant-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myconcierge-assistant-worker:local
+    container_name: myconcierge-assistant-worker
+    restart: unless-stopped
+    depends_on:
+      - queue
+    environment:
+      APP_ROLE: assistant-worker
+      NODE_ENV: production
+      PORT: 3000
+      QUEUE_ADAPTER: redis
+      REDIS_URL: redis://queue:6379
+      REDIS_QUEUE_NAME: assistant:queue
+      WORKER_POLL_INTERVAL_MS: 500
+    ports:
+      - "3001:3000"
+
+  gateway-telegram:
+    image: myconcierge-gateway-telegram:local
+    container_name: myconcierge-gateway-telegram
+    restart: unless-stopped
+    depends_on:
+      - assistant-api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      ASSISTANT_API_URL: http://assistant-api:3000
+    ports:
+      - "8081:3000"
+
+  gateway-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myconcierge-gateway-web:local
+    container_name: myconcierge-gateway-web
+    restart: unless-stopped
+    depends_on:
+      - assistant-api
+    environment:
+      APP_ROLE: gateway-web
+      NODE_ENV: production
+      PORT: 3000
+      ASSISTANT_API_URL: http://assistant-api:3000
+      CALLBACK_BASE_URL: http://gateway-web:3000
+    ports:
+      - "8080:3000"
+
+  gateway-email:
+    image: myconcierge-gateway-email:local
+    container_name: myconcierge-gateway-email
+    restart: unless-stopped
+    depends_on:
+      - assistant-api
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      ASSISTANT_API_URL: http://assistant-api:3000
+    ports:
+      - "8082:3000"
+
+  swagger:
+    image: swaggerapi/swagger-ui:latest
+    container_name: myconcierge-swagger
+    restart: unless-stopped
+    depends_on:
+      - assistant-api
+      - assistant-worker
+    environment:
+      URLS: |
+        [
+          { "url": "http://localhost:3000/openapi.json", "name": "assistant-api" },
+          { "url": "http://localhost:3001/openapi.json", "name": "assistant-worker" },
+          { "url": "http://localhost:8080/openapi.json", "name": "gateway-web" }
+        ]
+    ports:
+      - "8088:8080"
+
+  scheduler:
+    image: myconcierge-scheduler:local
+    container_name: myconcierge-scheduler
+    restart: unless-stopped
+    depends_on:
+      - assistant-api
+    environment:
+      NODE_ENV: production
+      ASSISTANT_API_URL: http://assistant-api:3000
+      CRON_SCHEDULE: "*/5 * * * *"

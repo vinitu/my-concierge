@@ -4,7 +4,7 @@ Personal home assistant built with NestJS.
 
 ## Project overview
 
-MyConcierge is a lightweight, personalized home assistant designed to replace heavier solutions like OpenClaw. It focuses on solving specific problems with a clean architecture tailored for a single user.
+MyConcierge is a lightweight, personalized home assistant designed to replace heavier solutions like OpenClaw. It focuses on solving specific problems with a clean, minimal, low-resource architecture tailored for a single user.
 
 ## Tech stack
 
@@ -48,6 +48,17 @@ test/
 
 ## Architecture decisions
 
-- No Docker for now — run directly with Node.js
+- Minimalist system — keep dependencies and runtime components small
+- Container-first runtime — use Docker Compose by default and also support Docker and Kubernetes
+- Main runtime process — use a process named `assistant`
+- Runtime startup — `assistant` is a local agent that starts in the working directory and reads `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `skills/`, and `memory/`
+- API-first architecture — keep assistant logic in one server
+- Interaction model — external interaction with `assistant` happens through the API
+- Telegram, Email, Web, Cron, and Heartbeat components must talk to the server through the API
+- Channel architecture must be extensible so new channels can be added as thin adapters
+- API, Email, and worker processes must support horizontal scaling
+- Scheduled tasks in Kubernetes must use CronJob
+- Use one shared LLM integration layer for DeepSeek, xAI, OpenAI, and Ollama
+- Keep the LLM layer extensible so new providers can be added later
+- Expose Prometheus metrics from the server
 - Single-user system — no multi-tenancy or auth needed initially
-- LiteLLM integration planned (already running in home k8s cluster)

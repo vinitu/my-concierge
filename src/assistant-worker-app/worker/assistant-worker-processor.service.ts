@@ -1,0 +1,101 @@
+import {
+  Inject,
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AssistantWorkerMetricsService } from '../observability/assistant-worker-metrics.service';
+import {
+  type ProcessingQueueMessage,
+  WORKER_QUEUE_CONSUMER,
+  type QueueConsumer,
+} from '../queue/queue-consumer';
+import { CallbackDeliveryService } from './callback-delivery.service';
+
+@Injectable()
+export class AssistantWorkerProcessorService
+  implements OnModuleInit, OnModuleDestroy
+{
+  private timer: NodeJS.Timeout | null = null;
+  private processing = false;
+
+  constructor(
+    private readonly callbackDeliveryService: CallbackDeliveryService,
+    private readonly configService: ConfigService,
+    private readonly metricsService: AssistantWorkerMetricsService,
+    @Inject(WORKER_QUEUE_CONSUMER) private readonly queueConsumer: QueueConsumer,
+  ) {}
+
+  onModuleInit(): void {
+    const pollIntervalMs = Number.parseInt(
+      this.configService.get<string>('WORKER_POLL_INTERVAL_MS', '500'),
+      10,
+    );
+
+    this.timer = setInterval(() => {
+      void this.processOnce();
+    }, pollIntervalMs);
+
+    void this.syncQueueDepth();
+  }
+
+  onModuleDestroy(): void {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+
+  async processOnce(): Promise<void> {
+    if (this.processing) {
+      return;
+    }
+
+    this.processing = true;
+
+    try {
+      const item = await this.queueConsumer.reserveNext();
+
+      if (!item) {
+        await this.syncQueueDepth();
+        return;
+      }
+
+      await this.handleMessage(item);
+      await this.queueConsumer.markDone(item);
+      this.metricsService.recordProcessedJob();
+      this.metricsService.recordCallback(true);
+    } catch (error) {
+      if (this.isProcessingQueueMessage(error)) {
+        await this.queueConsumer.markFailed(error);
+      }
+    } finally {
+      await this.syncQueueDepth();
+      this.processing = false;
+    }
+  }
+
+  private async handleMessage(item: ProcessingQueueMessage): Promise<void> {
+    const reply = `I received your message: ${item.message}`;
+
+    try {
+      await this.callbackDeliveryService.send(item.callback_url, reply);
+    } catch {
+      throw item;
+    }
+  }
+
+  private async syncQueueDepth(): Promise<void> {
+    this.metricsService.setQueueDepth(await this.queueConsumer.depth());
+  }
+
+  private isProcessingQueueMessage(value: unknown): value is ProcessingQueueMessage {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'processingToken' in value &&
+      typeof value.processingToken === 'string'
+    );
+  }
+}
