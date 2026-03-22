@@ -49,7 +49,7 @@ jobs:
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       github.actor != 'github-actions[bot]'
-    uses: vinitu/github-workflows/.github/workflows/workflow-determine-version-bump.yml@v0.1.9
+    uses: vinitu/github-workflows/.github/workflows/workflow-determine-version-bump.yml@v0.1.8
     with:
       target-branch: main
       major-branch-prefixes: |
@@ -75,7 +75,7 @@ jobs:
       github.actor != 'github-actions[bot]' &&
       needs.validate.result == 'success' &&
       needs.determine_version.result == 'success'
-    uses: vinitu/github-workflows/.github/workflows/workflow-compute-next-tag.yml@v0.1.9
+    uses: vinitu/github-workflows/.github/workflows/workflow-compute-next-tag.yml@v0.1.8
     with:
       target-branch: main
       version-bump: ${{ needs.determine_version.outputs['version-bump'] }}
@@ -135,7 +135,7 @@ jobs:
     needs:
       - create_tag
     if: ${{ needs.create_tag.result == 'success' }}
-    uses: vinitu/github-workflows/.github/workflows/workflow-create-release.yml@v0.1.9
+    uses: vinitu/github-workflows/.github/workflows/workflow-create-release.yml@v0.1.8
     with:
       tag-name: ${{ needs.create_tag.outputs['new-tag'] }}
       previous-tag: ${{ needs.create_tag.outputs['previous-tag'] }}
