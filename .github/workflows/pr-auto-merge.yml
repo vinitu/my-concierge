@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate gateway-web
+    name: Validate repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -45,7 +45,7 @@ jobs:
       - name: Validate Docker Compose
         run: docker compose config
 
-      - name: Build assistant-api, assistant-worker, and gateway-web images
+      - name: Build service images
         run: docker compose build assistant-api assistant-worker gateway-web
 
   determine_version:
