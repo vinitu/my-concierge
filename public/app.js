@@ -6,6 +6,8 @@ const socket = io({
 const messages = document.getElementById('messages');
 const form = document.getElementById('chat-form');
 const input = document.getElementById('message-input');
+const connectionStatus = document.getElementById('connection-status');
+const connectionStatusLabel = document.getElementById('connection-status-label');
 const maxComposerHeight = 180;
 
 function resizeInput() {
@@ -21,12 +23,27 @@ function appendMessage(role, text) {
   messages.scrollTop = messages.scrollHeight;
 }
 
+function setConnectionStatus(status) {
+  connectionStatus.classList.remove(
+    'status-connected',
+    'status-connecting',
+    'status-disconnected',
+  );
+  connectionStatus.classList.add(`status-${status}`);
+  connectionStatusLabel.textContent = status;
+}
+
 socket.on('connect', () => {
-  appendMessage('system', 'Connected');
+  setConnectionStatus('connected');
 });
 
 socket.on('connect_error', () => {
+  setConnectionStatus('disconnected');
   appendMessage('system', 'WebSocket connection failed');
+});
+
+socket.on('disconnect', () => {
+  setConnectionStatus('disconnected');
 });
 
 socket.on('assistant.message', (payload) => {
@@ -63,4 +80,5 @@ input.addEventListener('input', () => {
   resizeInput();
 });
 
+setConnectionStatus('connecting');
 resizeInput();

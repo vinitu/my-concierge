@@ -31,7 +31,7 @@
 .chat-form-panel,
 .messages {
   border: 1px solid var(--chat-line);
-  border-radius: 24px;
+  border-radius: 10px;
   background: var(--chat-surface);
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.34),
@@ -48,7 +48,7 @@
   align-items: center;
   gap: 10px;
   padding: 9px 13px;
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--chat-surface-2);
   color: #e5e7eb;
   font-size: 0.84rem;
@@ -62,6 +62,21 @@
   border-radius: 999px;
   background: var(--chat-accent);
   box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.08);
+}
+
+.status-pill.status-connected .status-dot {
+  background: #7dd3fc;
+  box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.08);
+}
+
+.status-pill.status-connecting .status-dot {
+  background: #fbbf24;
+  box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.08);
+}
+
+.status-pill.status-disconnected .status-dot {
+  background: #f87171;
+  box-shadow: 0 0 0 5px rgba(248, 113, 113, 0.08);
 }
 
 .messages {
@@ -78,7 +93,7 @@
 .message {
   max-width: min(80%, 34rem);
   padding: 14px 18px;
-  border-radius: 20px;
+  border-radius: 10px;
   line-height: 1.5;
   font-size: 0.98rem;
   border: 1px solid rgba(255, 255, 255, 0.04);
@@ -86,14 +101,12 @@
 
 .message-user {
   align-self: flex-end;
-  border-bottom-right-radius: 6px;
   background: #f3f4f6;
   color: #111827;
 }
 
 .message-assistant {
   align-self: flex-start;
-  border-bottom-left-radius: 6px;
   background: #151922;
   color: var(--chat-assistant);
 }
@@ -101,7 +114,7 @@
 .message-system {
   align-self: center;
   max-width: 100%;
-  border-radius: 999px;
+  border-radius: 10px;
   background: transparent;
   color: var(--chat-system);
   font-size: 0.84rem;
@@ -121,7 +134,7 @@
   max-height: 180px;
   padding: 18px 112px 18px 18px;
   border: 0;
-  border-radius: 22px;
+  border-radius: 10px;
   background: #0d1016;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   color: var(--chat-ink);
@@ -149,7 +162,7 @@
   min-width: 88px;
   min-height: 52px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 10px;
   background: #f3f4f6;
   color: #0b0d12;
   font-weight: 700;
