@@ -1,0 +1,144 @@
+name: CI · Main Push · Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: main-release-my-concierge
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run unit and e2e tests
+        run: npm run test:all
+
+      - name: Validate Docker Compose
+        run: docker compose config
+
+      - name: Build service images
+        run: docker compose build assistant-api assistant-worker gateway-web
+
+  determine_version:
+    name: Detect version bump
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor != 'github-actions[bot]'
+    uses: vinitu/github-workflows/.github/workflows/workflow-determine-version-bump.yml@v0.1.8
+    with:
+      target-branch: main
+      major-branch-prefixes: |
+        major/
+      minor-branch-prefixes: |
+        feature/
+        features/
+      patch-branch-prefixes: |
+        fix/
+        fixes/
+      default: patch
+    secrets:
+      gh_token: ${{ secrets.TOKEN }}
+
+  calculate_tag:
+    name: Compute next tag
+    needs:
+      - validate
+      - determine_version
+    if: |
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor != 'github-actions[bot]' &&
+      needs.validate.result == 'success' &&
+      needs.determine_version.result == 'success'
+    uses: vinitu/github-workflows/.github/workflows/workflow-compute-next-tag.yml@v0.1.8
+    with:
+      target-branch: main
+      version-bump: ${{ needs.determine_version.outputs['version-bump'] }}
+    secrets:
+      gh_token: ${{ secrets.TOKEN }}
+
+  create_tag:
+    name: Create git tag
+    needs:
+      - calculate_tag
+    if: ${{ needs.calculate_tag.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new-tag: ${{ steps.create.outputs.new_tag }}
+      previous-tag: ${{ steps.create.outputs.previous_tag }}
+    steps:
+      - name: Check out main with tags
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.TOKEN }}
+
+      - name: Create and push tag
+        id: create
+        env:
+          NEXT_TAG: ${{ needs.calculate_tag.outputs['new-tag'] }}
+          PREVIOUS_TAG: ${{ needs.calculate_tag.outputs['previous-tag'] }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NEXT_TAG:-}" ] || [ -z "${PREVIOUS_TAG:-}" ]; then
+            echo "Missing tag inputs." >&2
+            exit 1
+          fi
+
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main --tags
+
+          if git rev-parse "$NEXT_TAG" >/dev/null 2>&1; then
+            echo "Tag already exists: $NEXT_TAG" >&2
+            exit 1
+          fi
+
+          git tag -a "$NEXT_TAG" -m "Automated release $NEXT_TAG"
+          git push origin "$NEXT_TAG"
+
+          {
+            echo "new_tag=$NEXT_TAG"
+            echo "previous_tag=$PREVIOUS_TAG"
+          } >> "$GITHUB_OUTPUT"
+
+  create_release:
+    name: Publish release
+    needs:
+      - create_tag
+    if: ${{ needs.create_tag.result == 'success' }}
+    uses: vinitu/github-workflows/.github/workflows/workflow-create-release.yml@v0.1.8
+    with:
+      tag-name: ${{ needs.create_tag.outputs['new-tag'] }}
+      previous-tag: ${{ needs.create_tag.outputs['previous-tag'] }}
+      merged-prs: "[]"
+    secrets:
+      gh_token: ${{ secrets.TOKEN }}
