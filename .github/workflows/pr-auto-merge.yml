@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate gateway-web
+    name: Validate repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -45,13 +45,13 @@ jobs:
       - name: Validate Docker Compose
         run: docker compose config
 
-      - name: Build assistant-api, assistant-worker, and gateway-web images
+      - name: Build service images
         run: docker compose build assistant-api assistant-worker gateway-web
 
   determine_version:
     name: Detect version bump
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
-    uses: vinitu/github-workflows/.github/workflows/workflow-determine-version-bump.yml@v0.1.8
+    uses: vinitu/github-workflows/.github/workflows/workflow-determine-version-bump.yml@v0.1.10
     with:
       target-branch: main
       major-branch-prefixes: |
@@ -73,7 +73,7 @@ jobs:
       - validate
       - determine_version
     if: ${{ needs.determine_version.result == 'success' && needs.determine_version.outputs.matching_pr == 'true' && needs.validate.result == 'success' }}
-    uses: vinitu/github-workflows/.github/workflows/workflow-merge-pull-requests.yml@v0.1.8
+    uses: vinitu/github-workflows/.github/workflows/workflow-merge-pull-requests.yml@v0.1.10
     with:
       target-branch: main
       merge-method: squash
