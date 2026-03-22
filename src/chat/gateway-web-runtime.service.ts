@@ -51,6 +51,19 @@ export class GatewayWebRuntimeService {
     return this.appendMessage(sessionId, 'assistant', message);
   }
 
+  async clearConversation(sessionId: string): Promise<GatewayWebConversationState> {
+    const nextState = this.emptyState(sessionId);
+
+    await mkdir(dirname(this.conversationPath(sessionId)), { recursive: true });
+    await writeFile(
+      this.conversationPath(sessionId),
+      `${JSON.stringify(nextState, null, 2)}\n`,
+      'utf8',
+    );
+
+    return nextState;
+  }
+
   conversationPath(sessionId: string): string {
     return join(this.runtimeDirectory(), 'conversations', `${sessionId}.json`);
   }

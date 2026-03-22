@@ -408,7 +408,7 @@ export class AssistantWorkerRootController {
     return {
       deepseek: [...STATIC_PROVIDER_MODELS.deepseek],
       ollama: this.mergeModels(
-        ollamaModels.length > 0 ? ollamaModels : STATIC_PROVIDER_MODELS.ollama,
+        [...STATIC_PROVIDER_MODELS.ollama, ...ollamaModels],
         config.provider === 'ollama' ? config.model : null,
       ),
       xai: [...STATIC_PROVIDER_MODELS.xai],
@@ -416,7 +416,7 @@ export class AssistantWorkerRootController {
   }
 
   private mergeModels(models: string[], currentModel: string | null): string[] {
-    const next = [...models];
+    const next = [...new Set(models)];
 
     if (currentModel && !next.includes(currentModel)) {
       next.unshift(currentModel);

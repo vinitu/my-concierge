@@ -1,4 +1,10 @@
-import { Controller, Get, Req, Res } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Req,
+  Res,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -40,6 +46,22 @@ export class ChatPageController {
       sameSite: 'lax',
     });
     response.type('html').send(this.injectBootstrap(page, bootstrap));
+  }
+
+  @Delete('conversation')
+  async clearConversation(
+    @Req() request: Request,
+  ): Promise<{ cleared: true; sessionId: string }> {
+    const sessionId = ensureGatewayWebSessionId(
+      parseCookieValue(request.headers.cookie, GATEWAY_WEB_SESSION_COOKIE),
+    );
+
+    await this.gatewayWebRuntimeService.clearConversation(sessionId);
+
+    return {
+      cleared: true,
+      sessionId,
+    };
   }
 
   private injectBootstrap(template: string, bootstrap: GatewayWebBootstrap): string {
