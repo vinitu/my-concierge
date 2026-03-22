@@ -18,10 +18,11 @@ describe('FileQueueAdapter', () => {
     );
 
     await adapter.enqueue({
-      callback_url: 'http://gateway-web/callbacks/assistant/socket-1',
       chat: 'direct',
+      conversation_id: 'socket-1',
       contact: 'socket-1',
       direction: 'api',
+      host: 'http://gateway-web',
       message: 'hello',
     });
 
@@ -34,4 +35,3 @@ describe('FileQueueAdapter', () => {
     expect(await adapter.depth()).toBe(1);
   });
 });
-

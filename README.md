@@ -48,7 +48,6 @@ The current source of truth is the code for these services and the project docum
 - [Docker Compose](./docs/deployment/docker-compose.md)
 - [Assistant](./docs/services/assistant.md)
 - [Metrics](./docs/operations/metrics.md)
-- [Swagger](./docs/services/swagger.md)
 
 ## Implemented Scope
 
@@ -59,9 +58,8 @@ The current source of truth is the code for these services and the project docum
 - `assistant-api` supports env-based queue adapters and currently uses Redis by default through `QUEUE_ADAPTER=redis`
 - `assistant-worker` reads queued jobs, loads runtime context from `runtime/assistant-worker/`, sends them to the configured provider (`deepseek`, `xai`, or `ollama`), returns callback replies, and exposes a worker settings page with provider status
 - `gateway-web` provides the browser chat UI, persists browser chat history in `runtime/gateway-web/`, and uses a cookie-backed session id
-- `gateway-web` exposes `/`, `WS /ws`, `/callbacks/assistant/:contact`, `/status`, `/metrics`, and `/openapi.json`
+- `gateway-web` exposes `/`, `WS /ws`, `/response/:conversationId`, `/thinking/:conversationId`, `/status`, `/metrics`, and `/openapi.json`
 - `assistant-api`, `assistant-worker`, and `gateway-web` expose `/status`, `/metrics`, and OpenAPI documentation
-- One shared Swagger UI aggregates the service schemas
 - Default local runtime is Docker Compose
 - The system is prepared for home deployment and future horizontal scaling
 
@@ -93,6 +91,29 @@ flowchart LR
         Q --> Worker["assistant-worker"]
     end
 ```
+
+### Runtime Directory
+
+The local runtime is named `assistant`.
+It is split into service-specific runtime directories under `runtime/`.
+In Docker Compose, each service mounts only its own runtime directory:
+- `assistant-worker`: `./runtime/assistant-worker:/app/runtime`
+- `gateway-web`: `./runtime/gateway-web:/app/runtime`
+
+Expected runtime files and folders:
+
+- `runtime/assistant-worker/SYSTEM.js`
+- `runtime/assistant-worker/SOUL.js`
+- `runtime/assistant-worker/IDENTITY.js`
+- `runtime/assistant-worker/skills/`
+- `runtime/assistant-worker/memory/`
+- `runtime/assistant-worker/conversations/`
+- `runtime/assistant-worker/config/`
+- `runtime/gateway-web/conversations/`
+
+The runtime directory is not baked into the Docker image.
+The repository already includes a starter runtime directory in [runtime/](/Users/vinitu/Projects/vinitu/my-concierge/runtime) with placeholder instruction files.
+The repository-owned worker prompt template lives in [prompts/user-prompt.md](/Users/vinitu/Projects/vinitu/my-concierge/prompts/user-prompt.md).
 
 ### assistant-api
 
@@ -126,10 +147,6 @@ flowchart LR
 
 - [scheduler](./docs/services/scheduler.md): planned scheduled trigger component that only sends requests into `assistant`
 
-### swagger
-
-- [swagger](./docs/services/swagger.md): serves one shared Swagger UI for the runtime services
-
 ## Metrics
 
 Detailed metrics documentation lives in [docs/operations/metrics.md](./docs/operations/metrics.md).
@@ -144,7 +161,6 @@ It contains the metrics flow diagram and per-service metric tables.
 | [http://localhost:8080/](http://localhost:8080/) | [`gateway-web`](./docker-compose.yaml) | Web chat UI, WebSocket, callbacks |
 | [http://localhost:8081/](http://localhost:8081/) | [`gateway-telegram`](./docker-compose.yaml) | Telegram gateway |
 | [http://localhost:8082/](http://localhost:8082/) | [`gateway-email`](./docker-compose.yaml) | Email gateway |
-| [http://localhost:8088/](http://localhost:8088/) | [`swagger`](./docker-compose.yaml) | Shared Swagger UI |
 
 Notes:
 
@@ -184,7 +200,6 @@ make up
 6. Open the main entrypoints:
 
 - [http://localhost:8080/](http://localhost:8080/) for `gateway-web`
-- [http://localhost:8088/](http://localhost:8088/) for `swagger`
 
 7. Stop the stack:
 
@@ -211,35 +226,13 @@ make down
 - `npm test`: run unit tests
 - `npm run test:e2e`: run e2e tests
 
-## GitHub Automation
+## TODO
 
-- `PR Auto-merge`: runs `npm ci`, `npm run build`, `npm run test:all`, `docker compose config`, and `docker compose build assistant-api assistant-worker gateway-web`, then auto-merges matching PRs to `main`
-- `Main Release`: on `push` to `main`, repeats validation, computes the next semver tag from the merged PR branch prefix, creates the git tag, and publishes a GitHub Release
-- `Tag Image`: on push of a `v*` tag, repeats validation and publishes `gateway-web` to `ghcr.io/<owner>/my-concierge-gateway-web`
-
-## Runtime Directory
-
-The local runtime is named `assistant`.
-It is split into `assistant-api` and `assistant-worker`.
-The repository contains separate runtime directories under `runtime/`.
-In Docker Compose, each service mounts only its own runtime directory:
-- `assistant-worker`: `./runtime/assistant-worker:/app/runtime`
-- `gateway-web`: `./runtime/gateway-web:/app/runtime`
-The runtime directory is not baked into the Docker image.
-
-Expected runtime files and folders:
-
-- `runtime/assistant-worker/SYSTEM.js`
-- `runtime/assistant-worker/SOUL.js`
-- `runtime/assistant-worker/IDENTITY.js`
-- `runtime/assistant-worker/skills/`
-- `runtime/assistant-worker/memory/`
-- `runtime/assistant-worker/conversations/`
-- `runtime/assistant-worker/config/`
-- `runtime/gateway-web/conversations/`
-
-The repository already includes a starter runtime directory in [runtime/](/Users/vinitu/Projects/vinitu/my-concierge/runtime) with placeholder instruction files.
-The repository-owned worker prompt template lives in [prompts/user-prompt.md](/Users/vinitu/Projects/vinitu/my-concierge/prompts/user-prompt.md).
+- skills support in `assistant-worker`
+- tools support in `assistant-worker`
+- `gateway-telegram`
+- `gateway-email`
+- `scheduler`
 
 ## Out of Scope for First Version
 

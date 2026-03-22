@@ -16,12 +16,14 @@ export interface AssistantWorkerConfig {
   model: string;
   memory_window: number;
   provider: AssistantWorkerProvider;
+  thinking_interval_seconds: number;
 }
 
 const DEFAULT_WORKER_CONFIG: AssistantWorkerConfig = {
   memory_window: 3,
   model: defaultModelForProvider('xai'),
   provider: 'xai',
+  thinking_interval_seconds: 2,
 };
 
 const SUPPORTED_WORKER_PROVIDERS: AssistantWorkerProvider[] = ['xai', 'ollama', 'deepseek'];
@@ -44,6 +46,9 @@ export class AssistantWorkerConfigService {
         ),
         memory_window: this.normalizeMemoryWindow(parsed.memory_window),
         provider: this.normalizeProvider(parsed.provider),
+        thinking_interval_seconds: this.normalizeThinkingIntervalSeconds(
+          parsed.thinking_interval_seconds,
+        ),
       };
     } catch (error) {
       if (!this.isMissingPath(error)) {
@@ -61,6 +66,9 @@ export class AssistantWorkerConfigService {
       model: this.normalizeModel(provider, config.model),
       memory_window: this.normalizeMemoryWindow(config.memory_window),
       provider,
+      thinking_interval_seconds: this.normalizeThinkingIntervalSeconds(
+        config.thinking_interval_seconds,
+      ),
     };
 
     await mkdir(this.configDirectory(), { recursive: true });
@@ -128,6 +136,22 @@ export class AssistantWorkerConfigService {
     }
 
     return DEFAULT_WORKER_CONFIG.memory_window;
+  }
+
+  private normalizeThinkingIntervalSeconds(value: unknown): number {
+    if (typeof value === 'number' && Number.isInteger(value)) {
+      return Math.min(30, Math.max(1, value));
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number.parseInt(value.trim(), 10);
+
+      if (Number.isInteger(parsed)) {
+        return Math.min(30, Math.max(1, parsed));
+      }
+    }
+
+    return DEFAULT_WORKER_CONFIG.thinking_interval_seconds;
   }
 
   private isMissingPath(error: unknown): boolean {

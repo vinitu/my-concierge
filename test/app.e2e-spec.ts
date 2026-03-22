@@ -86,7 +86,8 @@ describe('gateway-web (e2e)', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.info.title).toBe('gateway-web');
-    expect(response.body.paths['/callbacks/assistant/{contact}']).toBeDefined();
+    expect(response.body.paths['/response/{conversationId}']).toBeDefined();
+    expect(response.body.paths['/thinking/{conversationId}']).toBeDefined();
     expect(response.body.paths['/metrics']).toBeDefined();
     expect(response.body.paths['/status']).toBeDefined();
   });
@@ -118,15 +119,20 @@ describe('gateway-web (e2e)', () => {
         client.emit('chat.message', { message: 'hello assistant' });
       });
 
-      setTimeout(() => {
+      const check = setInterval(() => {
+        if (assistantApiClientService.sendConversation.mock.calls.length === 0) {
+          return;
+        }
+
+        clearInterval(check);
+        clearTimeout(timeout);
         expect(assistantApiClientService.sendConversation).toHaveBeenCalledWith({
-          contact: sessionId,
+          conversationId: sessionId,
           message: 'hello assistant',
         });
         client.close();
         resolve();
-        clearTimeout(timeout);
-      }, 100);
+      }, 50);
     });
   });
 
@@ -155,7 +161,7 @@ describe('gateway-web (e2e)', () => {
 
       client.on('connect', async () => {
         await request(app.getHttpServer())
-          .post(`/callbacks/assistant/${sessionId}`)
+          .post(`/response/${sessionId}`)
           .send({ message: 'assistant reply' })
           .expect(200);
       });
@@ -163,6 +169,45 @@ describe('gateway-web (e2e)', () => {
       client.on('assistant.message', (payload) => {
         clearTimeout(timeout);
         expect(payload).toEqual({ message: 'assistant reply' });
+        client.close();
+        resolve();
+      });
+    });
+  });
+
+  it('delivers thinking callbacks back to the WebSocket session', async () => {
+    const pageResponse = await request(app.getHttpServer()).get('/');
+    const sessionCookie = pageResponse.headers['set-cookie'][0];
+    const sessionId = sessionCookie.match(
+      new RegExp(`${GATEWAY_WEB_SESSION_COOKIE}=([^;]+)`),
+    )?.[1];
+    expect(sessionId).toBeDefined();
+
+    const client = io(serverUrl, {
+      auth: { sessionId },
+      extraHeaders: {
+        Cookie: sessionCookie,
+      },
+      path: '/ws',
+      transports: ['websocket'],
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        client.close();
+        reject(new Error('thinking timeout'));
+      }, 5000);
+
+      client.on('connect', async () => {
+        await request(app.getHttpServer())
+          .post(`/thinking/${sessionId}`)
+          .send({ seconds: 2 })
+          .expect(200);
+      });
+
+      client.on('assistant.thinking', (payload) => {
+        clearTimeout(timeout);
+        expect(payload).toEqual({ seconds: 2 });
         client.close();
         resolve();
       });
@@ -194,7 +239,7 @@ describe('gateway-web (e2e)', () => {
         client.emit('chat.message', { message: 'hello assistant' });
         await new Promise((innerResolve) => setTimeout(innerResolve, 100));
         await request(app.getHttpServer())
-          .post(`/callbacks/assistant/${sessionId}`)
+          .post(`/response/${sessionId}`)
           .send({ message: 'assistant reply' })
           .expect(200);
       });

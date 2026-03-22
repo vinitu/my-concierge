@@ -14,7 +14,8 @@ gateway -> assistant-api -> queue -> assistant-worker -> callback target
 4. `assistant-api` returns an acceptance response.
 5. `assistant-worker` reads the queued job from Redis.
 6. `assistant-worker` runs assistant logic.
-7. `assistant-worker` sends zero, one, or many callback messages.
+7. `assistant-worker` may send periodic `thinking` callbacks while the LLM request is running.
+8. `assistant-worker` sends one final `response` callback.
 
 ## Web Chat Flow
 
@@ -22,7 +23,8 @@ gateway -> assistant-api -> queue -> assistant-worker -> callback target
 browser -> gateway-web GET /
 browser -> gateway-web WS /ws
 gateway-web -> assistant-api -> queue -> assistant-worker
-assistant-worker -> gateway-web POST /callbacks/assistant/<contact>
+assistant-worker -> gateway-web POST /thinking/<conversation_id>
+assistant-worker -> gateway-web POST /response/<conversation_id>
 gateway-web -> browser WS /ws
 ```
 
@@ -33,8 +35,10 @@ gateway-web -> browser WS /ws
 5. `gateway-web` sends the message to `assistant-api`.
 6. `assistant-api` validates the request and writes it to the queue.
 7. `assistant-worker` reads the queued job.
-8. `assistant-worker` sends callback messages to `gateway-web`.
-9. `gateway-web` forwards each callback message to the browser through WebSocket.
+8. `assistant-worker` may send `thinking` callbacks to `gateway-web` while waiting on the LLM.
+9. `gateway-web` forwards each thinking callback to the browser through WebSocket for the requested duration.
+10. `assistant-worker` sends the final `response` callback to `gateway-web`.
+11. `gateway-web` forwards the final response to the browser through WebSocket.
 
 ## Observability Flow
 

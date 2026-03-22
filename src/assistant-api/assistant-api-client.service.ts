@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { MetricsService } from '../observability/metrics.service';
 
 interface ConversationRequest {
-  contact: string;
+  conversationId: string;
   message: string;
 }
 
@@ -25,8 +25,7 @@ export class AssistantApiClientService {
     const callbackBaseUrl = trimTrailingSlash(
       this.configService.get<string>('CALLBACK_BASE_URL', 'http://localhost:3000'),
     );
-    const url = `${assistantApiUrl}/conversation/api/direct/${encodeURIComponent(request.contact)}`;
-    const callbackUrl = `${callbackBaseUrl}/callbacks/assistant/${encodeURIComponent(request.contact)}`;
+    const url = `${assistantApiUrl}/conversation/api/direct/${encodeURIComponent(request.conversationId)}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -34,8 +33,9 @@ export class AssistantApiClientService {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        conversation_id: request.conversationId,
+        host: callbackBaseUrl,
         message: request.message,
-        callback_url: callbackUrl,
       }),
     });
 
@@ -46,4 +46,3 @@ export class AssistantApiClientService {
     }
   }
 }
-

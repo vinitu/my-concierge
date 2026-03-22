@@ -23,12 +23,12 @@ export class GatewayWebOpenApiController {
             },
           },
         },
-        '/callbacks/assistant/{contact}': {
+        '/response/{conversationId}': {
           post: {
-            summary: 'Receive an assistant callback for a browser session',
+            summary: 'Receive the final assistant response for a browser conversation',
             parameters: [
               {
-                name: 'contact',
+                name: 'conversationId',
                 in: 'path',
                 required: true,
                 schema: { type: 'string' },
@@ -50,7 +50,39 @@ export class GatewayWebOpenApiController {
             },
             responses: {
               '200': {
-                description: 'Callback accepted and mapped to a browser session',
+                description: 'Response accepted and mapped to a browser session',
+              },
+            },
+          },
+        },
+        '/thinking/{conversationId}': {
+          post: {
+            summary: 'Receive a thinking callback for a browser conversation',
+            parameters: [
+              {
+                name: 'conversationId',
+                in: 'path',
+                required: true,
+                schema: { type: 'string' },
+              },
+            ],
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    required: ['seconds'],
+                    properties: {
+                      seconds: { type: 'integer', minimum: 1 },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              '200': {
+                description: 'Thinking state accepted and mapped to a browser session',
               },
             },
           },

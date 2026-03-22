@@ -281,8 +281,9 @@ sequenceDiagram
    - recent conversation messages from the configured `memory_window`
 5. Send the request to the configured LLM provider.
 6. Receive the final assistant answer and updated compact context from the LLM.
-7. Send the final answer to the gateway callback URL from the queued job.
-8. Mark the queue item as completed.
+7. While the LLM request is still running, send `thinking` callbacks every configured `N` seconds.
+8. Send the final answer to `host/response/{conversation_id}` from the queued job.
+9. Mark the queue item as completed.
 
 ## Queue Input
 
@@ -295,7 +296,8 @@ Main fields used by the worker:
 - `direction`
 - `chat`
 - `contact`
-- `callback_url`
+- `conversation_id`
+- `host`
 - `accepted_at`
 
 See [queue-message.md](../contracts/queue-message.md) for the exact queued message shape.
@@ -315,7 +317,9 @@ In V1, the stored config is:
 ```json
 {
   "provider": "xai",
-  "memory_window": 3
+  "model": "grok-4",
+  "memory_window": 3,
+  "thinking_interval_seconds": 2
 }
 ```
 
@@ -331,6 +335,7 @@ The settings page also shows:
 - whether the provider API check succeeds
 - the active model name
 - the last provider status message
+- the thinking callback interval in seconds
 
 ## LLM Request Composition
 
@@ -472,15 +477,17 @@ V1 is only:
 
 ## Callback Rules
 
-- The worker sends the final assistant answer to the callback URL from the queued job.
+- The worker reads `host` and `conversation_id` from the queued job.
+- While the LLM request is still running, the worker sends `POST {host}/thinking/{conversation_id}` every configured `N` seconds.
+- When the final reply is ready, the worker sends `POST {host}/response/{conversation_id}`.
 - The callback target belongs to the originating gateway.
 - The worker does not push directly to browser, Telegram, or Email clients.
 - Delivery must happen through the gateway callback contract.
 
 ```mermaid
 flowchart LR
-    Worker["assistant-worker"] --> Callback["callback_url from queue item"]
-    Callback --> Gateway["gateway callback endpoint"]
+    Worker["assistant-worker"] --> Callback["host + conversation_id from queue item"]
+    Callback --> Gateway["gateway response/thinking endpoints"]
     Gateway --> Client["end user channel"]
 ```
 

@@ -23,10 +23,11 @@ describe('AssistantWorkerConversationService', () => {
 
     await service.appendExchange(
       {
-        callback_url: 'http://example.test/callback',
         chat: 'direct',
+        conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
+        host: 'http://example.test',
         message: 'hello',
       },
       {
@@ -75,10 +76,11 @@ describe('AssistantWorkerConversationService', () => {
 
     const result = await service.appendExchange(
       {
-        callback_url: 'http://example.test/callback',
         chat: 'direct',
+        conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
+        host: 'http://example.test',
         message: 'Что он сделал?',
       },
       {
@@ -136,10 +138,11 @@ describe('AssistantWorkerConversationService', () => {
 
     const result = await service.appendExchange(
       {
-        callback_url: 'http://example.test/callback',
         chat: 'direct',
+        conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
+        host: 'http://example.test',
         message: 'What time should dinner be ready?',
       },
       {

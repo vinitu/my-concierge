@@ -22,7 +22,7 @@ describe('CallbackController', () => {
     );
 
     await expect(
-      controller.deliverAssistantMessage('session-1', { message: 'hello back' }),
+      controller.deliverAssistantResponse('session-1', { message: 'hello back' }),
     ).resolves.toEqual({
       delivered: true,
       response: 'Callback delivered',
@@ -51,10 +51,31 @@ describe('CallbackController', () => {
     );
 
     await expect(
-      controller.deliverAssistantMessage('session-1', { message: 'hello back' }),
+      controller.deliverAssistantResponse('session-1', { message: 'hello back' }),
     ).resolves.toEqual({
       delivered: false,
       response: 'WebSocket session not found',
+    });
+  });
+
+  it('delivers thinking notifications to a registered session', () => {
+    const gatewayWebRuntimeService = {} as unknown as GatewayWebRuntimeService;
+    const sessionRegistryService = {
+      sendAssistantThinking: jest.fn().mockReturnValue(true),
+    } as unknown as SessionRegistryService;
+    const metricsService = {
+      recordCallback: jest.fn(),
+    } as unknown as MetricsService;
+
+    const controller = new CallbackController(
+      gatewayWebRuntimeService,
+      sessionRegistryService,
+      metricsService,
+    );
+
+    expect(controller.deliverAssistantThinking('session-1', { seconds: 2 })).toEqual({
+      delivered: true,
+      response: 'Thinking callback delivered',
     });
   });
 });

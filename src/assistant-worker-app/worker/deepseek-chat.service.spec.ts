@@ -20,10 +20,11 @@ describe('DeepseekChatService', () => {
 ]`,
   };
   const queueMessage: QueueMessage = {
-    callback_url: 'http://gateway-web:3000/callbacks/assistant/alex',
     chat: 'direct',
+    conversation_id: 'alex',
     contact: 'alex',
     direction: 'api',
+    host: 'http://gateway-web:3000',
     message: 'Summarize the house status',
   };
 

@@ -9,11 +9,13 @@ Describe the queued job shape between `assistant-api` and `assistant-worker`.
 - `direction`
 - `chat`
 - `contact`
+- `conversation_id`
+- `host`
 - `message`
-- `callback_url`
 
 ## Rules
 
 - `assistant-api` writes this message.
 - `assistant-worker` reads this message.
+- `assistant-worker` derives callback endpoints from `host` and `conversation_id`.
 - The queue contract should stay stable across retries and scaling.

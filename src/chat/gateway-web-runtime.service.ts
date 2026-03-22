@@ -19,6 +19,8 @@ export interface GatewayWebConversationState {
   updated_at: string | null;
 }
 
+const MAX_GATEWAY_WEB_MESSAGES = 100;
+
 @Injectable()
 export class GatewayWebRuntimeService {
   constructor(private readonly configService: ConfigService) {}
@@ -68,7 +70,7 @@ export class GatewayWebRuntimeService {
           created_at: new Date().toISOString(),
           role,
         },
-      ],
+      ].slice(-MAX_GATEWAY_WEB_MESSAGES),
       session_id: sessionId,
       updated_at: new Date().toISOString(),
     };
@@ -110,7 +112,7 @@ export class GatewayWebRuntimeService {
       : [];
 
     return {
-      messages: normalizedMessages,
+      messages: normalizedMessages.slice(-MAX_GATEWAY_WEB_MESSAGES),
       session_id:
         typeof state.session_id === 'string' && state.session_id ? state.session_id : sessionId,
       updated_at: typeof state.updated_at === 'string' ? state.updated_at : null,

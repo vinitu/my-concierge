@@ -10,7 +10,7 @@ describe('AssistantApiClientService', () => {
     jest.restoreAllMocks();
   });
 
-  it('sends the conversation request to assistant-api with callback_url', async () => {
+  it('sends the conversation request to assistant-api with host and conversation_id', async () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 200 });
     global.fetch = fetchMock as typeof fetch;
 
@@ -22,7 +22,7 @@ describe('AssistantApiClientService', () => {
     const service = new AssistantApiClientService(configService, metricsService);
 
     await service.sendConversation({
-      contact: 'socket-1',
+      conversationId: 'socket-1',
       message: 'hello',
     });
 
@@ -32,8 +32,9 @@ describe('AssistantApiClientService', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
+          conversation_id: 'socket-1',
+          host: 'http://gateway-web:3000',
           message: 'hello',
-          callback_url: 'http://gateway-web:3000/callbacks/assistant/socket-1',
         }),
       },
     );
@@ -53,10 +54,9 @@ describe('AssistantApiClientService', () => {
 
     await expect(
       service.sendConversation({
-        contact: 'socket-1',
+        conversationId: 'socket-1',
         message: 'hello',
       }),
     ).rejects.toThrow('assistant-api returned 503');
   });
 });
-

@@ -14,6 +14,10 @@ import {
 import { AssistantWorkerConversationService } from './assistant-worker-conversation.service';
 import { CallbackDeliveryService } from './callback-delivery.service';
 import {
+  type AssistantWorkerConfig,
+  AssistantWorkerConfigService,
+} from './assistant-worker-config.service';
+import {
   ASSISTANT_LLM_PROVIDER,
   type AssistantLlmProvider,
 } from './assistant-llm-provider';
@@ -26,6 +30,7 @@ export class AssistantWorkerProcessorService
   private processing = false;
 
   constructor(
+    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
     private readonly conversationService: AssistantWorkerConversationService,
     private readonly callbackDeliveryService: CallbackDeliveryService,
     private readonly configService: ConfigService,
@@ -86,18 +91,46 @@ export class AssistantWorkerProcessorService
   }
 
   private async handleMessage(item: ProcessingQueueMessage): Promise<void> {
+    const workerConfig = await this.assistantWorkerConfigService.read();
+    const stopThinking = this.startThinkingLoop(item, workerConfig);
     const conversation = await this.conversationService.read(item);
-    const result = await this.llmProvider.generateReply({
-      conversation,
-      message: item,
-    });
 
     try {
-      await this.callbackDeliveryService.send(item.callback_url, result.message);
+      const result = await this.llmProvider.generateReply({
+        conversation,
+        message: item,
+      });
+
+      stopThinking();
+      await this.callbackDeliveryService.sendResponse(
+        item.host,
+        item.conversation_id,
+        result.message,
+      );
       await this.conversationService.appendExchange(item, result);
     } catch {
+      stopThinking();
       throw item;
     }
+  }
+
+  private startThinkingLoop(
+    item: ProcessingQueueMessage,
+    workerConfig: AssistantWorkerConfig,
+  ): () => void {
+    const delayMs = workerConfig.thinking_interval_seconds * 1000;
+
+    const timer = setInterval(() => {
+      void this.callbackDeliveryService.sendThinking(
+        item.host,
+        item.conversation_id,
+        workerConfig.thinking_interval_seconds,
+      );
+    }, delayMs);
+
+    return () => {
+      clearInterval(timer);
+    };
   }
 
   private async syncQueueDepth(): Promise<void> {

@@ -50,7 +50,8 @@ describe('assistant-api (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/conversation/api/direct/alex')
       .send({
-        callback_url: 'http://gateway-web:3000/callbacks/assistant/alex',
+        conversation_id: 'alex',
+        host: 'http://gateway-web:3000',
         message: 'Turn on the kitchen lights',
       });
 
@@ -67,7 +68,8 @@ describe('assistant-api (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/conversation/api/direct/alex')
       .send({
-        callback_url: 'http://gateway-web:3000/callbacks/assistant/alex',
+        conversation_id: 'alex',
+        host: 'http://gateway-web:3000',
         message: '   ',
       });
 

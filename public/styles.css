@@ -131,6 +131,42 @@
   color: var(--chat-assistant);
 }
 
+.message-thinking {
+  position: relative;
+  align-self: flex-start;
+  background: #151922;
+  color: var(--chat-muted);
+  border-style: dashed;
+  overflow: hidden;
+}
+
+.message-thinking::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    rgba(125, 211, 252, 0.06) 35%,
+    rgba(125, 211, 252, 0.16) 50%,
+    rgba(125, 211, 252, 0.06) 65%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: thinking-sheen 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes thinking-sheen {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .message-system {
   align-self: center;
   max-width: 100%;
