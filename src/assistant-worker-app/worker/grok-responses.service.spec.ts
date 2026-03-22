@@ -120,14 +120,15 @@ describe('GrokResponsesService', () => {
     expect(JSON.parse(init.body)).toEqual({
       input: [
         {
-          content: expect.stringContaining('"request": {'),
+          content: expect.stringContaining('"system_instructions": ['),
           role: 'system',
         },
       ],
       model: 'grok-4-latest',
       store: false,
     });
-    expect(JSON.parse(init.body).input[0].content).toContain('"system_instructions": ["agent rules"]');
+    expect(JSON.parse(init.body).input[0].content).toContain('"system_instructions": [');
+    expect(JSON.parse(init.body).input[0].content).toContain('"agent rules"');
     expect(JSON.parse(init.body).input[0].content).toContain('Turn on the kitchen lights');
   });
 
