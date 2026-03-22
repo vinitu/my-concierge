@@ -13,6 +13,16 @@ export class AssistantWorkerOpenApiController {
           'Background worker for queued assistant jobs. It reads queue messages, processes them, sends callbacks, and exposes operational endpoints.',
       },
       paths: {
+        '/': {
+          get: {
+            summary: 'Get worker root endpoint',
+            responses: {
+              '200': {
+                description: 'Service entrypoint summary',
+              },
+            },
+          },
+        },
         '/status': {
           get: {
             summary: 'Get worker status',

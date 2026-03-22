@@ -15,14 +15,25 @@ Provide a simple Web chat UI for the local assistant.
 - Expose `GET /metrics`
 - Expose `GET /openapi.json`
 
-## Main Endpoints
+## Relations
 
-- `GET /`
-- `WS /ws`
-- `POST /callbacks/assistant/:contact`
-- `GET /status`
-- `GET /metrics`
-- `GET /openapi.json`
+```mermaid
+flowchart LR
+    Browser["Browser"] <--> Gateway["gateway-web"]
+    Gateway <--> API["assistant-api"]
+    Worker["assistant-worker"] --> Gateway
+```
+
+## Endpoints
+
+| Endpoint | Purpose |
+|---------|---------|
+| `GET /` | Web chat page |
+| `WS /ws` | Browser WebSocket transport |
+| `POST /callbacks/assistant/:contact` | Receive assistant callback for a browser session |
+| `GET /status` | Service readiness |
+| `GET /metrics` | Prometheus metrics |
+| `GET /openapi.json` | OpenAPI schema |
 
 ## Internal Parts
 
@@ -87,3 +98,14 @@ If more services are implemented in the same repository later, `gateway-web` may
 - `assistant-worker` sends callbacks to `gateway-web`.
 - `gateway-web` maps callbacks back to the correct WebSocket session.
 - `gateway-web` exposes `GET /openapi.json` for the shared Swagger UI.
+
+## Metrics
+
+| Metric | Type | Labels | Description |
+|---------|---------|---------|-------------|
+| `gateway_web_active_websocket_sessions` | `gauge` | none | Current number of active WebSocket sessions |
+| `gateway_web_incoming_messages_total` | `counter` | none | Total number of incoming WebSocket messages |
+| `gateway_web_callbacks_total` | `counter` | `delivered` | Total number of callback deliveries |
+| `gateway_web_assistant_api_requests_total` | `counter` | `status` | Total number of requests from `gateway-web` to `assistant-api` |
+| `gateway_web_status_requests_total` | `counter` | none | Total number of status endpoint requests |
+| `gateway_web_metrics_requests_total` | `counter` | none | Total number of metrics endpoint requests |
