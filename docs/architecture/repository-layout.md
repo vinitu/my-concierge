@@ -50,17 +50,25 @@ my-concierge/
     operations/
 
   runtime/
-    SYSTEM.js
-    SOUL.js
-    IDENTITY.js
-    prompts/
-    skills/
-    memory/
-    conversations/
-    config/
-    data/
-    logs/
-    cache/
+    assistant-worker/
+      SYSTEM.js
+      SOUL.js
+      IDENTITY.js
+      skills/
+      memory/
+      conversations/
+      config/
+      data/
+      logs/
+      cache/
+    gateway-web/
+      conversations/
+      data/
+      logs/
+      cache/
+
+  prompts/
+    user-prompt.md
 ```
 
 ## Why The Current Layout Is Small

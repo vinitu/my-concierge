@@ -15,10 +15,12 @@ Describe what `assistant-worker` sends to callback targets.
 ## Rules
 
 - Callback delivery happens after queue processing.
-- One accepted request may produce zero, one, or many callback messages.
+- In the current V1 flow, one accepted request produces one final callback message.
 - Each callback request contains one assistant message.
 - For `gateway-web`, the callback target should be `POST /callbacks/assistant/<contact>`.
+- For `gateway-web`, `<contact>` is the stable browser `session_id` stored in the `myconcierge_session_id` cookie.
 - `gateway-web` should forward callback messages to the browser through WebSocket.
+- `gateway-web` should also persist callback messages in `runtime/gateway-web/conversations/{session_id}.json`.
 - `gateway-telegram` and `gateway-email` should deliver callback messages through their own channels.
 
 ## Callback Request
@@ -78,3 +80,14 @@ If the browser session is not found, it returns:
 - The caller receives an immediate acceptance response from `assistant-api`.
 - The final assistant answer is delivered asynchronously by `assistant-worker` through the callback endpoint.
 - The callback endpoint should be idempotent enough to tolerate retries.
+
+## Current `gateway-web` Mapping
+
+For the browser flow:
+
+- `gateway-web` creates or reads a stable `session_id` from the `myconcierge_session_id` cookie
+- the browser WebSocket authenticates with that `session_id`
+- `gateway-web` sends the same `session_id` as `contact` to `assistant-api`
+- `assistant-worker` calls back to `POST /callbacks/assistant/{session_id}`
+- `gateway-web` stores the assistant reply in `runtime/gateway-web/conversations/{session_id}.json`
+- `gateway-web` forwards the assistant reply to the active WebSocket session with the same `session_id`

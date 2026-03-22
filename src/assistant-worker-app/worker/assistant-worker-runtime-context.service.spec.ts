@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 
 describe('AssistantWorkerRuntimeContextService', () => {
-  it('loads runtime files and memory entries from datadir', async () => {
+  it('loads runtime files and memory entries from the assistant-worker runtime directory', async () => {
     const datadir = await mkdtemp(join(tmpdir(), 'assistant-runtime-'));
     const memoryDir = join(datadir, 'memory', 'notes');
 
@@ -56,11 +56,11 @@ describe('AssistantWorkerRuntimeContextService', () => {
     });
   });
 
-  it('defaults to the runtime directory inside the current working directory', async () => {
+  it('defaults to the assistant-worker runtime directory inside the current working directory', async () => {
     const service = new AssistantWorkerRuntimeContextService(new ConfigService({}));
 
     await expect(service.load()).resolves.toMatchObject({
-      datadir: join(process.cwd(), 'runtime'),
+      datadir: join(process.cwd(), 'runtime', 'assistant-worker'),
     });
   });
 });

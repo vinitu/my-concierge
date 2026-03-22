@@ -23,7 +23,9 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   if (appRole === 'gateway-web') {
-    app.useStaticAssets(join(process.cwd(), 'public'));
+    app.useStaticAssets(join(process.cwd(), 'public'), {
+      index: false,
+    });
   }
 
   await app.listen(port, '0.0.0.0');

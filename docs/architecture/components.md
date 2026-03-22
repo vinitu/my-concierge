@@ -37,7 +37,7 @@ Describe the main components and their boundaries.
 
 - Reads jobs from the queue
 - Runs assistant business logic
-- Loads assistant runtime context from `datadir`
+- Loads assistant runtime context from the runtime directory
 - Calls LLM providers through one shared provider interface
 - Uses Grok as the first configured provider in V1
 - Sends callback requests

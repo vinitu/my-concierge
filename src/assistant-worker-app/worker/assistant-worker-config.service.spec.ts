@@ -27,7 +27,7 @@ describe('AssistantWorkerConfigService', () => {
     );
   });
 
-  it('writes the worker config to runtime/config/worker.json', async () => {
+  it('writes the worker config to the assistant-worker runtime directory', async () => {
     const datadir = await mkdtemp(join(tmpdir(), 'assistant-worker-config-'));
     const service = new AssistantWorkerConfigService(
       new ConfigService({

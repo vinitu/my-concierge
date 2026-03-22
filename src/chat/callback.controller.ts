@@ -6,6 +6,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { MetricsService } from '../observability/metrics.service';
+import { GatewayWebRuntimeService } from './gateway-web-runtime.service';
 import { SessionRegistryService } from './session-registry.service';
 
 interface CallbackBody {
@@ -15,6 +16,7 @@ interface CallbackBody {
 @Controller()
 export class CallbackController {
   constructor(
+    private readonly gatewayWebRuntimeService: GatewayWebRuntimeService,
     private readonly sessionRegistryService: SessionRegistryService,
     private readonly metricsService: MetricsService,
   ) {}
@@ -24,8 +26,19 @@ export class CallbackController {
   deliverAssistantMessage(
     @Param('contact') contact: string,
     @Body() body: CallbackBody,
-  ): { delivered: boolean; response: string } {
+  ): Promise<{ delivered: boolean; response: string }> {
     const message = body.message?.trim() ?? '';
+    return this.handleDelivery(contact, message);
+  }
+
+  private async handleDelivery(
+    contact: string,
+    message: string,
+  ): Promise<{ delivered: boolean; response: string }> {
+    if (message.length > 0) {
+      await this.gatewayWebRuntimeService.appendAssistantMessage(contact, message);
+    }
+
     const delivered =
       message.length > 0 &&
       this.sessionRegistryService.sendAssistantMessage(contact, message);

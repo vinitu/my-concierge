@@ -23,7 +23,7 @@ It separates product rules, architecture rules, service rules, API contracts, de
 - `assistant` is split into `assistant-api` and `assistant-worker`.
 - `assistant-api` only validates requests, writes to the queue, and returns acceptance responses.
 - `assistant-api` already exists in the codebase.
-- `assistant-worker` reads the queue, loads runtime context from `./runtime`, calls an LLM provider through a shared provider interface, and sends callbacks.
+- `assistant-worker` reads the queue, loads runtime context from `./runtime/assistant-worker`, calls an LLM provider through a shared provider interface, and sends callbacks.
 - V1 supports `xai` and `ollama` providers.
 - Redis is the current default queue transport between `assistant-api` and `assistant-worker`.
 - `gateway-web` is the first implemented service in this repository.

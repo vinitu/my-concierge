@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { AssistantWorkerConversationService } from './assistant-worker-conversation.service';
 
 describe('AssistantWorkerConversationService', () => {
-  it('stores the conversation in runtime/conversations/{direction}/{chat}/{contact}.json', async () => {
+  it('stores the conversation in runtime/assistant-worker/conversations/{direction}/{chat}/{contact}.json', async () => {
     const datadir = await mkdtemp(join(tmpdir(), 'assistant-worker-conversation-'));
     const service = new AssistantWorkerConversationService(
       {

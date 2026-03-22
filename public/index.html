@@ -22,6 +22,10 @@
     <main class="chat-layout container-fluid py-3">
       <div class="chat-shell">
         <div class="status-cluster mb-3">
+          <span id="session-name" class="status-pill status-name-pill">
+            <span class="status-caption">session</span>
+            <span id="session-name-label">unknown</span>
+          </span>
           <span id="connection-status" class="status-pill">
             <span class="status-dot"></span>
             <span id="connection-status-label">connecting</span>
@@ -52,6 +56,7 @@
       </div>
     </main>
 
+    <!-- GATEWAY_BOOTSTRAP -->
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script src="/app.js"></script>
   </body>

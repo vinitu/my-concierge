@@ -57,8 +57,8 @@ The current source of truth is the code for these services and the project docum
 - Queue-based asynchronous flow between `assistant-api` and `assistant-worker`
 - `assistant-api` accepts requests, validates them, enqueues jobs, and acknowledges them
 - `assistant-api` supports env-based queue adapters and currently uses Redis by default through `QUEUE_ADAPTER=redis`
-- `assistant-worker` reads queued jobs, loads runtime context from `runtime/`, sends them to the configured provider (`deepseek`, `xai`, or `ollama`), returns callback replies, and exposes a worker settings page with provider status
-- `gateway-web` provides the browser chat UI and WebSocket transport
+- `assistant-worker` reads queued jobs, loads runtime context from `runtime/assistant-worker/`, sends them to the configured provider (`deepseek`, `xai`, or `ollama`), returns callback replies, and exposes a worker settings page with provider status
+- `gateway-web` provides the browser chat UI, persists browser chat history in `runtime/gateway-web/`, and uses a cookie-backed session id
 - `gateway-web` exposes `/`, `WS /ws`, `/callbacks/assistant/:contact`, `/status`, `/metrics`, and `/openapi.json`
 - `assistant-api`, `assistant-worker`, and `gateway-web` expose `/status`, `/metrics`, and OpenAPI documentation
 - One shared Swagger UI aggregates the service schemas
@@ -221,22 +221,25 @@ make down
 
 The local runtime is named `assistant`.
 It is split into `assistant-api` and `assistant-worker`.
-The repository contains a separate runtime `datadir` in `runtime/`.
-`assistant-worker` reads the core runtime files from this directory before processing queued work.
-In Docker Compose, `assistant-worker` mounts it as a bind volume: `./runtime:/app/runtime`.
+The repository contains separate runtime directories under `runtime/`.
+In Docker Compose, each service mounts only its own runtime directory:
+- `assistant-worker`: `./runtime/assistant-worker:/app/runtime`
+- `gateway-web`: `./runtime/gateway-web:/app/runtime`
+The runtime directory is not baked into the Docker image.
 
 Expected runtime files and folders:
 
-- `runtime/SYSTEM.js`
-- `runtime/SOUL.js`
-- `runtime/IDENTITY.js`
-- `runtime/skills/`
-- `runtime/memory/`
-- `runtime/conversations/`
-- `runtime/prompts/`
-- `runtime/config/`
+- `runtime/assistant-worker/SYSTEM.js`
+- `runtime/assistant-worker/SOUL.js`
+- `runtime/assistant-worker/IDENTITY.js`
+- `runtime/assistant-worker/skills/`
+- `runtime/assistant-worker/memory/`
+- `runtime/assistant-worker/conversations/`
+- `runtime/assistant-worker/config/`
+- `runtime/gateway-web/conversations/`
 
-The repository already includes a starter `datadir` in [runtime/](/Users/vinitu/Projects/vinitu/my-concierge/runtime) with placeholder instruction files.
+The repository already includes a starter runtime directory in [runtime/](/Users/vinitu/Projects/vinitu/my-concierge/runtime) with placeholder instruction files.
+The repository-owned worker prompt template lives in [prompts/user-prompt.md](/Users/vinitu/Projects/vinitu/my-concierge/prompts/user-prompt.md).
 
 ## Out of Scope for First Version
 

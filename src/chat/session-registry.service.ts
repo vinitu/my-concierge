@@ -8,24 +8,34 @@ export interface SocketEmitter {
 export class SessionRegistryService {
   private readonly sessions = new Map<string, SocketEmitter>();
 
-  register(contact: string, client: SocketEmitter): void {
-    this.sessions.set(contact, client);
+  register(sessionId: string, client: SocketEmitter): void {
+    this.sessions.set(sessionId, client);
   }
 
-  unregister(contact: string): void {
-    this.sessions.delete(contact);
+  unregister(sessionId: string, client?: SocketEmitter): void {
+    const currentClient = this.sessions.get(sessionId);
+
+    if (!currentClient) {
+      return;
+    }
+
+    if (client && currentClient !== client) {
+      return;
+    }
+
+    this.sessions.delete(sessionId);
   }
 
-  has(contact: string): boolean {
-    return this.sessions.has(contact);
+  has(sessionId: string): boolean {
+    return this.sessions.has(sessionId);
   }
 
   count(): number {
     return this.sessions.size;
   }
 
-  sendAssistantMessage(contact: string, message: string): boolean {
-    const client = this.sessions.get(contact);
+  sendAssistantMessage(sessionId: string, message: string): boolean {
+    const client = this.sessions.get(sessionId);
 
     if (!client) {
       return false;
@@ -35,4 +45,3 @@ export class SessionRegistryService {
     return true;
   }
 }
-

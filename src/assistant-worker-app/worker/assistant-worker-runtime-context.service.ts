@@ -26,7 +26,7 @@ export class AssistantWorkerRuntimeContextService {
   async load(): Promise<AssistantWorkerRuntimeContext> {
     const datadir = this.configService.get<string>(
       'ASSISTANT_DATADIR',
-      join(process.cwd(), 'runtime'),
+      join(process.cwd(), 'runtime', 'assistant-worker'),
     );
 
     return {

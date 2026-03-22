@@ -90,7 +90,10 @@ export class AssistantWorkerConversationService {
   }
 
   private datadir(): string {
-    return this.configService.get<string>('ASSISTANT_DATADIR', join(process.cwd(), 'runtime'));
+    return this.configService.get<string>(
+      'ASSISTANT_DATADIR',
+      join(process.cwd(), 'runtime', 'assistant-worker'),
+    );
   }
 
   private emptyState(message: QueueMessage): AssistantConversationState {
