@@ -32,6 +32,16 @@ flowchart LR
 | `GET /metrics` | Prometheus metrics |
 | `GET /openapi.json` | OpenAPI schema |
 
+## Request Contract
+
+The request body includes:
+
+- `message`
+- `host`
+- `conversation_id`
+
+`assistant-api` validates those fields and writes them to the queue without building callback URLs itself.
+
 ## Must Not Do
 
 - Run assistant business logic

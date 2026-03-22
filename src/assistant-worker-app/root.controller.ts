@@ -22,6 +22,7 @@ interface UpdateWorkerConfigBody {
   model?: string;
   memory_window?: number | string;
   provider?: AssistantWorkerProvider | string;
+  thinking_interval_seconds?: number | string;
 }
 
 @Controller()
@@ -219,6 +220,15 @@ export class AssistantWorkerRootController {
             max="20"
             value="${String(config.memory_window)}"
           />
+          <label for="thinking-interval-seconds">Thinking callback interval (seconds)</label>
+          <input
+            id="thinking-interval-seconds"
+            name="thinking_interval_seconds"
+            type="number"
+            min="1"
+            max="30"
+            value="${String(config.thinking_interval_seconds)}"
+          />
           <button type="submit">Save settings</button>
         </form>
         <div id="status"></div>
@@ -228,6 +238,7 @@ export class AssistantWorkerRootController {
             <div>Selected provider: <span id="provider-value">${this.escapeHtml(config.provider)}</span></div>
             <div>Selected model: <span id="selected-model-value">${this.escapeHtml(config.model)}</span></div>
             <div>Memory window: <span id="memory-window-value">${String(config.memory_window)}</span></div>
+            <div>Thinking interval: <span id="thinking-interval-value">${String(config.thinking_interval_seconds)}</span>s</div>
             <div>Provider id: <span id="provider-id">${this.escapeHtml(providerStatus.provider)}</span></div>
             <div>Configured model: <span id="provider-model">${this.escapeHtml(providerStatus.model)}</span></div>
             <div>Credential: <span id="provider-credential">${this.renderCredential(providerStatus)}</span></div>
@@ -284,12 +295,18 @@ export class AssistantWorkerRootController {
         const provider = document.getElementById('provider').value;
         const model = document.getElementById('model').value;
         const memoryWindow = document.getElementById('memory-window').value;
+        const thinkingIntervalSeconds = document.getElementById('thinking-interval-seconds').value;
         status.textContent = 'Saving...';
 
         const response = await fetch('/config', {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ memory_window: memoryWindow, model, provider }),
+          body: JSON.stringify({
+            memory_window: memoryWindow,
+            model,
+            provider,
+            thinking_interval_seconds: thinkingIntervalSeconds,
+          }),
         });
 
         if (!response.ok) {
@@ -298,13 +315,15 @@ export class AssistantWorkerRootController {
         }
 
         const payload = await response.json();
-        status.textContent = 'Saved provider: ' + payload.provider + ', model: ' + payload.model + ', memory window: ' + payload.memory_window;
+        status.textContent = 'Saved provider: ' + payload.provider + ', model: ' + payload.model + ', memory window: ' + payload.memory_window + ', thinking interval: ' + payload.thinking_interval_seconds + 's';
         document.getElementById('provider-value').textContent = payload.provider;
         document.getElementById('selected-model-value').textContent = payload.model;
         document.getElementById('provider').value = payload.provider;
         renderModelOptions(payload.provider, payload.model);
         document.getElementById('memory-window-value').textContent = String(payload.memory_window);
         document.getElementById('memory-window').value = String(payload.memory_window);
+        document.getElementById('thinking-interval-value').textContent = String(payload.thinking_interval_seconds);
+        document.getElementById('thinking-interval-seconds').value = String(payload.thinking_interval_seconds);
         await refreshProviderStatus();
       });
 
@@ -362,6 +381,12 @@ export class AssistantWorkerRootController {
             ? Number.parseInt(body.memory_window, 10)
             : 3,
       provider,
+      thinking_interval_seconds:
+        typeof body.thinking_interval_seconds === 'number'
+          ? body.thinking_interval_seconds
+          : typeof body.thinking_interval_seconds === 'string'
+            ? Number.parseInt(body.thinking_interval_seconds, 10)
+            : 2,
     });
   }
 

@@ -18,6 +18,7 @@ import { AssistantLlmProviderStatusService } from '../src/assistant-worker-app/w
 describe('assistant-worker (e2e)', () => {
   let app: NestExpressApplication;
   let callbackMessages: string[] = [];
+  let thinkingMessages: string[] = [];
   let callbackServer: ReturnType<typeof createServer>;
   let callbackUrl = '';
   let datadir: string;
@@ -51,7 +52,13 @@ describe('assistant-worker (e2e)', () => {
       });
 
       req.on('end', () => {
-        callbackMessages.push(Buffer.concat(chunks).toString('utf8'));
+        const body = Buffer.concat(chunks).toString('utf8');
+
+        if (req.url?.startsWith('/thinking/')) {
+          thinkingMessages.push(body);
+        } else {
+          callbackMessages.push(body);
+        }
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ delivered: true }));
@@ -67,7 +74,7 @@ describe('assistant-worker (e2e)', () => {
       throw new Error('callback server address is unavailable');
     }
 
-    callbackUrl = `http://127.0.0.1:${String(address.port)}/callbacks/assistant/alex`;
+    callbackUrl = `http://127.0.0.1:${String(address.port)}`;
 
     const moduleRef = await Test.createTestingModule({
       imports: [AssistantWorkerAppModule],
@@ -107,6 +114,7 @@ describe('assistant-worker (e2e)', () => {
 
   beforeEach(() => {
     callbackMessages = [];
+    thinkingMessages = [];
     jest.clearAllMocks();
   });
 
@@ -120,6 +128,7 @@ describe('assistant-worker (e2e)', () => {
     expect(response.text).toContain('<option value="xai" selected>');
     expect(response.text).toContain('<option value="ollama">ollama</option>');
     expect(response.text).toContain('value="3"');
+    expect(response.text).toContain('value="2"');
     expect(response.text).toContain('Credential: <span id="provider-credential">missing</span>');
     expect(response.text).toContain('Reachability: <span id="provider-reachable">not working</span>');
   });
@@ -132,12 +141,14 @@ describe('assistant-worker (e2e)', () => {
       model: 'grok-4',
       memory_window: 3,
       provider: 'xai',
+      thinking_interval_seconds: 2,
     });
 
     const putResponse = await request(app.getHttpServer()).put('/config').send({
       model: 'deepseek-chat',
       memory_window: 5,
       provider: 'deepseek',
+      thinking_interval_seconds: 4,
     });
 
     expect(putResponse.status).toBe(200);
@@ -145,6 +156,7 @@ describe('assistant-worker (e2e)', () => {
       model: 'deepseek-chat',
       memory_window: 5,
       provider: 'deepseek',
+      thinking_interval_seconds: 4,
     });
 
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
@@ -156,16 +168,20 @@ describe('assistant-worker (e2e)', () => {
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
       '"model": "deepseek-chat"',
     );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"thinking_interval_seconds": 4',
+    );
   });
 
   it('processes a queued file and sends a callback message', async () => {
     await writeFile(
       join(queueDir, '001.json'),
       JSON.stringify({
-        callback_url: callbackUrl,
         chat: 'direct',
+        conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
+        host: callbackUrl,
         message: 'Hello worker',
       }),
       'utf8',
@@ -180,6 +196,7 @@ describe('assistant-worker (e2e)', () => {
     }
 
     expect(callbackMessages).toHaveLength(1);
+    expect(thinkingMessages).toHaveLength(0);
     expect(callbackMessages[0]).toContain('hello from grok');
     const conversationPath = join(datadir, 'conversations', 'api', 'direct', 'alex.json');
     let storedConversation = '';
@@ -240,10 +257,11 @@ describe('assistant-worker (e2e)', () => {
     await writeFile(
       join(queueDir, 'metrics.json'),
       JSON.stringify({
-        callback_url: callbackUrl,
         chat: 'direct',
+        conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
+        host: callbackUrl,
         message: 'metrics job',
       }),
       'utf8',
@@ -268,6 +286,60 @@ describe('assistant-worker (e2e)', () => {
     );
     expect(response.text).toContain('processed_jobs_total{service="assistant-worker"}');
     expect(response.text).toContain('callback_requests_total{service="assistant-worker",status=');
+  });
+
+  it('sends periodic thinking callbacks while the LLM request is in progress', async () => {
+    llmProvider.generateReply.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              context: 'Slow request completed.',
+              message: 'slow reply',
+            });
+          }, 2600);
+        }),
+    );
+
+    await writeFile(
+      join(datadir, 'config', 'worker.json'),
+      `${JSON.stringify(
+        {
+          model: 'grok-4',
+          memory_window: 3,
+          provider: 'xai',
+          thinking_interval_seconds: 1,
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+
+    await writeFile(
+      join(queueDir, 'thinking.json'),
+      JSON.stringify({
+        chat: 'direct',
+        conversation_id: 'alex',
+        contact: 'alex',
+        direction: 'api',
+        host: callbackUrl,
+        message: 'slow job',
+      }),
+      'utf8',
+    );
+
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      if (callbackMessages.length > 0) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    expect(callbackMessages).toHaveLength(1);
+    expect(thinkingMessages.length).toBeGreaterThanOrEqual(2);
+    expect(thinkingMessages[0]).toContain('"seconds":1');
   });
 
   it('returns worker OpenAPI schema', async () => {

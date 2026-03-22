@@ -10,7 +10,8 @@ import { AssistantApiMetricsService } from './observability/assistant-api-metric
 import { QueueService } from './queue/queue.service';
 
 interface ConversationBody {
-  callback_url?: string;
+  conversation_id?: string;
+  host?: string;
   message?: string;
 }
 
@@ -30,21 +31,27 @@ export class ConversationController {
     @Body() body: ConversationBody,
   ): Promise<{ status: string }> {
     const message = body.message?.trim() ?? '';
-    const callbackUrl = body.callback_url?.trim() ?? '';
+    const host = body.host?.trim() ?? '';
+    const conversationId = body.conversation_id?.trim() ?? '';
 
     if (!message) {
       throw new BadRequestException('message must not be empty');
     }
 
-    if (!callbackUrl) {
-      throw new BadRequestException('callback_url must not be empty');
+    if (!host) {
+      throw new BadRequestException('host must not be empty');
+    }
+
+    if (!conversationId) {
+      throw new BadRequestException('conversation_id must not be empty');
     }
 
     await this.queueService.enqueue({
-      callback_url: callbackUrl,
       chat,
+      conversation_id: conversationId,
       contact,
       direction,
+      host,
       message,
     });
 

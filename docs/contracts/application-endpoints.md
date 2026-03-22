@@ -43,7 +43,8 @@ Describe the endpoints of all application services in one place.
 ### Notes
 
 - `assistant-worker` reads jobs from the queue.
-- `assistant-worker` sends callback messages after processing.
+- `assistant-worker` sends periodic `thinking` callbacks while waiting on the LLM.
+- `assistant-worker` sends the final `response` callback after processing.
 
 ## `gateway-telegram`
 
@@ -91,8 +92,10 @@ Describe the endpoints of all application services in one place.
   Purpose: return the `gateway-web` OpenAPI schema
 - `WS /ws`
   Purpose: accept browser chat messages and return assistant replies through the same WebSocket session
-- `POST /callbacks/assistant/:contact`
-  Purpose: receive callback messages from `assistant-worker` and send them to the browser through WebSocket
+- `POST /response/:conversationId`
+  Purpose: receive the final assistant response from `assistant-worker` and send it to the browser through WebSocket
+- `POST /thinking/:conversationId`
+  Purpose: receive transient thinking callbacks from `assistant-worker` and show them in the browser for the requested number of seconds
 - `GET /status`
   Purpose: report `gateway-web` readiness
 - `GET /metrics`

@@ -30,4 +30,14 @@ describe('SessionRegistryService', () => {
     expect(service.sendAssistantMessage('session-1', 'hello')).toBe(true);
     expect(secondClient.emit).toHaveBeenCalledWith('assistant.message', { message: 'hello' });
   });
+
+  it('sends thinking notifications to a registered session', () => {
+    const service = new SessionRegistryService();
+    const client: SocketEmitter = { emit: jest.fn() };
+
+    service.register('session-1', client);
+
+    expect(service.sendAssistantThinking('session-1', 2)).toBe(true);
+    expect(client.emit).toHaveBeenCalledWith('assistant.thinking', { seconds: 2 });
+  });
 });

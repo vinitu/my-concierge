@@ -15,17 +15,19 @@ describe('AssistantWorkerProcessorService', () => {
     await writeFile(
       join(queueDir, '001.json'),
       JSON.stringify({
-        callback_url: 'http://example.test/callback',
         chat: 'direct',
+        conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
+        host: 'http://example.test',
         message: 'hello',
       }),
       'utf8',
     );
 
     const callbackDeliveryService = {
-      send: jest.fn().mockResolvedValue(undefined),
+      sendResponse: jest.fn().mockResolvedValue(undefined),
+      sendThinking: jest.fn().mockResolvedValue(undefined),
     } as unknown as CallbackDeliveryService;
     const conversationService = {
       appendExchange: jest.fn().mockResolvedValue(undefined),
@@ -51,6 +53,14 @@ describe('AssistantWorkerProcessorService', () => {
     const metricsService = new AssistantWorkerMetricsService();
     const fileQueueConsumerService = new FileQueueConsumerService(configService);
     const service = new AssistantWorkerProcessorService(
+      {
+        read: jest.fn().mockResolvedValue({
+          memory_window: 3,
+          model: 'grok-4',
+          provider: 'xai',
+          thinking_interval_seconds: 2,
+        }),
+      } as never,
       conversationService,
       callbackDeliveryService,
       configService,
@@ -61,8 +71,9 @@ describe('AssistantWorkerProcessorService', () => {
 
     await service.processOnce();
 
-    expect(callbackDeliveryService.send).toHaveBeenCalledWith(
-      'http://example.test/callback',
+    expect(callbackDeliveryService.sendResponse).toHaveBeenCalledWith(
+      'http://example.test',
+      'alex',
       'hello from grok',
     );
     expect(conversationService.appendExchange).toHaveBeenCalledWith(

@@ -29,4 +29,27 @@ describe('GatewayWebRuntimeService', () => {
       expect.objectContaining({ content: 'hi', role: 'assistant' }),
     ]);
   });
+
+  it('keeps only the last 100 messages', async () => {
+    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'gateway-web-runtime-'));
+    const service = new GatewayWebRuntimeService(
+      new ConfigService({
+        GATEWAY_WEB_RUNTIME_DIR: runtimeDirectory,
+      }),
+    );
+
+    for (let index = 0; index < 105; index += 1) {
+      await service.appendUserMessage('session-1', `message-${String(index)}`);
+    }
+
+    const stored = JSON.parse(
+      await readFile(join(runtimeDirectory, 'conversations', 'session-1.json'), 'utf8'),
+    ) as {
+      messages: Array<{ content: string; role: string }>;
+    };
+
+    expect(stored.messages).toHaveLength(100);
+    expect(stored.messages[0]?.content).toBe('message-5');
+    expect(stored.messages[99]?.content).toBe('message-104');
+  });
 });

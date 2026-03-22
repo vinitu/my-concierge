@@ -10,8 +10,8 @@ Provide a simple Web chat UI for the local assistant.
 - Accept WebSocket chat messages from the browser
 - Keep a stable browser session id in cookies
 - Convert browser messages into `assistant-api` requests
-- Expose a callback endpoint for `assistant-worker`
-- Send callback messages back to the browser through WebSocket
+- Expose `response` and `thinking` callback endpoints for `assistant-worker`
+- Send final responses and thinking signals back to the browser through WebSocket
 - Persist browser chat history in the gateway runtime directory
 - Expose `GET /status`
 - Expose `GET /metrics`
@@ -32,7 +32,8 @@ flowchart LR
 |---------|---------|
 | `GET /` | Web chat page |
 | `WS /ws` | Browser WebSocket transport |
-| `POST /callbacks/assistant/:contact` | Receive assistant callback for a browser session |
+| `POST /response/:conversationId` | Receive the final assistant response for a browser session |
+| `POST /thinking/:conversationId` | Receive a transient thinking signal for a browser session |
 | `GET /status` | Service readiness |
 | `GET /metrics` | Prometheus metrics |
 | `GET /openapi.json` | OpenAPI schema |
@@ -58,10 +59,12 @@ flowchart LR
 5. `gateway-web` calls `assistant-api`.
 6. `assistant-api` accepts the message and writes it to the queue.
 7. `assistant-worker` processes the job.
-8. `assistant-worker` sends a callback to `POST /callbacks/assistant/:contact`.
-9. `gateway-web` stores the assistant reply in `runtime/gateway-web/conversations/{session_id}.json`.
-10. `gateway-web` finds the right WebSocket session.
-11. `gateway-web` sends the assistant message back to the browser.
+8. While the LLM request is still running, `assistant-worker` may send `POST /thinking/:conversationId`.
+9. `gateway-web` forwards the thinking state to the active browser session for the requested number of seconds.
+10. `assistant-worker` sends the final callback to `POST /response/:conversationId`.
+11. `gateway-web` stores the assistant reply in `runtime/gateway-web/conversations/{session_id}.json`.
+12. `gateway-web` finds the right WebSocket session.
+13. `gateway-web` sends the assistant message back to the browser.
 
 ## State Rules
 
@@ -101,9 +104,10 @@ If more services are implemented in the same repository later, `gateway-web` may
 - Assistant business logic does not live here.
 - The browser talks to `gateway-web` through WebSocket.
 - `gateway-web` talks to `assistant-api` through HTTP.
-- `assistant-worker` sends callbacks to `gateway-web`.
+- `gateway-web` sends `host` and `conversation_id` to `assistant-api`.
+- `assistant-worker` derives callback paths from those two values.
 - `gateway-web` maps callbacks back to the correct WebSocket session.
-- `gateway-web` uses the cookie-backed `session_id` as the browser contact identifier.
+- `gateway-web` uses the cookie-backed `session_id` as the browser contact identifier and `conversation_id`.
 - `gateway-web` exposes `GET /openapi.json` for the shared Swagger UI.
 
 ## Metrics

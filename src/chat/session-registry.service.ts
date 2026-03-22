@@ -44,4 +44,15 @@ export class SessionRegistryService {
     client.emit('assistant.message', { message });
     return true;
   }
+
+  sendAssistantThinking(sessionId: string, seconds: number): boolean {
+    const client = this.sessions.get(sessionId);
+
+    if (!client) {
+      return false;
+    }
+
+    client.emit('assistant.thinking', { seconds });
+    return true;
+  }
 }

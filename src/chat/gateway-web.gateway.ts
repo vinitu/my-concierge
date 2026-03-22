@@ -75,7 +75,7 @@ export class GatewayWebGateway
 
       await this.gatewayWebRuntimeService.appendUserMessage(sessionId, message);
       await this.assistantApiClientService.sendConversation({
-        contact: sessionId,
+        conversationId: sessionId,
         message,
       });
     } catch {

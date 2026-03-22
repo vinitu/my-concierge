@@ -6,7 +6,8 @@
 2. `assistant-api` validates the request and enqueues it.
 3. `assistant-api` returns an immediate acceptance response.
 4. `assistant-worker` reads the queued job later.
-5. `assistant-worker` sends the final assistant reply to the client callback URL.
+5. `assistant-worker` sends periodic thinking callbacks while the LLM request is still running.
+6. `assistant-worker` sends the final assistant reply to the gateway host.
 
 ## Endpoint
 
@@ -30,13 +31,15 @@ Accept a conversation event and place it into the queue.
 
 | Field | Type | Required | Description |
 |---------|---------|---------|-------------|
+| `conversation_id` | `string` | yes | Stable gateway-side conversation identifier |
+| `host` | `string` | yes | Gateway base URL that will receive callback requests |
 | `message` | `string` | yes | User message to process |
-| `callback_url` | `string` | yes | Absolute URL where `assistant-worker` should send the final reply |
 
 ```json
 {
-  "message": "Turn on the kitchen lights",
-  "callback_url": "https://client.example.com/callbacks/assistant/alex"
+  "conversation_id": "alex",
+  "host": "https://client.example.com",
+  "message": "Turn on the kitchen lights"
 }
 ```
 
@@ -78,7 +81,15 @@ Examples:
 ```json
 {
   "statusCode": 400,
-  "message": "callback_url must not be empty",
+  "message": "host must not be empty",
+  "error": "Bad Request"
+}
+```
+
+```json
+{
+  "statusCode": 400,
+  "message": "conversation_id must not be empty",
   "error": "Bad Request"
 }
 ```
@@ -86,8 +97,9 @@ Examples:
 ## Client Expectations
 
 - The client should treat `202 Accepted` as acceptance only, not as the final assistant answer.
-- The client should wait for the asynchronous callback on `callback_url`.
+- The client should wait for asynchronous callback requests on `host`.
 - In the current V1 flow, one accepted request produces one final callback message.
+- While the LLM request is running, the worker may also send periodic `thinking` callbacks.
 
 ## Current `gateway-web` Contact Rule
 
@@ -95,4 +107,5 @@ For the browser flow:
 
 - `contact` is the stable browser `session_id`
 - `gateway-web` stores `session_id` in the `myconcierge_session_id` cookie
-- `gateway-web` uses that `session_id` both for the websocket session mapping and for the callback path
+- `gateway-web` uses that `session_id` both for the websocket session mapping and for `conversation_id`
+- `gateway-web` sends `host` as its own base URL

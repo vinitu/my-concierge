@@ -18,10 +18,19 @@ const connectionStatus = document.getElementById('connection-status');
 const connectionStatusLabel = document.getElementById('connection-status-label');
 const sessionNameLabel = document.getElementById('session-name-label');
 const maxComposerHeight = 180;
+let thinkingTimer = null;
+let thinkingMessage = null;
 
 function resizeInput() {
   input.style.height = 'auto';
   input.style.height = `${Math.min(input.scrollHeight, maxComposerHeight)}px`;
+}
+
+function scrollMessagesToBottom() {
+  messages.scrollTop = messages.scrollHeight;
+  window.requestAnimationFrame(() => {
+    messages.scrollTop = messages.scrollHeight;
+  });
 }
 
 function appendMessage(role, text) {
@@ -29,7 +38,20 @@ function appendMessage(role, text) {
   article.className = `message message-${role}`;
   article.textContent = text;
   messages.appendChild(article);
-  messages.scrollTop = messages.scrollHeight;
+  scrollMessagesToBottom();
+  return article;
+}
+
+function clearThinking() {
+  if (thinkingTimer !== null) {
+    window.clearTimeout(thinkingTimer);
+    thinkingTimer = null;
+  }
+
+  if (thinkingMessage) {
+    thinkingMessage.remove();
+    thinkingMessage = null;
+  }
 }
 
 function setConnectionStatus(status) {
@@ -40,6 +62,23 @@ function setConnectionStatus(status) {
   );
   connectionStatus.classList.add(`status-${status}`);
   connectionStatusLabel.textContent = status;
+}
+
+function showThinking(seconds) {
+  if (!thinkingMessage) {
+    thinkingMessage = appendMessage('thinking', 'assistant is thinking...');
+  }
+
+  messages.appendChild(thinkingMessage);
+  scrollMessagesToBottom();
+
+  if (thinkingTimer !== null) {
+    window.clearTimeout(thinkingTimer);
+  }
+
+  thinkingTimer = window.setTimeout(() => {
+    clearThinking();
+  }, Math.max(1, Number(seconds) || 1) * 1000);
 }
 
 socket.on('connect', () => {
@@ -62,7 +101,12 @@ socket.on('disconnect', () => {
 });
 
 socket.on('assistant.message', (payload) => {
+  clearThinking();
   appendMessage('assistant', payload.message);
+});
+
+socket.on('assistant.thinking', (payload) => {
+  showThinking(payload?.seconds);
 });
 
 socket.on('assistant.error', (payload) => {
@@ -100,4 +144,5 @@ sessionNameLabel.textContent = sessionId;
 for (const entry of bootstrap.history) {
   appendMessage(entry.role, entry.content);
 }
+scrollMessagesToBottom();
 resizeInput();
