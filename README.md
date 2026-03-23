@@ -3,6 +3,25 @@
 MyConcierge is a personal home assistant for one user.
 It is a small and minimal alternative to heavier systems like OpenClaw.
 
+## Why This Project Exists
+
+- This project is part of my learning process to understand how to build agents.
+- I also ran into resource problems with OpenClaw on my Raspberry Pi, so I want a smaller system that fits my hardware better.
+
+## What Works Now
+
+- Web chat with LLM responses through `gateway-web`, `assistant-api`, and `assistant-worker`
+- Conversation context in the current chat flow
+
+## Roadmap
+
+- Telegram integration
+- Email integration
+- Scheduler
+- Agent looping
+- Skills
+- Tools
+
 ## Principles
 
 - Minimal resource usage
@@ -226,13 +245,6 @@ make down
 - `npm test`: run unit tests
 - `npm run test:e2e`: run e2e tests
 
-## TODO
-
-- skills support in `assistant-worker`
-- tools support in `assistant-worker`
-- `gateway-telegram`
-- `gateway-email`
-- `scheduler`
 
 ## Out of Scope for First Version
 
