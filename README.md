@@ -60,6 +60,7 @@ The current source of truth is the code for these services and the project docum
 - [Requirements](./docs/requirements.md)
 - [Runtime architecture](./docs/architecture/runtime.md)
 - [System components](./docs/architecture/components.md)
+- [Agent runtime redesign](./docs/architecture/agent-runtime-redesign.md)
 - [Data flow](./docs/architecture/data-flow.md)
 - [Repository layout](./docs/architecture/repository-layout.md)
 - [Application endpoints](./docs/contracts/application-endpoints.md)

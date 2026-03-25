@@ -11,11 +11,12 @@ It separates product rules, architecture rules, service rules, API contracts, de
 2. `architecture/runtime.md`
 3. `architecture/components.md`
 4. `architecture/data-flow.md`
-5. `architecture/repository-layout.md`
-6. `services/*`
-7. `contracts/*`
-8. `deployment/*`
-9. `operations/*`
+5. `architecture/agent-runtime-redesign.md`
+6. `architecture/repository-layout.md`
+7. `services/*`
+8. `contracts/*`
+9. `deployment/*`
+10. `operations/*`
 
 ## Main Ideas
 
@@ -24,6 +25,7 @@ It separates product rules, architecture rules, service rules, API contracts, de
 - `assistant-api` only validates requests, writes to the queue, and returns acceptance responses.
 - `assistant-api` already exists in the codebase.
 - `assistant-worker` reads the queue, loads runtime context from `./runtime/assistant-worker`, calls an LLM provider through a shared provider interface, and sends callbacks.
+- `architecture/agent-runtime-redesign.md` describes the proposed next-step split between `assistant-agent`, `assistant-memory`, and specialized execution services.
 - V1 supports `xai` and `ollama` providers.
 - Redis is the current default queue transport between `assistant-api` and `assistant-worker`.
 - `gateway-web` is the first implemented service in this repository.
@@ -36,6 +38,7 @@ It separates product rules, architecture rules, service rules, API contracts, de
 
 - `requirements.md`: high-level system requirements
 - `architecture/`: runtime model and component boundaries
+- `architecture/agent-runtime-redesign.md`: proposed redesign for `assistant-agent`, `assistant-memory`, and execution services
 - `architecture/repository-layout.md`: target repository structure
 - `services/`: service-by-service behavior
 - `contracts/`: exact API and queue contracts
