@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { AssistantLlmGenerateInput } from './assistant-llm-provider';
+import type { AssistantToolObservation } from './assistant-tool-dispatcher.service';
 import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
 import type { AssistantWorkerRuntimeContext } from './assistant-worker-runtime-context.service';
 
@@ -39,6 +40,21 @@ export class AssistantWorkerPromptTemplateService {
     return this.renderTemplate(template, {
       request: this.promptService.buildRequestSection(input, runtimeContext),
     });
+  }
+
+  async renderPlanningPrompt(
+    input: AssistantLlmGenerateInput,
+    runtimeContext: AssistantWorkerRuntimeContext,
+  ): Promise<string> {
+    return this.promptService.buildPlanningPrompt(input, runtimeContext);
+  }
+
+  async renderSynthesisPrompt(
+    input: AssistantLlmGenerateInput,
+    runtimeContext: AssistantWorkerRuntimeContext,
+    observation: AssistantToolObservation,
+  ): Promise<string> {
+    return this.promptService.buildSynthesisPrompt(input, runtimeContext, observation);
   }
 
   private promptsdir(): string {

@@ -2,12 +2,14 @@
 
 ## Purpose
 
-Transport work from `assistant-api` to `assistant-worker`.
+Transport execution jobs from `assistant-api` to `assistant-worker` and run events back from `assistant-worker` to `assistant-api`.
 
 ## Responsibilities
 
 - Accept accepted jobs from `assistant-api`
 - Keep jobs until a worker reads them
+- Accept worker run events
+- Keep run events until `assistant-api` reads them
 - Support more than one worker instance
 - Expose queue depth to metrics
 
@@ -15,8 +17,8 @@ Transport work from `assistant-api` to `assistant-worker`.
 
 ```mermaid
 flowchart LR
-    API["assistant-api"] --> Q["queue"]
-    Q --> Worker["assistant-worker"]
+    API["assistant-api"] <--> Q["queue"]
+    Q <--> Worker["assistant-worker"]
 ```
 
 ## Endpoints
@@ -32,7 +34,6 @@ flowchart LR
 
 ## Rules
 
-- The queue is the only transport layer between `assistant-api` and `assistant-worker`.
+- The queue is the transport layer between `assistant-api` and `assistant-worker` in both directions.
 - The queue contract must stay stable across retries and scaling.
-- Redis is the current queue technology.
-- File queue may stay as an optional fallback adapter.
+- Redis is the queue technology.

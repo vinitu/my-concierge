@@ -15,8 +15,8 @@ It is a small and minimal alternative to heavier systems like OpenClaw.
 
 ## Roadmap
 
-- Telegram integration
 - Email integration
+- Telegram integration
 - Scheduler
 - Agent looping
 - Skills
@@ -49,8 +49,8 @@ It is a small and minimal alternative to heavier systems like OpenClaw.
 
 ## Repository Status
 
-This repository now contains implemented services: `gateway-web`, `assistant-api`, and `assistant-worker`.
-The rest of the system is still described by documentation.
+This repository now contains implemented services: `assistant-api`, `assistant-worker`, `assistant-memory`, `gateway-web`, `gateway-email`, `gateway-telegram`, and `dashboard`.
+Additional components such as `assistant-scheduler` are currently documented as target services.
 The current source of truth is the code for these services and the project documentation for the wider system.
 
 ## Documents
@@ -60,40 +60,62 @@ The current source of truth is the code for these services and the project docum
 - [Requirements](./docs/requirements.md)
 - [Runtime architecture](./docs/architecture/runtime.md)
 - [System components](./docs/architecture/components.md)
-- [Agent runtime redesign](./docs/architecture/agent-runtime-redesign.md)
 - [Data flow](./docs/architecture/data-flow.md)
+- [Conversation](./docs/architecture/conversation.md)
+- [Queue communication](./docs/architecture/queue-flow.md)
+- [Callback architecture](./docs/architecture/callback-flow.md)
+- [Memory architecture](./docs/architecture/memory.md)
+- [Persistence schema](./docs/architecture/persistence-schema.md)
 - [Repository layout](./docs/architecture/repository-layout.md)
 - [Application endpoints](./docs/contracts/application-endpoints.md)
 - [assistant-worker system prompt](./docs/contracts/assistant-worker-system-prompt.md)
 - [Docker Compose](./docs/deployment/docker-compose.md)
 - [Assistant](./docs/services/assistant.md)
+- [Assistant Memory](./docs/services/assistant/assistant-memory.md)
+- [Prometheus](./docs/services/prometheus.md)
 - [Metrics](./docs/operations/metrics.md)
 
-## Implemented Scope
+## Implemented Today
 
 - Local runtime named `assistant`
 - Core backend split into `assistant-api` and `assistant-worker`
-- Queue-based asynchronous flow between `assistant-api` and `assistant-worker`
-- `assistant-api` accepts requests, validates them, enqueues jobs, and acknowledges them
+- Redis-based asynchronous flow between `assistant-api` and `assistant-worker` in both directions
+- `assistant-api` accepts requests, validates them, enqueues jobs, consumes run events, and owns all external callbacks
 - `assistant-api` supports env-based queue adapters and currently uses Redis by default through `QUEUE_ADAPTER=redis`
-- `assistant-worker` reads queued jobs, loads runtime context from `runtime/assistant-worker/`, sends them to the configured provider (`deepseek`, `xai`, or `ollama`), returns callback replies, and exposes a worker settings page with provider status
+- `assistant-worker` reads queued jobs, loads bootstrap runtime context from `runtime/assistant-worker/`, runs the LangChain.js-based execution flow, publishes run events, persists canonical conversation state in MySQL, and exposes a worker settings page with provider status
+- `assistant-memory` exposes typed memory APIs for profile state, search, writes, archive, compact, and reindex operations
 - `gateway-web` provides the browser chat UI, persists browser chat history in `runtime/gateway-web/`, and uses a cookie-backed session id
 - `gateway-web` exposes `/`, `WS /ws`, `/response/:conversationId`, `/thinking/:conversationId`, `/status`, `/metrics`, and `/openapi.json`
-- `assistant-api`, `assistant-worker`, and `gateway-web` expose `/status`, `/metrics`, and OpenAPI documentation
+- `gateway-telegram` provides its own web panel, keeps a local chat runtime, and delivers replies through the Telegram Bot API with preserved reply context
+- `gateway-email` provides its own web panel, keeps a local mailbox runtime, syncs IMAP state, and delivers replies by SMTP with preserved thread headers
+- `dashboard` aggregates service links and polls service statuses over HTTP every `DASHBOARD_REFRESH_SECONDS`
+- `assistant-api`, `assistant-worker`, `assistant-memory`, `gateway-web`, `gateway-telegram`, `gateway-email`, and `dashboard` expose `/status`, `/metrics`, and OpenAPI documentation
 - Default local runtime is Docker Compose
 - The system is prepared for home deployment and future horizontal scaling
+
+## Target Architecture
+
+- `assistant-scheduler` triggers scheduled work through `assistant-api`
+- one shared Swagger UI exposes the available OpenAPI schemas across runtime services
+
+## Gateway Rollout Order
+
+1. `gateway-web`
+2. `gateway-email`
+3. `gateway-telegram`
 
 ## Services
 
 ### Structure
 
-- [assistant](./docs/services/assistant.md): core backend component that includes [assistant-api](./docs/services/assistant-api.md), [queue](./docs/services/queue.md), and [assistant-worker](./docs/services/assistant-worker.md)
-- gateway: channel-facing layer that includes [gateway-web](./docs/services/gateway-web.md), [gateway-telegram](./docs/services/gateway-telegram.md), and [gateway-email](./docs/services/gateway-email.md)
-- [scheduler](./docs/services/scheduler.md): scheduled trigger component that only sends requests into `assistant`
+- [assistant](./docs/services/assistant.md): core backend component that includes [assistant-api](./docs/services/assistant/assistant-api.md), [queue](./docs/services/queue.md), [assistant-worker](./docs/services/assistant/assistant-worker.md), and [assistant-memory](./docs/services/assistant/assistant-memory.md)
+- [assistant-memory](./docs/services/assistant/assistant-memory.md): durable memory service for profile state and memory operations
+- [gateways](./docs/services/gateways.md): channel-facing layer that includes [gateway-web](./docs/services/gateways/gateway-web.md), [gateway-telegram](./docs/services/gateways/gateway-telegram.md), and [gateway-email](./docs/services/gateways/gateway-email.md)
+- [assistant-scheduler](./docs/services/assistant-scheduler.md): scheduled trigger component that only sends requests into `assistant`
 
 ```mermaid
 flowchart LR
-    Scheduler["scheduler"] --> Assistant
+    Scheduler["assistant-scheduler"] --> Assistant
     Browser["Browser"] --> GW["gateway-web"]
     Telegram["Telegram"] --> GT["gateway-telegram"]
     Email["Email"] --> GE["gateway-email"]
@@ -107,8 +129,9 @@ flowchart LR
 
     subgraph Assistant["assistant"]
         direction LR
-        API["assistant-api"] --> Q["queue"]
-        Q --> Worker["assistant-worker"]
+        API["assistant-api"] <--> Q["queue"]
+        Q <--> Worker["assistant-worker"]
+        Worker --> Memory["assistant-memory"]
     end
 ```
 
@@ -119,6 +142,8 @@ It is split into service-specific runtime directories under `runtime/`.
 In Docker Compose, each service mounts only its own runtime directory:
 - `assistant-worker`: `./runtime/assistant-worker:/app/runtime`
 - `gateway-web`: `./runtime/gateway-web:/app/runtime`
+- `gateway-telegram`: `./runtime/gateway-telegram:/app/runtime`
+- `gateway-email`: `./runtime/gateway-email:/app/runtime`
 
 Expected runtime files and folders:
 
@@ -126,46 +151,62 @@ Expected runtime files and folders:
 - `runtime/assistant-worker/SOUL.js`
 - `runtime/assistant-worker/IDENTITY.js`
 - `runtime/assistant-worker/skills/`
-- `runtime/assistant-worker/memory/`
-- `runtime/assistant-worker/conversations/`
 - `runtime/assistant-worker/config/`
 - `runtime/gateway-web/conversations/`
+- `runtime/gateway-telegram/conversations/`
+- `runtime/gateway-email/conversations/`
 
 The runtime directory is not baked into the Docker image.
-The repository already includes a starter runtime directory in [runtime/](/Users/vinitu/Projects/vinitu/my-concierge/runtime) with placeholder instruction files.
-The repository-owned worker prompt template lives in [prompts/user-prompt.md](/Users/vinitu/Projects/vinitu/my-concierge/prompts/user-prompt.md).
+The repository already includes a starter runtime directory in [runtime](./runtime) with placeholder instruction files.
+The repository-owned worker prompt template lives in [prompts/user-prompt.md](./prompts/user-prompt.md).
 
 ### assistant-api
 
-- [assistant-api](./docs/services/assistant-api.md): receives inbound requests, validates them, enqueues work, and exposes operational endpoints without sending replies back to gateways
+- [assistant-api](./docs/services/assistant/assistant-api.md): receives inbound requests, validates them, enqueues work, consumes run events, and owns external callback delivery
 
 ### assistant-worker
 
-- [assistant-worker](./docs/services/assistant-worker.md): processes queued jobs, calls the configured LLM provider, sends callback replies, and exposes operational endpoints plus provider status
+- [assistant-worker](./docs/services/assistant/assistant-worker.md): processes queued jobs, runs the assistant execution flow, publishes run events, and exposes operational endpoints plus provider status
+
+### assistant-memory
+
+- [assistant-memory](./docs/services/assistant/assistant-memory.md): durable memory service for retrieval, writes, profile state, and maintenance
 
 ### assistant
 
-- [assistant](./docs/services/assistant.md): groups `assistant-api`, `queue`, and `assistant-worker` into the core backend component
+- [assistant](./docs/services/assistant.md): groups `assistant-api`, `queue`, `assistant-worker`, and `assistant-memory` into the core backend component
 
 ### queue
 
-- [queue](./docs/services/queue.md): transports work from `assistant-api` to `assistant-worker`
+- [queue](./docs/services/queue.md): transports execution jobs to `assistant-worker` and run events back to `assistant-api`
 
 ### gateway-web
 
-- [gateway-web](./docs/services/gateway-web.md): serves the browser chat UI and bridges browser traffic to `assistant`
+- [gateway-web](./docs/services/gateways/gateway-web.md): serves the browser chat UI and bridges browser traffic to `assistant`
 
 ### gateway-telegram
 
-- [gateway-telegram](./docs/services/gateway-telegram.md): planned Telegram adapter for inbound messages and assistant replies
+- [gateway-telegram](./docs/services/gateways/gateway-telegram.md): Telegram adapter for inbound messages and assistant replies
 
 ### gateway-email
 
-- [gateway-email](./docs/services/gateway-email.md): planned Email adapter for inbound messages and assistant replies
+- [gateway-email](./docs/services/gateways/gateway-email.md): Email adapter for inbound messages and assistant replies
 
-### scheduler
+### assistant-scheduler
 
-- [scheduler](./docs/services/scheduler.md): planned scheduled trigger component that only sends requests into `assistant`
+- [assistant-scheduler](./docs/services/assistant-scheduler.md): scheduled trigger component that only sends requests into `assistant`
+
+### swagger
+
+- [swagger](./docs/services/swagger.md): shared OpenAPI viewer for runtime services
+
+### dashboard
+
+- dashboard: aggregated service dashboard with links, `UP/DOWN` tiles, and uptime-aware status polling
+
+### prometheus
+
+- [prometheus](./docs/services/prometheus.md): metrics scraper and query service for runtime components
 
 ## Metrics
 
@@ -178,14 +219,16 @@ It contains the metrics flow diagram and per-service metric tables.
 |---------|-------------|---------|
 | [http://localhost:3000/](http://localhost:3000/) | [`assistant-api`](./docker-compose.yaml) | HTTP API |
 | [http://localhost:3001/](http://localhost:3001/) | [`assistant-worker`](./docker-compose.yaml) | Worker settings page, provider status, and service |
-| [http://localhost:8080/](http://localhost:8080/) | [`gateway-web`](./docker-compose.yaml) | Web chat UI, WebSocket, callbacks |
+| [http://localhost:3002/](http://localhost:3002/) | [`assistant-memory`](./docker-compose.yaml) | Memory API and operational endpoints |
+| [http://localhost:8079/](http://localhost:8079/) | [`gateway-web`](./docker-compose.yaml) | Web chat UI, WebSocket, callbacks |
 | [http://localhost:8081/](http://localhost:8081/) | [`gateway-telegram`](./docker-compose.yaml) | Telegram gateway |
 | [http://localhost:8082/](http://localhost:8082/) | [`gateway-email`](./docker-compose.yaml) | Email gateway |
+| [http://localhost:8080/](http://localhost:8080/) | [`dashboard`](./docker-compose.yaml) | Service dashboard |
 
 Notes:
 
 - `queue` is internal-only in the current local `docker-compose` and is not exposed on a host port.
-- `scheduler` does not publish a host port in the current local `docker-compose`.
+- `assistant-scheduler` is a target service and is not part of the current local `docker-compose`.
 - All app containers use internal port `3000`.
 
 ## Run
@@ -219,7 +262,8 @@ make up
 
 6. Open the main entrypoints:
 
-- [http://localhost:8080/](http://localhost:8080/) for `gateway-web`
+- [http://localhost:8080/](http://localhost:8080/) for `dashboard`
+- [http://localhost:8079/](http://localhost:8079/) for `gateway-web`
 
 7. Stop the stack:
 

@@ -22,8 +22,9 @@ export class AssistantApiClientService {
     const assistantApiUrl = trimTrailingSlash(
       this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:3000'),
     );
+    const localPort = this.configService.get<string>('PORT', '3000');
     const callbackBaseUrl = trimTrailingSlash(
-      this.configService.get<string>('CALLBACK_BASE_URL', 'http://localhost:3000'),
+      this.configService.get<string>('CALLBACK_BASE_URL', `http://localhost:${localPort}`),
     );
     const url = `${assistantApiUrl}/conversation/api/direct/${encodeURIComponent(request.conversationId)}`;
 
@@ -33,8 +34,10 @@ export class AssistantApiClientService {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
+        callback: {
+          base_url: callbackBaseUrl,
+        },
         conversation_id: request.conversationId,
-        host: callbackBaseUrl,
         message: request.message,
       }),
     });

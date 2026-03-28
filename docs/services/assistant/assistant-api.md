@@ -2,13 +2,15 @@
 
 ## Purpose
 
-`assistant-api` is the public intake service inside `assistant`.
+`assistant-api` is the public transport boundary inside `assistant`.
 
 ## Responsibilities
 
 - Accept inbound conversation requests
 - Validate request path and body
 - Write accepted work to the queue
+- Consume worker run events from the queue
+- Route and deliver callbacks to gateways
 - Select the queue adapter from environment variables
 - Return immediate acceptance responses
 - Expose operational endpoints
@@ -17,9 +19,9 @@
 
 ```mermaid
 flowchart LR
-    GW["gateways"] --> API["assistant-api"]
-    Scheduler["scheduler"] --> API
-    API --> Q["queue"]
+    GW["gateways"] <--> API["assistant-api"]
+    Scheduler["assistant-scheduler"] --> API
+    API <--> Q["queue"]
 ```
 
 ## Endpoints
@@ -28,6 +30,7 @@ flowchart LR
 |---------|---------|
 | `GET /` | Service entrypoint summary |
 | `POST /conversation/{direction}/{chat}/{contact}` | Accept a conversation event |
+| `POST /internal/run-events/{eventType}` | Optional internal run event intake if Redis is not used for this path |
 | `GET /status` | Service readiness |
 | `GET /metrics` | Prometheus metrics |
 | `GET /openapi.json` | OpenAPI schema |
@@ -37,26 +40,26 @@ flowchart LR
 The request body includes:
 
 - `message`
-- `host`
 - `conversation_id`
+- callback routing metadata
 
-`assistant-api` validates those fields and writes them to the queue without building callback URLs itself.
+`assistant-api` validates those fields, stores callback routing metadata, and writes the execution request to the queue.
 
 ## Must Not Do
 
 - Run assistant business logic
 - Call LLM providers for conversation processing
-- Send callback messages
-- Send replies back to gateways
+- Build model prompts
+- Persist durable memory directly
 
 ## Queue Adapter
 
 - `assistant-api` should choose its queue adapter through env
 - `QUEUE_ADAPTER=redis` means Redis queue storage
 - `REDIS_URL` defines the Redis connection string
-- `REDIS_QUEUE_NAME` defines the Redis list name
-- Redis is the current default adapter
-- `QUEUE_ADAPTER=file` remains available as a fallback
+- `REDIS_QUEUE_NAME` defines the Redis transport for execution jobs
+- a separate Redis queue or stream may carry worker run events back to `assistant-api`
+- Redis is the canonical queue adapter
 
 ## Metrics
 
@@ -65,4 +68,11 @@ The request body includes:
 | `http_request_time_ms` | `histogram` | `route`, `service`, `response_code` | HTTP request duration in milliseconds |
 | `accepted_messages_total` | `counter` | `service` | Total number of accepted conversation requests |
 | `queue_messages` | `gauge` | `service` | Current number of messages in the queue |
+| `callback_deliveries_total` | `counter` | `service`, `status` | Total number of callback deliveries owned by `assistant-api` |
 | `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |
+
+## Related Documents
+
+- [assistant](../assistant.md)
+- [Queue Communication](../../architecture/queue-flow.md)
+- [Callback Architecture](../../architecture/callback-flow.md)

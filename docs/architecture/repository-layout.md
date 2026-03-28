@@ -8,6 +8,7 @@ Describe how the project should be stored in the repository.
 
 The project stays in one repository.
 Right now, `gateway-web`, `assistant-api`, and `assistant-worker` are implemented.
+`assistant-memory` is part of the target service layout.
 To keep the first version simple, the implemented services live in the repository root.
 
 ## Current Top-Level Layout
@@ -55,8 +56,6 @@ my-concierge/
       SOUL.js
       IDENTITY.js
       skills/
-      memory/
-      conversations/
       config/
       data/
       logs/
@@ -88,11 +87,12 @@ When more services are implemented, the repository may move to a multi-applicati
 my-concierge/
   apps/
     assistant-api/
+    assistant-memory/
     assistant-worker/
     gateway-telegram/
     gateway-email/
     gateway-web/
-    scheduler/
+    assistant-scheduler/
 
   packages/
     contracts/
@@ -118,6 +118,6 @@ Only a small number of shared packages should exist.
 
 ## Why This Layout
 
-- It keeps the current implementation simple.
+- It keeps the repository simple.
 - It still leaves room for the future multi-service design.
 - It avoids building a monorepo too early.

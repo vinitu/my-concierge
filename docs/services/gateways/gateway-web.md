@@ -10,7 +10,7 @@ Provide a simple Web chat UI for the local assistant.
 - Accept WebSocket chat messages from the browser
 - Keep a stable browser session id in cookies
 - Convert browser messages into `assistant-api` requests
-- Expose `response` and `thinking` callback endpoints for `assistant-worker`
+- Expose `response` and `thinking` callback endpoints for `assistant-api`
 - Send final responses and thinking signals back to the browser through WebSocket
 - Persist browser chat history in the gateway runtime directory
 - Expose `GET /status`
@@ -23,7 +23,7 @@ Provide a simple Web chat UI for the local assistant.
 flowchart LR
     Browser["Browser"] <--> Gateway["gateway-web"]
     Gateway <--> API["assistant-api"]
-    Worker["assistant-worker"] --> Gateway
+    API --> Gateway
 ```
 
 ## Endpoints
@@ -43,7 +43,7 @@ flowchart LR
 - `chat-page`: returns the simple Web chat page
 - `websocket-gateway`: accepts browser WebSocket connections
 - `assistant-api-client`: sends accepted browser messages to `assistant-api`
-- `callback-controller`: accepts `assistant-worker` callback requests
+- `callback-controller`: accepts `assistant-api` callback requests
 - `session-registry`: maps callback messages to the correct WebSocket connection
 - `runtime-store`: stores per-session browser chat history in `runtime/gateway-web/`
 - `status`: returns service readiness
@@ -59,12 +59,13 @@ flowchart LR
 5. `gateway-web` calls `assistant-api`.
 6. `assistant-api` accepts the message and writes it to the queue.
 7. `assistant-worker` processes the job.
-8. While the LLM request is still running, `assistant-worker` may send `POST /thinking/:conversationId`.
-9. `gateway-web` forwards the thinking state to the active browser session for the requested number of seconds.
-10. `assistant-worker` sends the final callback to `POST /response/:conversationId`.
-11. `gateway-web` stores the assistant reply in `runtime/gateway-web/conversations/{session_id}.json`.
-12. `gateway-web` finds the right WebSocket session.
-13. `gateway-web` sends the assistant message back to the browser.
+8. While the worker run is active, `assistant-worker` may publish `thinking` run events.
+9. `assistant-api` consumes those events and may send `POST /thinking/:conversationId`.
+10. `gateway-web` forwards the thinking state to the active browser session for the requested number of seconds.
+11. `assistant-api` sends the final callback to `POST /response/:conversationId`.
+12. `gateway-web` stores the assistant reply in `runtime/gateway-web/conversations/{session_id}.json`.
+13. `gateway-web` finds the right WebSocket session.
+14. `gateway-web` sends the assistant message back to the browser.
 
 ## State Rules
 
@@ -104,8 +105,8 @@ If more services are implemented in the same repository later, `gateway-web` may
 - Assistant business logic does not live here.
 - The browser talks to `gateway-web` through WebSocket.
 - `gateway-web` talks to `assistant-api` through HTTP.
-- `gateway-web` sends `host` and `conversation_id` to `assistant-api`.
-- `assistant-worker` derives callback paths from those two values.
+- `gateway-web` sends callback routing metadata and `conversation_id` to `assistant-api`.
+- `assistant-api` owns callback routing and delivery.
 - `gateway-web` maps callbacks back to the correct WebSocket session.
 - `gateway-web` uses the cookie-backed `session_id` as the browser contact identifier and `conversation_id`.
 - `gateway-web` exposes `GET /openapi.json` for the shared Swagger UI.
@@ -120,3 +121,8 @@ If more services are implemented in the same repository later, `gateway-web` may
 | `callback_deliveries_total` | `counter` | `delivered`, `service` | Total number of callback deliveries |
 | `upstream_requests_total` | `counter` | `service`, `status`, `upstream` | Total number of upstream HTTP requests |
 | `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |
+
+## Related Documents
+
+- [gateways](../gateways.md)
+- [Callback Architecture](../../architecture/callback-flow.md)

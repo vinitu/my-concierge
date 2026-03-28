@@ -1,27 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { AssistantLlmProviderStatus } from './assistant-llm-provider-status';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 
 @Injectable()
 export class XaiProviderStatusService {
-  constructor(
-    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly assistantWorkerConfigService: AssistantWorkerConfigService) {}
 
   async getStatus(): Promise<AssistantLlmProviderStatus> {
-    const apiKey = this.configService.get<string>('XAI_API_KEY', '').trim();
     const config = await this.assistantWorkerConfigService.read();
-    const model =
-      config.provider === 'xai'
-        ? config.model
-        : this.configService.get<string>('XAI_MODEL', 'grok-4');
+    const apiKey = config.xai_api_key.trim();
+    const model = config.provider === 'xai' ? config.model : 'grok-4';
 
     if (!apiKey) {
       return {
         apiKeyConfigured: false,
-        message: 'XAI_API_KEY is not configured',
+        message: 'xAI API key is not configured in assistant-worker web settings',
         model,
         provider: 'xai',
         reachable: false,
@@ -29,11 +22,8 @@ export class XaiProviderStatusService {
       };
     }
 
-    const baseUrl = this.configService.get<string>('XAI_BASE_URL', 'https://api.x.ai/v1');
-    const timeoutMs = Number.parseInt(
-      this.configService.get<string>('XAI_TIMEOUT_MS', '360000'),
-      10,
-    );
+    const baseUrl = config.xai_base_url;
+    const timeoutMs = config.xai_timeout_ms;
 
     try {
       const response = await fetch(`${baseUrl}/models`, {

@@ -10,7 +10,7 @@ describe('AssistantApiClientService', () => {
     jest.restoreAllMocks();
   });
 
-  it('sends the conversation request to assistant-api with host and conversation_id', async () => {
+  it('sends the conversation request to assistant-api with callback routing and conversation_id', async () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 200 });
     global.fetch = fetchMock as typeof fetch;
 
@@ -32,8 +32,10 @@ describe('AssistantApiClientService', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
+          callback: {
+            base_url: 'http://gateway-web:3000',
+          },
           conversation_id: 'socket-1',
-          host: 'http://gateway-web:3000',
           message: 'hello',
         }),
       },

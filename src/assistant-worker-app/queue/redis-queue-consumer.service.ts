@@ -7,7 +7,7 @@ import {
   createClient,
   type RedisClientType,
 } from 'redis';
-import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
+import type { ExecutionJob } from '../../contracts/assistant-transport';
 import type {
   ProcessingQueueMessage,
   QueueConsumer,
@@ -32,7 +32,7 @@ export class RedisQueueConsumerService implements QueueConsumer, OnModuleDestroy
     }
 
     return {
-      ...(JSON.parse(payload.element) as QueueMessage),
+      ...(JSON.parse(payload.element) as ExecutionJob),
       processingToken: payload.element,
     };
   }
@@ -43,7 +43,7 @@ export class RedisQueueConsumerService implements QueueConsumer, OnModuleDestroy
 
   async markFailed(message: ProcessingQueueMessage): Promise<void> {
     const client = await this.getClient();
-    await client.lPush(this.queueName(), message.processingToken);
+    await client.rPush(this.failedQueueName(), message.processingToken);
   }
 
   async depth(): Promise<number> {
@@ -69,7 +69,13 @@ export class RedisQueueConsumerService implements QueueConsumer, OnModuleDestroy
   }
 
   private queueName(): string {
-    return this.configService.get<string>('REDIS_QUEUE_NAME', 'assistant:queue');
+    return this.configService.get<string>('REDIS_QUEUE_NAME', 'assistant:jobs');
+  }
+
+  private failedQueueName(): string {
+    return this.configService.get<string>(
+      'REDIS_FAILED_QUEUE_NAME',
+      'assistant:jobs:failed',
+    );
   }
 }
-

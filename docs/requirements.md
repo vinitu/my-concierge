@@ -12,8 +12,10 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 ### Scope (list)
 - In: one local runtime named `assistant`
 - In: split runtime parts `assistant-api` and `assistant-worker`
-- In: a queue between `assistant-api` and `assistant-worker`
+- In: Redis transport between `assistant-api` and `assistant-worker` in both directions
+- In: one `assistant-memory` service for durable memory
 - In: communication through Telegram, Email, a simple Web chat, and Scheduler
+- In: MySQL for conversation state and durable memory storage
 - In: Prometheus metrics
 - In: OpenAPI schemas and one shared Swagger UI
 - In: Docker, Docker Compose, and Kubernetes
@@ -25,18 +27,21 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - The system must use Node.js, TypeScript, and NestJS.
 - The local runtime must be named `assistant`.
 - `assistant` must be split into `assistant-api` and `assistant-worker`.
-- `assistant-api` and `assistant-worker` must communicate only through a queue.
-- `assistant-api` must only validate, enqueue, and acknowledge requests.
+- `assistant-api` and `assistant-worker` must communicate through Redis-based jobs and run events.
+- `assistant-api` must validate requests, enqueue jobs, consume run events, and own all external callbacks.
 - `assistant-worker` must run assistant business logic.
+- `assistant-memory` must own durable memory retrieval and writes.
 - The system must support Grok in the first version.
 - Later versions must support DeepSeek, OpenAI, and Ollama through the same integration model.
 - `assistant-worker` must call LLMs through one shared provider interface.
+- `assistant-worker` must use LangChain.js.
 - The system must support Telegram, Email, and Web gateway components.
 - `gateway-web` must provide a simple chat page and WebSocket transport for browser messages.
+- Gateway rollout order is `gateway-web`, then `gateway-email`, then `gateway-telegram`.
 - The system must support a Scheduler component.
 - All runtime components must expose `GET /status` and `GET /metrics`.
-- `assistant-api` and `assistant-worker` must expose their own `GET /openapi.json`.
-- One shared Swagger UI must be able to show both OpenAPI schemas.
+- `assistant-api`, `assistant-worker`, `assistant-memory`, `gateway-web`, `gateway-telegram`, and `gateway-email` must expose their own `GET /openapi.json`.
+- One shared Swagger UI must be able to show the available OpenAPI schemas.
 - `GET /metrics` for `assistant-api` must include queue depth.
 - Docker Compose must be the default way to run the project.
 - The same runtime model must work in Docker and Kubernetes.
@@ -46,6 +51,7 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - The number of runtime services should stay low.
 - `assistant-api` should stay thin.
 - Queue and callback rules should stay consistent across channels.
+- External callbacks should be owned by `assistant-api`.
 - The Web chat should stay simple and low-resource.
 - OpenAPI, status, and metrics endpoints should stay consistent across services.
 - App services should use the same internal port in container environments.
@@ -56,32 +62,33 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - The system is for one personal user.
 - The first version is backend-first.
 - Docker Compose is the default deployment mode.
-- A queue is required between API intake and worker execution.
+- Redis transport is required between API intake and worker execution.
+- Redis is the canonical queue transport.
 - One shared Swagger UI is preferred over multiple Swagger UI services.
-- `assistant-worker` reads `SYSTEM.js`, `SOUL.js`, `IDENTITY.js`, `skills/`, and `memory/` from `runtime/assistant-worker/`.
-- `assistant-worker` reserves `runtime/assistant-worker/conversations/` for conversation history and future context retention.
+- `assistant-worker` reads `SYSTEM.js`, `SOUL.js`, `IDENTITY.js`, and `skills/` from `runtime/assistant-worker/`.
+- conversation state lives in MySQL under `assistant-worker` ownership.
+- durable memory lives behind `assistant-memory`.
 - `gateway-web` stores browser chat history in `runtime/gateway-web/conversations/`.
 
 ### Done checks
 - The documentation is split into overview, architecture, services, contracts, deployment, and operations.
 - The requirements state that `assistant` is split into `assistant-api` and `assistant-worker`.
-- The requirements state that `assistant-api` only validates and enqueues requests.
+- The requirements state that `assistant-api` owns ingress and external callback delivery.
 - The requirements state that `assistant-worker` runs business logic.
+- The requirements state that `assistant-memory` owns durable memory.
 - The requirements state that all runtime components expose `GET /status` and `GET /metrics`.
-- The requirements state that `assistant-api` and `assistant-worker` each expose `GET /openapi.json`.
-- The requirements state that one shared Swagger UI may show both schemas.
+- The requirements state that `assistant-api`, `assistant-worker`, `assistant-memory`, `gateway-web`, `gateway-telegram`, and `gateway-email` each expose `GET /openapi.json`.
+- The requirements state that one shared Swagger UI may show the available schemas.
 - The requirements state that Docker Compose is the default runtime.
 
 ### Risks
 - Weak queue contracts may cause lost or duplicated jobs.
 - Weak component boundaries may move business logic into `assistant-api`.
 - Different LLM providers may need different prompts, limits, and response parsing.
+- Weak callback ownership may create duplicate or lost deliveries.
 - Poor metrics design may create too many time series.
 - Too many runtime services may break the minimal design goal.
 
 ### Open questions
-- Which queue technology should be used in the first MVP?
-- Which channel should be implemented first?
 - Which worker jobs need scaling first?
-- What retry rules should be used for callback delivery?
 - Which Prometheus metrics are required in the first MVP?

@@ -6,6 +6,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { AssistantToolCatalogService } from './assistant-tool-catalog.service';
 import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
 import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
 import type { AssistantWorkerRuntimeContext } from './assistant-worker-runtime-context.service';
@@ -42,7 +43,7 @@ describe('AssistantWorkerPromptTemplateService', () => {
       new ConfigService({
         ASSISTANT_PROMPTS_DIR: promptsdir,
       }),
-      new AssistantWorkerPromptService(),
+      new AssistantWorkerPromptService(new AssistantToolCatalogService()),
     );
 
     await expect(
@@ -63,13 +64,16 @@ describe('AssistantWorkerPromptTemplateService', () => {
             updated_at: null,
           },
           message: {
+            accepted_at: new Date().toISOString(),
+            callback: { base_url: 'http://example.test' },
             chat: 'direct',
             conversation_id: 'alex',
             contact: 'alex',
             direction: 'api',
-            host: 'http://example.test',
             message: 'current message',
+            request_id: 'req-1',
           },
+          retrieved_memory: [],
         },
         runtimeContext,
       ),
@@ -94,13 +98,16 @@ describe('AssistantWorkerPromptTemplateService', () => {
             updated_at: null,
           },
           message: {
+            accepted_at: new Date().toISOString(),
+            callback: { base_url: 'http://example.test' },
             chat: 'direct',
             conversation_id: 'alex',
             contact: 'alex',
             direction: 'api',
-            host: 'http://example.test',
             message: 'current message',
+            request_id: 'req-1',
           },
+          retrieved_memory: [],
         },
         runtimeContext,
       ),
@@ -125,13 +132,16 @@ describe('AssistantWorkerPromptTemplateService', () => {
             updated_at: null,
           },
           message: {
+            accepted_at: new Date().toISOString(),
+            callback: { base_url: 'http://example.test' },
             chat: 'direct',
             conversation_id: 'alex',
             contact: 'alex',
             direction: 'api',
-            host: 'http://example.test',
             message: 'current message',
+            request_id: 'req-1',
           },
+          retrieved_memory: [],
         },
         runtimeContext,
       ),

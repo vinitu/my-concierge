@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 import { OllamaProviderStatusService } from './ollama-provider-status.service';
 
@@ -20,11 +19,21 @@ describe('OllamaProviderStatusService', () => {
     } as Response);
     const service = new OllamaProviderStatusService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'gemma3:1b', provider: 'ollama' }),
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'gemma3:1b',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'ollama',
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
       } as unknown as AssistantWorkerConfigService,
-      new ConfigService({
-        OLLAMA_BASE_URL: 'http://host.docker.internal:11434',
-      }),
     );
 
     await expect(service.getStatus()).resolves.toEqual({
@@ -50,10 +59,21 @@ describe('OllamaProviderStatusService', () => {
     } as Response);
     const service = new OllamaProviderStatusService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'gemma3:1b', provider: 'ollama' }),
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'gemma3:1b',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'ollama',
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
       } as unknown as AssistantWorkerConfigService,
-      new ConfigService({
-      }),
     );
 
     await expect(service.getStatus()).resolves.toEqual({
@@ -78,9 +98,21 @@ describe('OllamaProviderStatusService', () => {
     } as Response);
     const service = new OllamaProviderStatusService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'gemma3:1b', provider: 'ollama' }),
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'gemma3:1b',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'ollama',
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
       } as unknown as AssistantWorkerConfigService,
-      new ConfigService({}),
     );
 
     await expect(service.listAvailableModels()).resolves.toEqual([

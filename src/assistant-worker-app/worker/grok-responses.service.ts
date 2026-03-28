@@ -2,18 +2,8 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type {
-  AssistantLlmGenerateInput,
-  AssistantLlmProvider,
-} from './assistant-llm-provider';
-import {
-  parseAssistantLlmResult,
-  type AssistantLlmGenerateResult,
-} from './assistant-llm-response-parser';
+import type { AssistantLlmProvider } from './assistant-llm-provider';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
-import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
-import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 
 interface XaiOutputContentItem {
   text?: string;
@@ -38,43 +28,39 @@ interface XaiResponseBody {
 export class GrokResponsesService implements AssistantLlmProvider {
   private readonly logger = new Logger(GrokResponsesService.name);
 
-  constructor(
-    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
-    private readonly configService: ConfigService,
-    private readonly promptTemplateService: AssistantWorkerPromptTemplateService,
-    private readonly runtimeContextService: AssistantWorkerRuntimeContextService,
-  ) {}
+  constructor(private readonly assistantWorkerConfigService: AssistantWorkerConfigService) {}
 
-  private async modelName(): Promise<string> {
+  private async currentConfig(): Promise<{
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+    timeoutMs: number;
+  }> {
     const config = await this.assistantWorkerConfigService.read();
-    return config.provider === 'xai'
-      ? config.model
-      : this.configService.get<string>('XAI_MODEL', 'grok-4');
+    return {
+      apiKey: config.xai_api_key.trim(),
+      baseUrl: config.xai_base_url,
+      model: config.provider === 'xai' ? config.model : 'grok-4',
+      timeoutMs: config.xai_timeout_ms,
+    };
   }
 
-  async generateReply(input: AssistantLlmGenerateInput): Promise<AssistantLlmGenerateResult> {
-    const apiKey = this.configService.get<string>('XAI_API_KEY', '').trim();
+  async generateText(prompt: string): Promise<string> {
+    const providerConfig = await this.currentConfig();
+    const apiKey = providerConfig.apiKey;
 
     if (!apiKey) {
-      throw new Error('XAI_API_KEY is required for assistant-worker');
+      throw new Error('xAI API key is not configured in assistant-worker web settings');
     }
 
-    const baseUrl = this.configService.get<string>('XAI_BASE_URL', 'https://api.x.ai/v1');
-    const model = await this.modelName();
-    const timeoutMs = Number.parseInt(
-      this.configService.get<string>('XAI_TIMEOUT_MS', '360000'),
-      10,
-    );
-    const runtimeContext = await this.runtimeContextService.load();
-    const systemPrompt = await this.promptTemplateService.renderAssistantSystemPrompt(
-      input,
-      runtimeContext,
-    );
+    const baseUrl = providerConfig.baseUrl;
+    const model = providerConfig.model;
+    const timeoutMs = providerConfig.timeoutMs;
     const requestBody = {
       input: [
         {
+          content: prompt,
           role: 'system',
-          content: systemPrompt,
         },
       ],
       model,
@@ -97,11 +83,13 @@ export class GrokResponsesService implements AssistantLlmProvider {
     }
 
     const body = (await response.json()) as XaiResponseBody;
-    return parseAssistantLlmResult(this.extractAssistantText(body));
+    this.logger.debug(`xAI reply response: ${this.preview(body)}`);
+    return this.extractAssistantText(body);
   }
 
   private extractAssistantText(body: XaiResponseBody): string {
     if (typeof body.output_text === 'string' && body.output_text.trim()) {
+      this.logger.debug(`xAI extracted text: ${this.preview(body.output_text.trim())}`);
       return body.output_text.trim();
     }
 
@@ -116,6 +104,7 @@ export class GrokResponsesService implements AssistantLlmProvider {
         .filter((text) => text.length > 0) ?? [];
 
     if (texts.length > 0) {
+      this.logger.debug(`xAI extracted text: ${this.preview(texts.join('\n').trim())}`);
       return texts.join('\n').trim();
     }
 
@@ -126,5 +115,10 @@ export class GrokResponsesService implements AssistantLlmProvider {
     }
 
     throw new Error('xAI API response did not contain assistant text');
+  }
+
+  private preview(value: unknown): string {
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    return serialized.length > 4000 ? `${serialized.slice(0, 4000)}…` : serialized;
   }
 }

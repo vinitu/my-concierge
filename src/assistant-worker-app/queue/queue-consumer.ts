@@ -1,6 +1,6 @@
-import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
+import type { ExecutionJob } from '../../contracts/assistant-transport';
 
-export interface ProcessingQueueMessage extends QueueMessage {
+export interface ProcessingQueueMessage extends ExecutionJob {
   processingToken: string;
 }
 
@@ -13,4 +13,3 @@ export interface QueueConsumer {
 }
 
 export const WORKER_QUEUE_CONSUMER = Symbol('WORKER_QUEUE_CONSUMER');
-

@@ -7,6 +7,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { MysqlService } from '../../persistence/mysql.service';
 import { AssistantWorkerConversationService } from './assistant-worker-conversation.service';
 
 describe('AssistantWorkerConversationService', () => {
@@ -18,22 +19,27 @@ describe('AssistantWorkerConversationService', () => {
       } as never,
       new ConfigService({
         ASSISTANT_DATADIR: datadir,
+        ASSISTANT_CONVERSATION_STORE_DRIVER: 'file',
       }),
+      { getPool: jest.fn() } as unknown as MysqlService,
     );
 
     await service.appendExchange(
       {
+        accepted_at: new Date().toISOString(),
+        callback: { base_url: 'http://example.test' },
         chat: 'direct',
         conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
-        host: 'http://example.test',
         message: 'hello',
+        request_id: 'req-1',
       },
       {
         context: '',
         message: 'hi there',
       },
+      'run-1',
     );
 
     const stored = await readFile(
@@ -71,22 +77,27 @@ describe('AssistantWorkerConversationService', () => {
       } as never,
       new ConfigService({
         ASSISTANT_DATADIR: datadir,
+        ASSISTANT_CONVERSATION_STORE_DRIVER: 'file',
       }),
+      { getPool: jest.fn() } as unknown as MysqlService,
     );
 
     const result = await service.appendExchange(
       {
+        accepted_at: new Date().toISOString(),
+        callback: { base_url: 'http://example.test' },
         chat: 'direct',
         conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
-        host: 'http://example.test',
         message: 'Что он сделал?',
+        request_id: 'req-1',
       },
       {
         context: '   ',
         message: 'Он основал Tesla и SpaceX.',
       },
+      'run-1',
     );
 
     expect(result.context).toBe('The conversation is in Russian. The active topic is Elon Musk.');
@@ -133,22 +144,27 @@ describe('AssistantWorkerConversationService', () => {
       } as never,
       new ConfigService({
         ASSISTANT_DATADIR: datadir,
+        ASSISTANT_CONVERSATION_STORE_DRIVER: 'file',
       }),
+      { getPool: jest.fn() } as unknown as MysqlService,
     );
 
     const result = await service.appendExchange(
       {
+        accepted_at: new Date().toISOString(),
+        callback: { base_url: 'http://example.test' },
         chat: 'direct',
         conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
-        host: 'http://example.test',
         message: 'What time should dinner be ready?',
+        request_id: 'req-1',
       },
       {
         context: 'Alex asked about dinner planning. Salad was requested for dinner.',
         message: 'Dinner should be ready at 19:00.',
       },
+      'run-1',
     );
 
     expect(result.context).toBe(

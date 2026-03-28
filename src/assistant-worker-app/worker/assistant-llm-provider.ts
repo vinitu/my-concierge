@@ -1,4 +1,5 @@
-import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
+import type { MemoryEntry } from '../../contracts/assistant-memory';
+import type { ExecutionJob } from '../../contracts/assistant-transport';
 import type {
   AssistantConversationState,
 } from './assistant-worker-conversation.service';
@@ -8,11 +9,12 @@ export type AssistantWorkerProvider = 'deepseek' | 'ollama' | 'xai';
 
 export interface AssistantLlmGenerateInput {
   conversation: AssistantConversationState;
-  message: QueueMessage;
+  message: ExecutionJob;
+  retrieved_memory: MemoryEntry[];
 }
 
 export interface AssistantLlmProvider {
-  generateReply(input: AssistantLlmGenerateInput): Promise<AssistantLlmGenerateResult>;
+  generateText(prompt: string): Promise<string>;
 }
 
 export const ASSISTANT_LLM_PROVIDER = Symbol('ASSISTANT_LLM_PROVIDER');

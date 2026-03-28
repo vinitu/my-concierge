@@ -4,9 +4,9 @@ import {
   createClient,
   type RedisClientType,
 } from 'redis';
+import type { ExecutionJob } from '../../contracts/assistant-transport';
 import type {
   QueueAdapter,
-  QueueMessage,
 } from './queue-adapter';
 
 @Injectable()
@@ -19,7 +19,7 @@ export class RedisQueueAdapter implements QueueAdapter, OnModuleDestroy {
     return 'redis';
   }
 
-  async enqueue(message: QueueMessage): Promise<void> {
+  async enqueue(message: ExecutionJob): Promise<void> {
     const client = await this.getClient();
     await client.rPush(this.queueName(), JSON.stringify(message));
   }
@@ -47,7 +47,6 @@ export class RedisQueueAdapter implements QueueAdapter, OnModuleDestroy {
   }
 
   private queueName(): string {
-    return this.configService.get<string>('REDIS_QUEUE_NAME', 'assistant:queue');
+    return this.configService.get<string>('REDIS_QUEUE_NAME', 'assistant:jobs');
   }
 }
-

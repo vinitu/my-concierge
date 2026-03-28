@@ -3,7 +3,11 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'node:path';
 import { AppModule } from './app.module';
 import { AssistantApiAppModule } from './assistant-api-app/assistant-api-app.module';
+import { AssistantMemoryAppModule } from './assistant-memory-app/assistant-memory-app.module';
 import { AssistantWorkerAppModule } from './assistant-worker-app/assistant-worker-app.module';
+import { DashboardAppModule } from './dashboard-app/dashboard-app.module';
+import { GatewayEmailAppModule } from './gateway-email-app/gateway-email-app.module';
+import { GatewayTelegramAppModule } from './gateway-telegram-app/gateway-telegram-app.module';
 
 async function bootstrap(): Promise<void> {
   const appRole = process.env.APP_ROLE ?? 'gateway-web';
@@ -12,6 +16,14 @@ async function bootstrap(): Promise<void> {
       ? AssistantApiAppModule
       : appRole === 'assistant-worker'
         ? AssistantWorkerAppModule
+        : appRole === 'assistant-memory'
+          ? AssistantMemoryAppModule
+        : appRole === 'gateway-email'
+          ? GatewayEmailAppModule
+        : appRole === 'gateway-telegram'
+          ? GatewayTelegramAppModule
+        : appRole === 'dashboard'
+          ? DashboardAppModule
         : AppModule;
   const app = await NestFactory.create<NestExpressApplication>(appModule, {
     logger: ['error', 'warn', 'log', 'debug'],

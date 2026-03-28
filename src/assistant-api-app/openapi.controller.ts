@@ -52,10 +52,16 @@ export class AssistantApiOpenApiController {
                 'application/json': {
                   schema: {
                     type: 'object',
-                    required: ['message', 'host', 'conversation_id'],
+                    required: ['message', 'callback', 'conversation_id'],
                     properties: {
+                      callback: {
+                        type: 'object',
+                        required: ['base_url'],
+                        properties: {
+                          base_url: { type: 'string', format: 'uri' },
+                        },
+                      },
                       conversation_id: { type: 'string' },
-                      host: { type: 'string', format: 'uri' },
                       message: { type: 'string' },
                     },
                   },

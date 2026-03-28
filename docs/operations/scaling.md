@@ -8,6 +8,7 @@ Describe horizontal scaling rules.
 
 - `assistant-api` may run in more than one instance
 - `assistant-worker` may run in more than one instance
+- `assistant-memory` may scale horizontally for reads and conservatively for writes
 - Queue must support multiple worker instances
 - Gateway components may scale when needed
 

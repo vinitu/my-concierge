@@ -17,10 +17,19 @@ describe('AssistantWorkerConfigService', () => {
     );
 
     await expect(service.read()).resolves.toEqual({
+      deepseek_api_key: '',
+      deepseek_base_url: 'https://api.deepseek.com',
+      deepseek_timeout_ms: 360000,
       model: 'grok-4',
       memory_window: 3,
+      ollama_base_url: 'http://host.docker.internal:11434',
+      ollama_timeout_ms: 360000,
       provider: 'xai',
+      run_timeout_seconds: 30,
       thinking_interval_seconds: 2,
+      xai_api_key: '',
+      xai_base_url: 'https://api.x.ai/v1',
+      xai_timeout_ms: 360000,
     });
 
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
@@ -38,16 +47,34 @@ describe('AssistantWorkerConfigService', () => {
 
     await expect(
       service.write({
+        deepseek_api_key: '',
+        deepseek_base_url: 'https://api.deepseek.com',
+        deepseek_timeout_ms: 360000,
         memory_window: 3,
         model: 'grok-4',
+        ollama_base_url: 'http://host.docker.internal:11434',
+        ollama_timeout_ms: 360000,
         provider: 'xai',
+        run_timeout_seconds: 30,
         thinking_interval_seconds: 2,
+        xai_api_key: '',
+        xai_base_url: 'https://api.x.ai/v1',
+        xai_timeout_ms: 360000,
       }),
     ).resolves.toEqual({
+      deepseek_api_key: '',
+      deepseek_base_url: 'https://api.deepseek.com',
+      deepseek_timeout_ms: 360000,
       model: 'grok-4',
       memory_window: 3,
+      ollama_base_url: 'http://host.docker.internal:11434',
+      ollama_timeout_ms: 360000,
       provider: 'xai',
+      run_timeout_seconds: 30,
       thinking_interval_seconds: 2,
+      xai_api_key: '',
+      xai_base_url: 'https://api.x.ai/v1',
+      xai_timeout_ms: 360000,
     });
 
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
@@ -65,30 +92,66 @@ describe('AssistantWorkerConfigService', () => {
 
     await expect(
       service.write({
+        deepseek_api_key: '',
+        deepseek_base_url: 'https://api.deepseek.com',
+        deepseek_timeout_ms: 360000,
         memory_window: 9,
         model: 'deepseek-r1:latest',
+        ollama_base_url: 'http://host.docker.internal:11434',
+        ollama_timeout_ms: 360000,
         provider: 'OLLAMA' as never,
+        run_timeout_seconds: 30,
         thinking_interval_seconds: 4,
+        xai_api_key: '',
+        xai_base_url: 'https://api.x.ai/v1',
+        xai_timeout_ms: 360000,
       }),
     ).resolves.toEqual({
+      deepseek_api_key: '',
+      deepseek_base_url: 'https://api.deepseek.com',
+      deepseek_timeout_ms: 360000,
       model: 'deepseek-r1:latest',
       memory_window: 9,
+      ollama_base_url: 'http://host.docker.internal:11434',
+      ollama_timeout_ms: 360000,
       provider: 'ollama',
+      run_timeout_seconds: 30,
       thinking_interval_seconds: 4,
+      xai_api_key: '',
+      xai_base_url: 'https://api.x.ai/v1',
+      xai_timeout_ms: 360000,
     });
 
     await expect(
       service.write({
+        deepseek_api_key: '',
+        deepseek_base_url: 'https://api.deepseek.com',
+        deepseek_timeout_ms: 360000,
         memory_window: 9,
         model: 'deepseek-reasoner',
+        ollama_base_url: 'http://host.docker.internal:11434',
+        ollama_timeout_ms: 360000,
         provider: 'DEEPSEEK' as never,
+        run_timeout_seconds: 30,
         thinking_interval_seconds: 4,
+        xai_api_key: '',
+        xai_base_url: 'https://api.x.ai/v1',
+        xai_timeout_ms: 360000,
       }),
     ).resolves.toEqual({
+      deepseek_api_key: '',
+      deepseek_base_url: 'https://api.deepseek.com',
+      deepseek_timeout_ms: 360000,
       model: 'deepseek-reasoner',
       memory_window: 9,
+      ollama_base_url: 'http://host.docker.internal:11434',
+      ollama_timeout_ms: 360000,
       provider: 'deepseek',
+      run_timeout_seconds: 30,
       thinking_interval_seconds: 4,
+      xai_api_key: '',
+      xai_base_url: 'https://api.x.ai/v1',
+      xai_timeout_ms: 360000,
     });
   });
 });

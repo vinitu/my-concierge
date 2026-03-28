@@ -18,12 +18,16 @@ describe('FileQueueAdapter', () => {
     );
 
     await adapter.enqueue({
+      accepted_at: new Date().toISOString(),
+      callback: {
+        base_url: 'http://gateway-web',
+      },
       chat: 'direct',
       conversation_id: 'socket-1',
       contact: 'socket-1',
       direction: 'api',
-      host: 'http://gateway-web',
       message: 'hello',
+      request_id: 'req-1',
     });
 
     const files = await readdir(queueDir);

@@ -2,29 +2,35 @@
 
 ## Purpose
 
-Describe what `assistant-worker` sends to callback targets.
+Describe what `assistant-api` sends to callback targets after consuming run events from Redis.
 
 ## Flow
 
-1. A gateway or scheduler sends a message to `assistant-api`.
+1. A gateway or `assistant-scheduler` sends a message to `assistant-api`.
 2. `assistant-api` accepts the request and enqueues it.
 3. `assistant-worker` processes the queued message asynchronously.
-4. While the LLM request is running, `assistant-worker` may send periodic `thinking` callbacks.
-5. When the LLM request finishes, `assistant-worker` sends the final assistant reply to the `response` callback endpoint.
-6. The callback target returns a delivery response.
+4. While the worker run is active, `assistant-worker` may publish periodic `thinking` run events.
+5. When the run finishes, `assistant-worker` publishes the final run event to Redis.
+6. `assistant-api` consumes those run events and sends the corresponding callback request to the gateway callback endpoint.
+7. The callback target returns a delivery response.
 
 ## Rules
 
 - Callback delivery happens after queue processing starts.
-- In the current V1 flow, one accepted request produces one final callback message.
-- `thinking` callbacks are transient and may happen every `N` seconds while the LLM request is in progress.
+- One accepted request produces one final callback message.
+- `thinking` callbacks are transient and may happen every `N` seconds while the worker run is in progress.
 - `response` callbacks contain the final assistant message.
 - For `gateway-web`, callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
 - For `gateway-web`, `<conversation_id>` is the stable browser `session_id` stored in the `myconcierge_session_id` cookie.
 - `gateway-web` should forward `thinking` callbacks to the browser through WebSocket without persisting them.
 - `gateway-web` should forward final `response` callbacks to the browser through WebSocket.
 - `gateway-web` should also persist final `response` callbacks in `runtime/gateway-web/conversations/{session_id}.json`.
-- `gateway-telegram` and `gateway-email` should deliver callback messages through their own channels.
+- `gateway-email` callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
+- `gateway-email` should resolve the local mailbox thread by `conversation_id`, preserve `In-Reply-To` and `References`, and send the final `response` callback as an SMTP reply.
+- `gateway-telegram` callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
+- `gateway-telegram` should resolve the local Telegram thread by `conversation_id` and send the final `response` callback through the Telegram Bot API using `reply_to_message_id` and `message_thread_id` when available.
+- `assistant-api` retries callback delivery when the gateway returns a non-2xx response or times out.
+- callback delivery is idempotent by `runId + eventType + sequence`.
 
 ## Thinking Callback Request
 
@@ -101,9 +107,16 @@ If the browser session is not found, it returns:
 
 - The caller sends one message per request to `assistant-api`.
 - The caller receives an immediate acceptance response from `assistant-api`.
-- While the worker is waiting on the LLM, it may send periodic `thinking` callbacks.
-- The final assistant answer is delivered asynchronously by `assistant-worker` through the `response` callback endpoint.
+- While the worker run is active, `assistant-api` may send periodic `thinking` callbacks after consuming worker run events.
+- The final assistant answer is delivered asynchronously by `assistant-api` through the `response` callback endpoint.
 - The callback endpoint should be idempotent enough to tolerate retries.
+
+## Retry Policy
+
+- `assistant-api` owns callback retries
+- gateways must treat duplicate callback deliveries as safe retries
+- retries must preserve the same callback payload
+- terminal callback retries must not create duplicate user-visible state when the gateway already processed the event
 
 ## Current `gateway-web` Mapping
 
@@ -112,8 +125,37 @@ For the browser flow:
 - `gateway-web` creates or reads a stable `session_id` from the `myconcierge_session_id` cookie
 - the browser WebSocket authenticates with that `session_id`
 - `gateway-web` sends the same `session_id` as both `contact` and `conversation_id` to `assistant-api`
-- `gateway-web` sends its own base URL as `host`
-- `assistant-worker` calls back to `POST /thinking/{session_id}` while the LLM request is running
-- `assistant-worker` calls back to `POST /response/{session_id}` when the final reply is ready
+- `assistant-api` stores the callback routing metadata for that session
+- `assistant-worker` publishes `thinking` and `completed` run events to Redis
+- `assistant-api` calls back to `POST /thinking/{session_id}` while the worker run is active
+- `assistant-api` calls back to `POST /response/{session_id}` when the final reply is ready
 - `gateway-web` stores the final assistant reply in `runtime/gateway-web/conversations/{session_id}.json`
 - `gateway-web` forwards both thinking and final response events to the active WebSocket session with the same `session_id`
+
+## `gateway-email` Mapping
+
+For the email flow:
+
+- `gateway-email` resolves one stable `conversation_id` per email chain from `Message-ID`, `In-Reply-To`, and `References`
+- `gateway-email` stores inbound and outbound message copies in its local mailbox runtime
+- `gateway-email` sends the same stable `conversation_id` to `assistant-api`
+- `assistant-api` stores callback routing metadata for that email thread
+- `assistant-worker` publishes `thinking` and `completed` run events to Redis
+- `assistant-api` calls back to `POST /thinking/{conversation_id}` while the worker run is active
+- `assistant-api` calls back to `POST /response/{conversation_id}` when the final reply is ready
+- `gateway-email` resolves the thread from its local runtime and sends an SMTP reply with preserved `In-Reply-To` and `References`
+- `gateway-email` stores the outbound reply in its local mailbox runtime
+
+## `gateway-telegram` Mapping
+
+For the Telegram flow:
+
+- `gateway-telegram` resolves one stable `conversation_id` per Telegram chat or topic
+- `gateway-telegram` stores inbound and outbound message copies in its local chat runtime
+- `gateway-telegram` sends the same stable `conversation_id` to `assistant-api`
+- `assistant-api` stores callback routing metadata for that Telegram thread
+- `assistant-worker` publishes `thinking` and `completed` run events to Redis
+- `assistant-api` calls back to `POST /thinking/{conversation_id}` while the worker run is active
+- `assistant-api` calls back to `POST /response/{conversation_id}` when the final reply is ready
+- `gateway-telegram` resolves the thread from its local runtime and sends a Telegram Bot API reply using `reply_to_message_id` and `message_thread_id` when available
+- `gateway-telegram` stores the outbound reply in its local chat runtime

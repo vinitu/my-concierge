@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { AssistantLlmProviderStatus } from './assistant-llm-provider-status';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 
@@ -12,17 +11,12 @@ interface OllamaTagsResponse {
 
 @Injectable()
 export class OllamaProviderStatusService {
-  constructor(
-    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly assistantWorkerConfigService: AssistantWorkerConfigService) {}
 
   async listAvailableModels(): Promise<string[]> {
-    const baseUrl = this.configService.get<string>('OLLAMA_BASE_URL', 'http://host.docker.internal:11434');
-    const timeoutMs = Number.parseInt(
-      this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
-      10,
-    );
+    const config = await this.assistantWorkerConfigService.read();
+    const baseUrl = config.ollama_base_url;
+    const timeoutMs = config.ollama_timeout_ms;
 
     try {
       const response = await fetch(`${baseUrl}/api/tags`, {
@@ -46,16 +40,10 @@ export class OllamaProviderStatusService {
   }
 
   async getStatus(): Promise<AssistantLlmProviderStatus> {
-    const baseUrl = this.configService.get<string>('OLLAMA_BASE_URL', 'http://host.docker.internal:11434');
     const config = await this.assistantWorkerConfigService.read();
-    const model =
-      config.provider === 'ollama'
-        ? config.model
-        : this.configService.get<string>('OLLAMA_MODEL', 'gemma3:1b');
-    const timeoutMs = Number.parseInt(
-      this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
-      10,
-    );
+    const baseUrl = config.ollama_base_url;
+    const model = config.provider === 'ollama' ? config.model : 'gemma3:1b';
+    const timeoutMs = config.ollama_timeout_ms;
 
     try {
       const response = await fetch(`${baseUrl}/api/tags`, {

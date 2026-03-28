@@ -2,18 +2,8 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type {
-  AssistantLlmGenerateInput,
-  AssistantLlmProvider,
-} from './assistant-llm-provider';
-import {
-  parseAssistantLlmResult,
-  type AssistantLlmGenerateResult,
-} from './assistant-llm-response-parser';
+import type { AssistantLlmProvider } from './assistant-llm-provider';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
-import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
-import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 
 interface DeepseekChatCompletionResponse {
   choices?: Array<{
@@ -30,42 +20,38 @@ interface DeepseekChatCompletionResponse {
 export class DeepseekChatService implements AssistantLlmProvider {
   private readonly logger = new Logger(DeepseekChatService.name);
 
-  constructor(
-    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
-    private readonly configService: ConfigService,
-    private readonly promptTemplateService: AssistantWorkerPromptTemplateService,
-    private readonly runtimeContextService: AssistantWorkerRuntimeContextService,
-  ) {}
+  constructor(private readonly assistantWorkerConfigService: AssistantWorkerConfigService) {}
 
-  private async modelName(): Promise<string> {
+  private async currentConfig(): Promise<{
+    apiKey: string;
+    baseUrl: string;
+    model: string;
+    timeoutMs: number;
+  }> {
     const config = await this.assistantWorkerConfigService.read();
-    return config.provider === 'deepseek'
-      ? config.model
-      : this.configService.get<string>('DEEPSEEK_MODEL', 'deepseek-chat');
+    return {
+      apiKey: config.deepseek_api_key.trim(),
+      baseUrl: config.deepseek_base_url,
+      model: config.provider === 'deepseek' ? config.model : 'deepseek-chat',
+      timeoutMs: config.deepseek_timeout_ms,
+    };
   }
 
-  async generateReply(input: AssistantLlmGenerateInput): Promise<AssistantLlmGenerateResult> {
-    const apiKey = this.configService.get<string>('DEEPSEEK_API_KEY', '').trim();
+  async generateText(prompt: string): Promise<string> {
+    const providerConfig = await this.currentConfig();
+    const apiKey = providerConfig.apiKey;
 
     if (!apiKey) {
-      throw new Error('DEEPSEEK_API_KEY is required for assistant-worker');
+      throw new Error('DeepSeek API key is not configured in assistant-worker web settings');
     }
 
-    const baseUrl = this.configService.get<string>('DEEPSEEK_BASE_URL', 'https://api.deepseek.com');
-    const model = await this.modelName();
-    const timeoutMs = Number.parseInt(
-      this.configService.get<string>('DEEPSEEK_TIMEOUT_MS', '360000'),
-      10,
-    );
-    const runtimeContext = await this.runtimeContextService.load();
-    const systemPrompt = await this.promptTemplateService.renderAssistantSystemPrompt(
-      input,
-      runtimeContext,
-    );
+    const baseUrl = providerConfig.baseUrl;
+    const model = providerConfig.model;
+    const timeoutMs = providerConfig.timeoutMs;
     const requestBody = {
       messages: [
         {
-          content: systemPrompt,
+          content: prompt,
           role: 'system',
         },
       ],
@@ -91,10 +77,12 @@ export class DeepseekChatService implements AssistantLlmProvider {
     }
 
     const body = (await response.json()) as DeepseekChatCompletionResponse;
+    this.logger.debug(`DeepSeek reply response: ${this.preview(body)}`);
     const content = body.choices?.[0]?.message?.content?.trim();
 
     if (content) {
-      return parseAssistantLlmResult(content);
+      this.logger.debug(`DeepSeek extracted text: ${this.preview(content)}`);
+      return content;
     }
 
     if (body.error?.message) {
@@ -102,5 +90,10 @@ export class DeepseekChatService implements AssistantLlmProvider {
     }
 
     throw new Error('DeepSeek API response did not contain assistant text');
+  }
+
+  private preview(value: unknown): string {
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    return serialized.length > 4000 ? `${serialized.slice(0, 4000)}…` : serialized;
   }
 }

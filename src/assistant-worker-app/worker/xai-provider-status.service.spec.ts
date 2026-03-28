@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 import { XaiProviderStatusService } from './xai-provider-status.service';
 
@@ -10,14 +9,26 @@ describe('XaiProviderStatusService', () => {
   it('returns missing_key when XAI_API_KEY is not configured', async () => {
     const service = new XaiProviderStatusService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'grok-4-latest', provider: 'xai' }),
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'grok-4-latest',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'xai',
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
       } as unknown as AssistantWorkerConfigService,
-      new ConfigService({}),
     );
 
     await expect(service.getStatus()).resolves.toEqual({
       apiKeyConfigured: false,
-      message: 'XAI_API_KEY is not configured',
+      message: 'xAI API key is not configured in assistant-worker web settings',
       model: 'grok-4-latest',
       provider: 'xai',
       reachable: false,
@@ -31,11 +42,21 @@ describe('XaiProviderStatusService', () => {
     } as Response);
     const service = new XaiProviderStatusService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'grok-4-latest', provider: 'xai' }),
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'grok-4-latest',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'xai',
+          thinking_interval_seconds: 2,
+          xai_api_key: 'test-key',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
       } as unknown as AssistantWorkerConfigService,
-      new ConfigService({
-        XAI_API_KEY: 'test-key',
-      }),
     );
 
     await expect(service.getStatus()).resolves.toEqual({
@@ -66,11 +87,21 @@ describe('XaiProviderStatusService', () => {
     } as Response);
     const service = new XaiProviderStatusService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'grok-4-latest', provider: 'xai' }),
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'grok-4-latest',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'xai',
+          thinking_interval_seconds: 2,
+          xai_api_key: 'bad-key',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
       } as unknown as AssistantWorkerConfigService,
-      new ConfigService({
-        XAI_API_KEY: 'bad-key',
-      }),
     );
 
     await expect(service.getStatus()).resolves.toEqual({

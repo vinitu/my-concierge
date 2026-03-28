@@ -2,17 +2,17 @@ import {
   Inject,
   Injectable,
 } from '@nestjs/common';
+import type { ExecutionJob } from '../../contracts/assistant-transport';
 import {
   QUEUE_ADAPTER,
   type QueueAdapter,
-  type QueueMessage,
 } from './queue-adapter';
 
 @Injectable()
 export class QueueService {
   constructor(@Inject(QUEUE_ADAPTER) private readonly queueAdapter: QueueAdapter) {}
 
-  async enqueue(message: QueueMessage): Promise<void> {
+  async enqueue(message: ExecutionJob): Promise<void> {
     await this.queueAdapter.enqueue(message);
   }
 
@@ -24,4 +24,3 @@ export class QueueService {
     return this.queueAdapter.driverName();
   }
 }
-

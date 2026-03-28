@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 import { DeepseekProviderStatusService } from './deepseek-provider-status.service';
 
@@ -10,14 +9,26 @@ describe('DeepseekProviderStatusService', () => {
   it('returns missing_key when DEEPSEEK_API_KEY is not configured', async () => {
     const service = new DeepseekProviderStatusService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'deepseek-reasoner', provider: 'deepseek' }),
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'deepseek-reasoner',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'deepseek',
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
       } as unknown as AssistantWorkerConfigService,
-      new ConfigService({}),
     );
 
     await expect(service.getStatus()).resolves.toEqual({
       apiKeyConfigured: false,
-      message: 'DEEPSEEK_API_KEY is not configured',
+      message: 'DeepSeek API key is not configured in assistant-worker web settings',
       model: 'deepseek-reasoner',
       provider: 'deepseek',
       reachable: false,
@@ -31,11 +42,21 @@ describe('DeepseekProviderStatusService', () => {
     } as Response);
     const service = new DeepseekProviderStatusService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'deepseek-reasoner', provider: 'deepseek' }),
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: 'test-key',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'deepseek-reasoner',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'deepseek',
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
       } as unknown as AssistantWorkerConfigService,
-      new ConfigService({
-        DEEPSEEK_API_KEY: 'test-key',
-      }),
     );
 
     await expect(service.getStatus()).resolves.toEqual({

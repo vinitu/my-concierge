@@ -1,12 +1,13 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help env build up down
+.PHONY: help env build up down migrate
 
 help:
 	@printf "\nMyConcierge Commands\n\n"
 	@printf "  \033[36m%-10s\033[0m %s\n" "help" "Show available make targets"
 	@printf "  \033[36m%-10s\033[0m %s\n" "env" "Create .env from .env.example if it does not exist"
 	@printf "  \033[36m%-10s\033[0m %s\n" "build" "Build assistant-api, assistant-worker, and gateway-web Docker images"
+	@printf "  \033[36m%-10s\033[0m %s\n" "migrate" "Run MySQL migrations inside the assistant-worker container"
 	@printf "  \033[36m%-10s\033[0m %s\n" "up" "Start assistant-api, assistant-worker, gateway-web, and swagger with Docker Compose"
 	@printf "  \033[36m%-10s\033[0m %s\n" "down" "Stop Docker Compose services"
 	@printf "\n"
@@ -21,6 +22,10 @@ env:
 
 build:
 	docker compose build assistant-api assistant-worker gateway-web
+
+migrate:
+	docker compose build assistant-worker
+	docker compose run --rm assistant-worker npm run db:migrate
 
 up:
 	docker compose up --build assistant-api assistant-worker gateway-web swagger

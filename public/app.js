@@ -28,10 +28,27 @@ function resizeInput() {
 }
 
 function scrollMessagesToBottom() {
-  messages.scrollTop = messages.scrollHeight;
-  window.requestAnimationFrame(() => {
+  const scroll = () => {
     messages.scrollTop = messages.scrollHeight;
+    messages.scrollTo({
+      top: messages.scrollHeight,
+      behavior: 'auto',
+    });
+
+    if (messages.lastElementChild instanceof HTMLElement) {
+      messages.lastElementChild.scrollIntoView({
+        block: 'end',
+        inline: 'nearest',
+      });
+    }
+  };
+
+  scroll();
+  window.requestAnimationFrame(scroll);
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(scroll);
   });
+  window.setTimeout(scroll, 0);
 }
 
 function appendMessage(role, text) {
@@ -117,6 +134,7 @@ socket.on('assistant.thinking', (payload) => {
 });
 
 socket.on('assistant.error', (payload) => {
+  clearThinking();
   appendMessage('system', payload.message);
 });
 

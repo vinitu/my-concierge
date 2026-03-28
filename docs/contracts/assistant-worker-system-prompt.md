@@ -2,32 +2,31 @@
 
 ## Goal
 
-Describe what `assistant-worker` sends to the LLM as the runtime system prompt and what response format `assistant-worker` expects back.
+Describe what `assistant-worker` sends into the LangChain.js runtime and which structured output the worker expects back from the assistant execution loop.
 
 The repository prompt template lives in:
 
-- [`prompts/user-prompt.md`](/Users/vinitu/Projects/vinitu/my-concierge/prompts/user-prompt.md)
+- [prompts/user-prompt.md](../../prompts/user-prompt.md)
 
-## Prompt Layers
+## Context Layers
 
-For each queued request, `assistant-worker` builds one composed system prompt with:
+For each queued request, `assistant-worker` builds one execution input from four layers:
 
-- a short text contract that explains `request_format` and `response_format`
-- one JSON object that contains the actual request payload
+1. bootstrap context
+   - `SYSTEM.js`
+   - `SOUL.js`
+   - `IDENTITY.js`
+2. conversation context
+   - rolling summary from MySQL
+   - recent conversation turns from MySQL
+3. durable memory context
+   - ranked entries returned by `assistant-memory`
+4. current request
+   - current queued user request and channel metadata
 
-1. runtime instructions
-   - system instructions
-   - behavior instructions
-   - identity statements
-2. conversation state
-   - `context` from `runtime/assistant-worker/conversations/{direction}/{chat}/{contact}.json`
-   - recent full messages from the same conversation JSON
-3. current request
-   - the current queued user request as JSON
+## Bootstrap Instruction Block
 
-## Runtime Instruction Block
-
-The system prompt contains these runtime arrays inside the top-level JSON object:
+The bootstrap part contains these arrays inside the top-level input object:
 
 - `system_instructions`
 - `behavior`
@@ -35,28 +34,19 @@ The system prompt contains these runtime arrays inside the top-level JSON object
 
 Meaning:
 
-- `system_instructions`: array of operating rules and execution constraints
-- `behavior`: array of behavior instructions, tone, and boundaries
-- `identity`: array of identity statements and role descriptions
-
-The default assistant system prompt template uses placeholders like:
-
-```text
-{{request}}
-```
+- `system_instructions`: operating rules and execution constraints
+- `behavior`: tone, style, and response boundaries
+- `identity`: identity statements and role descriptions
 
 ## Conversation Block
 
 The conversation part includes:
 
-- `context`: compact persistent working memory of the dialogue
-- `messages`: the recent full messages kept in the configured `memory_window`
-- the current incoming user request
+- `conversation_summary`
+- `recent_messages`
+- `current_user_message`
 
-`{{conversation_context_json}}` is inserted as a JSON string.
-It should preserve useful working state for future turns, not only general user profile facts.
-
-`{{recent_messages}}` is inserted as a JSON array with this shape:
+Suggested shape for `recent_messages`:
 
 ```json
 [
@@ -73,22 +63,66 @@ It should preserve useful working state for future turns, not only general user 
 ]
 ```
 
-`{{conversation_message}}` is inserted as a JSON object with this shape:
+Suggested shape for `current_user_message`:
 
 ```json
 {
-  "direction": "api",
+  "direction": "web",
   "chat": "direct",
-  "contact": "alex",
+  "contact": "session_123",
+  "conversation_id": "session_123",
   "message": "What time should dinner be ready?"
 }
 ```
 
+## Durable Memory Block
+
+The durable memory part includes ranked entries returned by `assistant-memory`.
+
+Suggested shape:
+
+```json
+[
+  {
+    "id": "mem_1",
+    "kind": "preference",
+    "scope": "user",
+    "content": "The user prefers concise answers.",
+    "score": 0.92
+  },
+  {
+    "id": "mem_2",
+    "kind": "project",
+    "scope": "household",
+    "content": "Dinner planning for tonight includes pasta and salad.",
+    "score": 0.81
+  }
+]
+```
+
+## Tool Block
+
+The worker runtime exposes these model-callable tools:
+
+- `time_current`
+- `memory_search`
+- `memory_write`
+- `conversation_search`
+- `skill_execute`
+
+Rules:
+
+- tools are invoked through the LangChain.js runtime, not by direct gateway callbacks
+- `memory_search` and `memory_write` map to `assistant-memory`
+- `conversation_search` reads canonical conversation state from MySQL
+- `skill_execute` maps to local skill definitions
+- raw infrastructure access is never exposed as a model tool
+
 ## Full Example
 
-Example composed input for a request:
+Example composed input for one request:
 
-```text
+```json
 {
   "system_instructions": [
     "Follow the project rules.",
@@ -98,14 +132,12 @@ Example composed input for a request:
   "behavior": [
     "Stay calm in the dialogue.",
     "Preserve a natural conversational tone.",
-    "Be direct and practical.",
-    "Keep responses concise by default.",
-    "Be helpful without unnecessary explanation."
+    "Be direct and practical."
   ],
   "identity": [
     "You are MyConcierge, a personal home assistant for one household."
   ],
-  "conversation_context": "Alex is planning dinner and asked to keep answers short.",
+  "conversation_summary": "The user is planning dinner and asked to keep answers short.",
   "recent_messages": [
     {
       "role": "user",
@@ -123,36 +155,40 @@ Example composed input for a request:
       "created_at": "2026-03-22T10:01:00.000Z"
     }
   ],
+  "retrieved_memory": [
+    {
+      "id": "mem_1",
+      "kind": "preference",
+      "scope": "user",
+      "content": "The user prefers concise answers.",
+      "score": 0.92
+    }
+  ],
   "current_user_message": {
-    "direction": "api",
+    "direction": "web",
     "chat": "direct",
-    "contact": "alex",
+    "contact": "session_123",
+    "conversation_id": "session_123",
     "message": "What time should dinner be ready?"
-  },
-  "task": [
-    "Answer as the assistant inside the dialogue.",
-    "Preserve continuity with the conversation history and context."
-  ]
+  }
 }
 ```
 
-## Purpose Of This Structure
+## Expected Worker Output
 
-This structure gives the LLM:
-
-- stable operating rules from runtime files
-- compressed long-running and active-topic conversation context
-- a short recent message window from the configured `memory_window`
-- the exact current request that needs an answer now
-
-## Expected LLM Response
-
-For each request, `assistant-worker` expects exactly one JSON object:
+For each request, `assistant-worker` expects one structured result from the execution loop:
 
 ```json
 {
-  "message": "assistant reply text",
-  "context": "updated compact conversation context"
+  "message": "Dinner should be ready by 19:00.",
+  "conversation_summary": "Dinner planning continues for tonight.",
+  "memory_writes": [
+    {
+      "kind": "episode",
+      "scope": "household",
+      "content": "Dinner plan for tonight is pasta and salad."
+    }
+  ]
 }
 ```
 
@@ -160,14 +196,14 @@ Rules:
 
 - `message` is required
 - `message` must be a non-empty string
-- `context` is required
-- `context` must be a string
-- `context` may be empty only if there is nothing useful to keep
-- `context` should usually preserve the active topic, important entities, and unresolved intent when relevant
-- no extra keys are needed
-- no markdown fences should wrap the JSON
-- no text should appear before or after the JSON object
+- `conversation_summary` is optional but recommended when the summary changes
+- `memory_writes` is optional and contains durable memory candidates
+- no raw callback data belongs in this output
+- no text should appear before or after the structured payload
 
-`assistant-worker` parses this JSON, sends `message` through the callback, and stores `context` back into the conversation file.
-Return plain text only.
-```
+## Worker Handling Rules
+
+- `assistant-worker` persists conversation turns and updated summaries in MySQL
+- `assistant-worker` submits `memory_writes` candidates to `assistant-memory`
+- `assistant-worker` publishes run events to Redis
+- `assistant-api` consumes those run events and performs gateway callbacks

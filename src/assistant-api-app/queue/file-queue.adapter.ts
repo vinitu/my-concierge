@@ -5,11 +5,11 @@ import {
   readdir,
   writeFile,
 } from 'node:fs/promises';
-import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { join } from 'node:path';
+import type { ExecutionJob } from '../../contracts/assistant-transport';
 import type {
   QueueAdapter,
-  QueueMessage,
 } from './queue-adapter';
 
 @Injectable()
@@ -20,16 +20,11 @@ export class FileQueueAdapter implements QueueAdapter {
     return 'file';
   }
 
-  async enqueue(message: QueueMessage): Promise<void> {
+  async enqueue(message: ExecutionJob): Promise<void> {
     const directory = await this.ensureQueueDirectory();
     const filename = `${Date.now()}-${randomUUID()}.json`;
     const path = join(directory, filename);
-    const payload = {
-      ...message,
-      accepted_at: new Date().toISOString(),
-    };
-
-    await writeFile(path, JSON.stringify(payload, null, 2), 'utf8');
+    await writeFile(path, JSON.stringify(message, null, 2), 'utf8');
   }
 
   async depth(): Promise<number> {
@@ -49,4 +44,3 @@ export class FileQueueAdapter implements QueueAdapter {
     return configuredPath;
   }
 }
-

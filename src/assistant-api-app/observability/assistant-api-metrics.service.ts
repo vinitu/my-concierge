@@ -32,6 +32,12 @@ export class AssistantApiMetricsService {
     labelNames: ['service'] as const,
     registers: [this.registry],
   });
+  private readonly callbackDeliveryCounter = new Counter({
+    name: 'callback_deliveries_total',
+    help: 'Total number of callback deliveries',
+    labelNames: ['service', 'status'] as const,
+    registers: [this.registry],
+  });
   private readonly endpointRequestCounter = new Counter({
     name: 'endpoint_requests_total',
     help: 'Total number of endpoint requests',
@@ -58,6 +64,13 @@ export class AssistantApiMetricsService {
 
   recordAcceptedConversation(): void {
     this.acceptedConversationCounter.inc({ service: 'assistant-api' });
+  }
+
+  recordCallbackDelivery(success: boolean): void {
+    this.callbackDeliveryCounter.inc({
+      service: 'assistant-api',
+      status: success ? 'success' : 'error',
+    });
   }
 
   recordStatusRequest(): void {

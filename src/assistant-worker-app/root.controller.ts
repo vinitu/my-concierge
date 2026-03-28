@@ -19,10 +19,19 @@ import {
 import { OllamaProviderStatusService } from './worker/ollama-provider-status.service';
 
 interface UpdateWorkerConfigBody {
+  deepseek_api_key?: string;
+  deepseek_base_url?: string;
+  deepseek_timeout_ms?: number | string;
   model?: string;
   memory_window?: number | string;
+  ollama_base_url?: string;
+  ollama_timeout_ms?: number | string;
   provider?: AssistantWorkerProvider | string;
+  run_timeout_seconds?: number | string;
   thinking_interval_seconds?: number | string;
+  xai_api_key?: string;
+  xai_base_url?: string;
+  xai_timeout_ms?: number | string;
 }
 
 @Controller()
@@ -106,7 +115,7 @@ export class AssistantWorkerRootController {
       select, input, button {
         font: inherit;
       }
-      select, input[type="number"] {
+      select, input[type="number"], input[type="text"], input[type="password"], input[type="url"] {
         width: 100%;
         padding: 12px 14px;
         border-radius: 10px;
@@ -131,6 +140,21 @@ export class AssistantWorkerRootController {
         border-top: 1px solid var(--chat-line);
         font-size: 14px;
         color: var(--chat-muted);
+      }
+      .config-group {
+        margin-top: 18px;
+        padding: 16px;
+        border-radius: 10px;
+        background: var(--chat-surface-2);
+        border: 1px solid var(--chat-line);
+      }
+      .config-group h2 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+      .config-group p {
+        margin-bottom: 4px;
+        font-size: 14px;
       }
       .status-grid {
         margin-top: 20px;
@@ -220,7 +244,7 @@ export class AssistantWorkerRootController {
             max="20"
             value="${String(config.memory_window)}"
           />
-          <label for="thinking-interval-seconds">Thinking callback interval (seconds)</label>
+          <label for="thinking-interval-seconds">run.thinking interval (seconds)</label>
           <input
             id="thinking-interval-seconds"
             name="thinking_interval_seconds"
@@ -229,6 +253,43 @@ export class AssistantWorkerRootController {
             max="30"
             value="${String(config.thinking_interval_seconds)}"
           />
+          <label for="run-timeout-seconds">Run timeout (seconds)</label>
+          <input
+            id="run-timeout-seconds"
+            name="run_timeout_seconds"
+            type="number"
+            min="5"
+            max="600"
+            value="${String(config.run_timeout_seconds)}"
+          />
+          <div class="config-group">
+            <h2>xAI</h2>
+            <p>Used when provider is <code>xai</code>.</p>
+            <label for="xai-api-key">API key</label>
+            <input id="xai-api-key" name="xai_api_key" type="password" value="${this.escapeHtml(config.xai_api_key)}" />
+            <label for="xai-base-url">Base URL</label>
+            <input id="xai-base-url" name="xai_base_url" type="url" value="${this.escapeHtml(config.xai_base_url)}" />
+            <label for="xai-timeout-ms">Timeout (ms)</label>
+            <input id="xai-timeout-ms" name="xai_timeout_ms" type="number" min="1000" max="3600000" value="${String(config.xai_timeout_ms)}" />
+          </div>
+          <div class="config-group">
+            <h2>DeepSeek</h2>
+            <p>Used when provider is <code>deepseek</code>.</p>
+            <label for="deepseek-api-key">API key</label>
+            <input id="deepseek-api-key" name="deepseek_api_key" type="password" value="${this.escapeHtml(config.deepseek_api_key)}" />
+            <label for="deepseek-base-url">Base URL</label>
+            <input id="deepseek-base-url" name="deepseek_base_url" type="url" value="${this.escapeHtml(config.deepseek_base_url)}" />
+            <label for="deepseek-timeout-ms">Timeout (ms)</label>
+            <input id="deepseek-timeout-ms" name="deepseek_timeout_ms" type="number" min="1000" max="3600000" value="${String(config.deepseek_timeout_ms)}" />
+          </div>
+          <div class="config-group">
+            <h2>Ollama</h2>
+            <p>Used when provider is <code>ollama</code>.</p>
+            <label for="ollama-base-url">Base URL</label>
+            <input id="ollama-base-url" name="ollama_base_url" type="url" value="${this.escapeHtml(config.ollama_base_url)}" />
+            <label for="ollama-timeout-ms">Timeout (ms)</label>
+            <input id="ollama-timeout-ms" name="ollama_timeout_ms" type="number" min="1000" max="3600000" value="${String(config.ollama_timeout_ms)}" />
+          </div>
           <button type="submit">Save settings</button>
         </form>
         <div id="status"></div>
@@ -296,16 +357,34 @@ export class AssistantWorkerRootController {
         const model = document.getElementById('model').value;
         const memoryWindow = document.getElementById('memory-window').value;
         const thinkingIntervalSeconds = document.getElementById('thinking-interval-seconds').value;
+        const runTimeoutSeconds = document.getElementById('run-timeout-seconds').value;
+        const xaiApiKey = document.getElementById('xai-api-key').value;
+        const xaiBaseUrl = document.getElementById('xai-base-url').value;
+        const xaiTimeoutMs = document.getElementById('xai-timeout-ms').value;
+        const deepseekApiKey = document.getElementById('deepseek-api-key').value;
+        const deepseekBaseUrl = document.getElementById('deepseek-base-url').value;
+        const deepseekTimeoutMs = document.getElementById('deepseek-timeout-ms').value;
+        const ollamaBaseUrl = document.getElementById('ollama-base-url').value;
+        const ollamaTimeoutMs = document.getElementById('ollama-timeout-ms').value;
         status.textContent = 'Saving...';
 
         const response = await fetch('/config', {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
+            deepseek_api_key: deepseekApiKey,
+            deepseek_base_url: deepseekBaseUrl,
+            deepseek_timeout_ms: deepseekTimeoutMs,
             memory_window: memoryWindow,
             model,
+            ollama_base_url: ollamaBaseUrl,
+            ollama_timeout_ms: ollamaTimeoutMs,
             provider,
+            run_timeout_seconds: runTimeoutSeconds,
             thinking_interval_seconds: thinkingIntervalSeconds,
+            xai_api_key: xaiApiKey,
+            xai_base_url: xaiBaseUrl,
+            xai_timeout_ms: xaiTimeoutMs,
           }),
         });
 
@@ -315,7 +394,7 @@ export class AssistantWorkerRootController {
         }
 
         const payload = await response.json();
-        status.textContent = 'Saved provider: ' + payload.provider + ', model: ' + payload.model + ', memory window: ' + payload.memory_window + ', thinking interval: ' + payload.thinking_interval_seconds + 's';
+        status.textContent = 'Saved provider: ' + payload.provider + ', model: ' + payload.model + ', memory window: ' + payload.memory_window + ', thinking interval: ' + payload.thinking_interval_seconds + 's, run timeout: ' + payload.run_timeout_seconds + 's';
         document.getElementById('provider-value').textContent = payload.provider;
         document.getElementById('selected-model-value').textContent = payload.model;
         document.getElementById('provider').value = payload.provider;
@@ -324,6 +403,15 @@ export class AssistantWorkerRootController {
         document.getElementById('memory-window').value = String(payload.memory_window);
         document.getElementById('thinking-interval-value').textContent = String(payload.thinking_interval_seconds);
         document.getElementById('thinking-interval-seconds').value = String(payload.thinking_interval_seconds);
+        document.getElementById('run-timeout-seconds').value = String(payload.run_timeout_seconds);
+        document.getElementById('xai-api-key').value = payload.xai_api_key;
+        document.getElementById('xai-base-url').value = payload.xai_base_url;
+        document.getElementById('xai-timeout-ms').value = String(payload.xai_timeout_ms);
+        document.getElementById('deepseek-api-key').value = payload.deepseek_api_key;
+        document.getElementById('deepseek-base-url').value = payload.deepseek_base_url;
+        document.getElementById('deepseek-timeout-ms').value = String(payload.deepseek_timeout_ms);
+        document.getElementById('ollama-base-url').value = payload.ollama_base_url;
+        document.getElementById('ollama-timeout-ms').value = String(payload.ollama_timeout_ms);
         await refreshProviderStatus();
       });
 
@@ -370,6 +458,16 @@ export class AssistantWorkerRootController {
     const provider = this.normalizeProvider(body.provider);
 
     return this.assistantWorkerConfigService.write({
+      deepseek_api_key:
+        typeof body.deepseek_api_key === 'string' ? body.deepseek_api_key : '',
+      deepseek_base_url:
+        typeof body.deepseek_base_url === 'string' ? body.deepseek_base_url : '',
+      deepseek_timeout_ms:
+        typeof body.deepseek_timeout_ms === 'number'
+          ? body.deepseek_timeout_ms
+          : typeof body.deepseek_timeout_ms === 'string'
+            ? Number.parseInt(body.deepseek_timeout_ms, 10)
+            : 360000,
       model:
         typeof body.model === 'string' && body.model.trim()
           ? body.model.trim()
@@ -380,13 +478,35 @@ export class AssistantWorkerRootController {
           : typeof body.memory_window === 'string'
             ? Number.parseInt(body.memory_window, 10)
             : 3,
+      ollama_base_url:
+        typeof body.ollama_base_url === 'string' ? body.ollama_base_url : '',
+      ollama_timeout_ms:
+        typeof body.ollama_timeout_ms === 'number'
+          ? body.ollama_timeout_ms
+          : typeof body.ollama_timeout_ms === 'string'
+            ? Number.parseInt(body.ollama_timeout_ms, 10)
+            : 360000,
       provider,
+      run_timeout_seconds:
+        typeof body.run_timeout_seconds === 'number'
+          ? body.run_timeout_seconds
+          : typeof body.run_timeout_seconds === 'string'
+            ? Number.parseInt(body.run_timeout_seconds, 10)
+            : 30,
       thinking_interval_seconds:
         typeof body.thinking_interval_seconds === 'number'
           ? body.thinking_interval_seconds
           : typeof body.thinking_interval_seconds === 'string'
             ? Number.parseInt(body.thinking_interval_seconds, 10)
             : 2,
+      xai_api_key: typeof body.xai_api_key === 'string' ? body.xai_api_key : '',
+      xai_base_url: typeof body.xai_base_url === 'string' ? body.xai_base_url : '',
+      xai_timeout_ms:
+        typeof body.xai_timeout_ms === 'number'
+          ? body.xai_timeout_ms
+          : typeof body.xai_timeout_ms === 'string'
+            ? Number.parseInt(body.xai_timeout_ms, 10)
+            : 360000,
     });
   }
 

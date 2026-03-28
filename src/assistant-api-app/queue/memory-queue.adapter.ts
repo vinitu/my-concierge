@@ -1,18 +1,18 @@
 import { Injectable } from '@nestjs/common';
+import type { ExecutionJob } from '../../contracts/assistant-transport';
 import type {
   QueueAdapter,
-  QueueMessage,
 } from './queue-adapter';
 
 @Injectable()
 export class MemoryQueueAdapter implements QueueAdapter {
-  private readonly messages: QueueMessage[] = [];
+  private readonly messages: ExecutionJob[] = [];
 
   driverName(): string {
     return 'memory';
   }
 
-  async enqueue(message: QueueMessage): Promise<void> {
+  async enqueue(message: ExecutionJob): Promise<void> {
     this.messages.push(message);
   }
 
@@ -20,4 +20,3 @@ export class MemoryQueueAdapter implements QueueAdapter {
     return this.messages.length;
   }
 }
-

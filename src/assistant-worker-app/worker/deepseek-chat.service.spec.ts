@@ -1,41 +1,12 @@
-import { ConfigService } from '@nestjs/config';
-import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
-import type { AssistantWorkerRuntimeContext } from './assistant-worker-runtime-context.service';
-import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
-import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
-import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 import { DeepseekChatService } from './deepseek-chat.service';
 
 describe('DeepseekChatService', () => {
-  const runtimeContext: AssistantWorkerRuntimeContext = {
-    agents: '["agent rules"]',
-    datadir: '/runtime',
-    identity: '["assistant identity"]',
-    memory: [],
-    soul: `[
-  "Stay calm in the dialogue.",
-  "Preserve a natural conversational tone.",
-  "Be direct and practical."
-]`,
-  };
-  const queueMessage: QueueMessage = {
-    chat: 'direct',
-    conversation_id: 'alex',
-    contact: 'alex',
-    direction: 'api',
-    host: 'http://gateway-web:3000',
-    message: 'Summarize the house status',
-  };
-
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
   it('sends an OpenAI-compatible chat request to DeepSeek and returns assistant text', async () => {
-    const runtimeContextService = {
-      load: jest.fn().mockResolvedValue(runtimeContext),
-    } as unknown as AssistantWorkerRuntimeContextService;
     const fetchMock = jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       json: async () => ({
         choices: [
@@ -50,37 +21,26 @@ describe('DeepseekChatService', () => {
     } as Response);
     const service = new DeepseekChatService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'deepseek-reasoner', provider: 'deepseek' }),
-      } as unknown as AssistantWorkerConfigService,
-      new ConfigService({
-        ASSISTANT_DATADIR: '/runtime',
-        DEEPSEEK_API_KEY: 'test-key',
-      }),
-      new AssistantWorkerPromptTemplateService(
-        new ConfigService({
-          ASSISTANT_DATADIR: '/runtime',
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: 'test-key',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'deepseek-reasoner',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'deepseek',
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
         }),
-        new AssistantWorkerPromptService(),
-      ),
-      runtimeContextService,
+      } as unknown as AssistantWorkerConfigService,
     );
 
-    await expect(
-      service.generateReply({
-        conversation: {
-          chat: 'direct',
-          contact: 'alex',
-          context: 'Home status updates should be short.',
-          direction: 'api',
-          messages: [],
-          updated_at: null,
-        },
-        message: queueMessage,
-      }),
-    ).resolves.toEqual({
-      context: 'The active topic is current house status.',
-      message: 'Everything looks normal.',
-    });
+    await expect(service.generateText('prompt')).resolves.toEqual(
+      '{"message":"Everything looks normal.","context":"The active topic is current house status."}',
+    );
 
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.deepseek.com/chat/completions',
@@ -103,37 +63,27 @@ describe('DeepseekChatService', () => {
   });
 
   it('fails fast when DEEPSEEK_API_KEY is missing', async () => {
-    const runtimeContextService = {
-      load: jest.fn().mockResolvedValue(runtimeContext),
-    } as unknown as AssistantWorkerRuntimeContextService;
     const service = new DeepseekChatService(
       {
-        read: jest.fn().mockResolvedValue({ memory_window: 3, model: 'deepseek-chat', provider: 'deepseek' }),
-      } as unknown as AssistantWorkerConfigService,
-      new ConfigService({
-        ASSISTANT_DATADIR: '/runtime',
-      }),
-      new AssistantWorkerPromptTemplateService(
-        new ConfigService({
-          ASSISTANT_DATADIR: '/runtime',
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'deepseek-chat',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'deepseek',
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
         }),
-        new AssistantWorkerPromptService(),
-      ),
-      runtimeContextService,
+      } as unknown as AssistantWorkerConfigService,
     );
 
-    await expect(
-      service.generateReply({
-        conversation: {
-          chat: 'direct',
-          contact: 'alex',
-          context: '',
-          direction: 'api',
-          messages: [],
-          updated_at: null,
-        },
-        message: queueMessage,
-      }),
-    ).rejects.toThrow('DEEPSEEK_API_KEY is required for assistant-worker');
+    await expect(service.generateText('prompt')).rejects.toThrow(
+      'DeepSeek API key is not configured in assistant-worker web settings',
+    );
   });
 });

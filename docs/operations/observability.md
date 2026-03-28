@@ -18,4 +18,9 @@ Describe status, metrics, and documentation endpoints.
 
 - `assistant-api` exposes `GET /openapi.json`
 - `assistant-worker` exposes `GET /openapi.json`
-- One shared Swagger UI shows both schemas
+- `assistant-memory` exposes `GET /openapi.json`
+- `dashboard` exposes `GET /openapi.json`
+- `gateway-web` exposes `GET /openapi.json`
+- `gateway-telegram` exposes `GET /openapi.json`
+- `gateway-email` exposes `GET /openapi.json`
+- One shared Swagger UI shows the available service schemas

@@ -2,18 +2,8 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type {
-  AssistantLlmGenerateInput,
-  AssistantLlmProvider,
-} from './assistant-llm-provider';
-import {
-  parseAssistantLlmResult,
-  type AssistantLlmGenerateResult,
-} from './assistant-llm-response-parser';
+import type { AssistantLlmProvider } from './assistant-llm-provider';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
-import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
-import { AssistantWorkerRuntimeContextService } from './assistant-worker-runtime-context.service';
 
 interface OllamaChatResponse {
   error?: string;
@@ -26,36 +16,30 @@ interface OllamaChatResponse {
 export class OllamaChatService implements AssistantLlmProvider {
   private readonly logger = new Logger(OllamaChatService.name);
 
-  constructor(
-    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
-    private readonly configService: ConfigService,
-    private readonly promptTemplateService: AssistantWorkerPromptTemplateService,
-    private readonly runtimeContextService: AssistantWorkerRuntimeContextService,
-  ) {}
+  constructor(private readonly assistantWorkerConfigService: AssistantWorkerConfigService) {}
 
-  private async modelName(): Promise<string> {
+  private async currentConfig(): Promise<{
+    baseUrl: string;
+    model: string;
+    timeoutMs: number;
+  }> {
     const config = await this.assistantWorkerConfigService.read();
-    return config.provider === 'ollama'
-      ? config.model
-      : this.configService.get<string>('OLLAMA_MODEL', 'gemma3:1b');
+    return {
+      baseUrl: config.ollama_base_url,
+      model: config.provider === 'ollama' ? config.model : 'gemma3:1b',
+      timeoutMs: config.ollama_timeout_ms,
+    };
   }
 
-  async generateReply(input: AssistantLlmGenerateInput): Promise<AssistantLlmGenerateResult> {
-    const baseUrl = this.configService.get<string>('OLLAMA_BASE_URL', 'http://host.docker.internal:11434');
-    const model = await this.modelName();
-    const timeoutMs = Number.parseInt(
-      this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
-      10,
-    );
-    const runtimeContext = await this.runtimeContextService.load();
-    const systemPrompt = await this.promptTemplateService.renderAssistantSystemPrompt(
-      input,
-      runtimeContext,
-    );
+  async generateText(prompt: string): Promise<string> {
+    const providerConfig = await this.currentConfig();
+    const baseUrl = providerConfig.baseUrl;
+    const model = providerConfig.model;
+    const timeoutMs = providerConfig.timeoutMs;
     const requestBody = {
       messages: [
         {
-          content: systemPrompt,
+          content: prompt,
           role: 'system',
         },
       ],
@@ -78,10 +62,12 @@ export class OllamaChatService implements AssistantLlmProvider {
     }
 
     const body = (await response.json()) as OllamaChatResponse;
+    this.logger.debug(`Ollama reply response: ${this.preview(body)}`);
     const content = body.message?.content?.trim();
 
     if (content) {
-      return parseAssistantLlmResult(content);
+      this.logger.debug(`Ollama extracted text: ${this.preview(content)}`);
+      return content;
     }
 
     if (body.error) {
@@ -89,5 +75,10 @@ export class OllamaChatService implements AssistantLlmProvider {
     }
 
     throw new Error('Ollama API response did not contain assistant text');
+  }
+
+  private preview(value: unknown): string {
+    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+    return serialized.length > 4000 ? `${serialized.slice(0, 4000)}…` : serialized;
   }
 }

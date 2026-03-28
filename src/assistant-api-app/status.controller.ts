@@ -10,7 +10,13 @@ export class AssistantApiStatusController {
   ) {}
 
   @Get('status')
-  getStatus(): { queueAdapter: string; ready: boolean; service: string; status: string } {
+  getStatus(): {
+    queueAdapter: string;
+    ready: boolean;
+    service: string;
+    status: string;
+    uptime_seconds: number;
+  } {
     this.metricsService.recordStatusRequest();
 
     return {
@@ -18,7 +24,7 @@ export class AssistantApiStatusController {
       ready: true,
       service: 'assistant-api',
       status: 'ok',
+      uptime_seconds: Math.floor(process.uptime()),
     };
   }
 }
-

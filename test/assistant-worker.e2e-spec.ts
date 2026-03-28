@@ -7,86 +7,62 @@ import {
   readdir,
   writeFile,
 } from 'node:fs/promises';
-import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { AssistantWorkerAppModule } from '../src/assistant-worker-app/assistant-worker-app.module';
-import { ASSISTANT_LLM_PROVIDER } from '../src/assistant-worker-app/worker/assistant-llm-provider';
+import { RUN_EVENT_PUBLISHER } from '../src/assistant-worker-app/run-events/run-event-publisher';
+import { AssistantLangchainRuntimeService } from '../src/assistant-worker-app/worker/assistant-langchain-runtime.service';
 import { AssistantLlmProviderStatusService } from '../src/assistant-worker-app/worker/assistant-llm-provider-status.service';
 
 describe('assistant-worker (e2e)', () => {
   let app: NestExpressApplication;
-  let callbackMessages: string[] = [];
-  let thinkingMessages: string[] = [];
-  let callbackServer: ReturnType<typeof createServer>;
-  let callbackUrl = '';
+  let completedEvents: Array<Record<string, unknown>> = [];
+  let thinkingEvents: Array<Record<string, unknown>> = [];
   let datadir: string;
-  const llmProvider = {
-    generateReply: jest.fn().mockResolvedValue({
+  const langchainRuntime = {
+    run: jest.fn().mockResolvedValue({
       context: 'Greeting completed.',
       message: 'hello from grok',
+      memory_writes: [],
+      tool_observations: [],
     }),
   };
   const providerStatus = {
-    getStatus: jest.fn().mockResolvedValue({
-      apiKeyConfigured: false,
-      message: 'XAI_API_KEY is not configured',
-      model: 'grok-4',
-      provider: 'xai',
-      reachable: false,
-      status: 'missing_key',
-    }),
+    getStatus: jest.fn(),
   };
   let queueDir: string;
+  const runEventPublisher = {
+    driverName: jest.fn().mockReturnValue('memory'),
+    publish: jest.fn().mockImplementation(async (event) => {
+      if (event.eventType === 'run.thinking') {
+        thinkingEvents.push(event as Record<string, unknown>);
+      } else if (event.eventType === 'run.completed') {
+        completedEvents.push(event as Record<string, unknown>);
+      }
+
+      return event;
+    }),
+  };
 
   beforeAll(async () => {
     queueDir = await mkdtemp(join(tmpdir(), 'assistant-worker-queue-'));
     datadir = await mkdtemp(join(tmpdir(), 'assistant-worker-runtime-'));
 
-    callbackServer = createServer((req, res) => {
-      const chunks: Uint8Array[] = [];
-
-      req.on('data', (chunk) => {
-        chunks.push(chunk);
-      });
-
-      req.on('end', () => {
-        const body = Buffer.concat(chunks).toString('utf8');
-
-        if (req.url?.startsWith('/thinking/')) {
-          thinkingMessages.push(body);
-        } else {
-          callbackMessages.push(body);
-        }
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ delivered: true }));
-      });
-    });
-
-    await new Promise<void>((resolve) => {
-      callbackServer.listen(0, '127.0.0.1', resolve);
-    });
-
-    const address = callbackServer.address();
-    if (!address || typeof address === 'string') {
-      throw new Error('callback server address is unavailable');
-    }
-
-    callbackUrl = `http://127.0.0.1:${String(address.port)}`;
-
     const moduleRef = await Test.createTestingModule({
       imports: [AssistantWorkerAppModule],
     })
-      .overrideProvider(ASSISTANT_LLM_PROVIDER)
-      .useValue(llmProvider)
+      .overrideProvider(AssistantLangchainRuntimeService)
+      .useValue(langchainRuntime)
+      .overrideProvider(RUN_EVENT_PUBLISHER)
+      .useValue(runEventPublisher)
       .overrideProvider(AssistantLlmProviderStatusService)
       .useValue(providerStatus)
       .overrideProvider(ConfigService)
       .useValue(
         new ConfigService({
           ASSISTANT_DATADIR: datadir,
+          ASSISTANT_CONVERSATION_STORE_DRIVER: 'file',
           FILE_QUEUE_DIR: queueDir,
           QUEUE_ADAPTER: 'file',
           WORKER_POLL_INTERVAL_MS: '50',
@@ -100,22 +76,20 @@ describe('assistant-worker (e2e)', () => {
 
   afterAll(async () => {
     await app.close();
-    await new Promise<void>((resolve, reject) => {
-      callbackServer.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve();
-      });
-    });
   });
 
   beforeEach(() => {
-    callbackMessages = [];
-    thinkingMessages = [];
+    completedEvents = [];
+    thinkingEvents = [];
     jest.clearAllMocks();
+    providerStatus.getStatus.mockResolvedValue({
+      apiKeyConfigured: true,
+      message: 'xAI API is reachable',
+      model: 'grok-4',
+      provider: 'xai',
+      reachable: true,
+      status: 'ready',
+    });
   });
 
   it('returns the service root endpoint', async () => {
@@ -129,8 +103,12 @@ describe('assistant-worker (e2e)', () => {
     expect(response.text).toContain('<option value="ollama">ollama</option>');
     expect(response.text).toContain('value="3"');
     expect(response.text).toContain('value="2"');
-    expect(response.text).toContain('Credential: <span id="provider-credential">missing</span>');
-    expect(response.text).toContain('Reachability: <span id="provider-reachable">not working</span>');
+    expect(response.text).toContain('name="run_timeout_seconds"');
+    expect(response.text).toContain('name="xai_api_key"');
+    expect(response.text).toContain('name="deepseek_api_key"');
+    expect(response.text).toContain('name="ollama_base_url"');
+    expect(response.text).toContain('Credential: <span id="provider-credential">configured</span>');
+    expect(response.text).toContain('Reachability: <span id="provider-reachable">working</span>');
   });
 
   it('returns worker config and stores updates in runtime/assistant-worker/config/worker.json', async () => {
@@ -138,25 +116,52 @@ describe('assistant-worker (e2e)', () => {
 
     expect(getResponse.status).toBe(200);
     expect(getResponse.body).toEqual({
+      deepseek_api_key: '',
+      deepseek_base_url: 'https://api.deepseek.com',
+      deepseek_timeout_ms: 360000,
       model: 'grok-4',
       memory_window: 3,
+      ollama_base_url: 'http://host.docker.internal:11434',
+      ollama_timeout_ms: 360000,
       provider: 'xai',
+      run_timeout_seconds: 30,
       thinking_interval_seconds: 2,
+      xai_api_key: '',
+      xai_base_url: 'https://api.x.ai/v1',
+      xai_timeout_ms: 360000,
     });
 
     const putResponse = await request(app.getHttpServer()).put('/config').send({
+      deepseek_api_key: 'deepseek-key',
+      deepseek_base_url: 'https://deepseek.example.test',
+      deepseek_timeout_ms: 240000,
       model: 'deepseek-chat',
       memory_window: 5,
+      ollama_base_url: 'http://ollama.example.test:11434',
+      ollama_timeout_ms: 150000,
       provider: 'deepseek',
+      run_timeout_seconds: 25,
       thinking_interval_seconds: 4,
+      xai_api_key: 'xai-key',
+      xai_base_url: 'https://xai.example.test/v1',
+      xai_timeout_ms: 120000,
     });
 
     expect(putResponse.status).toBe(200);
     expect(putResponse.body).toEqual({
+      deepseek_api_key: 'deepseek-key',
+      deepseek_base_url: 'https://deepseek.example.test',
+      deepseek_timeout_ms: 240000,
       model: 'deepseek-chat',
       memory_window: 5,
+      ollama_base_url: 'http://ollama.example.test:11434',
+      ollama_timeout_ms: 150000,
       provider: 'deepseek',
+      run_timeout_seconds: 25,
       thinking_interval_seconds: 4,
+      xai_api_key: 'xai-key',
+      xai_base_url: 'https://xai.example.test/v1',
+      xai_timeout_ms: 120000,
     });
 
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
@@ -171,33 +176,46 @@ describe('assistant-worker (e2e)', () => {
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
       '"thinking_interval_seconds": 4',
     );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"xai_api_key": "xai-key"',
+    );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"deepseek_api_key": "deepseek-key"',
+    );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"run_timeout_seconds": 25',
+    );
   });
 
-  it('processes a queued file and sends a callback message', async () => {
+  it('processes a queued file and publishes a completed run event', async () => {
     await writeFile(
       join(queueDir, '001.json'),
       JSON.stringify({
+        accepted_at: new Date().toISOString(),
+        callback: {
+          base_url: 'http://gateway-web:3000',
+        },
         chat: 'direct',
         conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
-        host: callbackUrl,
         message: 'Hello worker',
+        request_id: 'req-1',
       }),
       'utf8',
     );
 
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      if (callbackMessages.length > 0) {
+      if (completedEvents.length > 0) {
         break;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    expect(callbackMessages).toHaveLength(1);
-    expect(thinkingMessages).toHaveLength(0);
-    expect(callbackMessages[0]).toContain('hello from grok');
+    expect(completedEvents).toHaveLength(1);
+    expect(thinkingEvents).toHaveLength(0);
+    expect(completedEvents[0]?.payload).toEqual({ message: 'hello from grok' });
     const conversationPath = join(datadir, 'conversations', 'api', 'direct', 'alex.json');
     let storedConversation = '';
 
@@ -232,20 +250,31 @@ describe('assistant-worker (e2e)', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
+      conversationStore: 'file',
       queueAdapter: 'file',
       ready: true,
       service: 'assistant-worker',
       status: 'ok',
+      uptime_seconds: expect.any(Number),
     });
   });
 
   it('returns xai provider status', async () => {
+    providerStatus.getStatus.mockResolvedValueOnce({
+      apiKeyConfigured: false,
+      message: 'xAI API key is not configured in assistant-worker web settings',
+      model: 'grok-4',
+      provider: 'xai',
+      reachable: false,
+      status: 'missing_key',
+    });
+
     const response = await request(app.getHttpServer()).get('/provider-status');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       apiKeyConfigured: false,
-      message: 'XAI_API_KEY is not configured',
+      message: 'xAI API key is not configured in assistant-worker web settings',
       model: 'grok-4',
       provider: 'xai',
       reachable: false,
@@ -257,18 +286,22 @@ describe('assistant-worker (e2e)', () => {
     await writeFile(
       join(queueDir, 'metrics.json'),
       JSON.stringify({
+        accepted_at: new Date().toISOString(),
+        callback: {
+          base_url: 'http://gateway-web:3000',
+        },
         chat: 'direct',
         conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
-        host: callbackUrl,
         message: 'metrics job',
+        request_id: 'req-1',
       }),
       'utf8',
     );
 
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      if (callbackMessages.length > 0) {
+      if (completedEvents.length > 0) {
         break;
       }
 
@@ -285,17 +318,19 @@ describe('assistant-worker (e2e)', () => {
       'route="/status",service="assistant-worker",response_code="200"',
     );
     expect(response.text).toContain('processed_jobs_total{service="assistant-worker"}');
-    expect(response.text).toContain('callback_requests_total{service="assistant-worker",status=');
+    expect(response.text).toContain('run_events_total{event_type=');
   });
 
   it('sends periodic thinking callbacks while the LLM request is in progress', async () => {
-    llmProvider.generateReply.mockImplementationOnce(
+    langchainRuntime.run.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           setTimeout(() => {
             resolve({
               context: 'Slow request completed.',
               message: 'slow reply',
+              memory_writes: [],
+              tool_observations: [],
             });
           }, 2600);
         }),
@@ -305,10 +340,19 @@ describe('assistant-worker (e2e)', () => {
       join(datadir, 'config', 'worker.json'),
       `${JSON.stringify(
         {
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
           model: 'grok-4',
           memory_window: 3,
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
           provider: 'xai',
+          run_timeout_seconds: 30,
           thinking_interval_seconds: 1,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
         },
         null,
         2,
@@ -319,27 +363,31 @@ describe('assistant-worker (e2e)', () => {
     await writeFile(
       join(queueDir, 'thinking.json'),
       JSON.stringify({
+        accepted_at: new Date().toISOString(),
+        callback: {
+          base_url: 'http://gateway-web:3000',
+        },
         chat: 'direct',
         conversation_id: 'alex',
         contact: 'alex',
         direction: 'api',
-        host: callbackUrl,
         message: 'slow job',
+        request_id: 'req-1',
       }),
       'utf8',
     );
 
     for (let attempt = 0; attempt < 80; attempt += 1) {
-      if (callbackMessages.length > 0) {
+      if (completedEvents.length > 0) {
         break;
       }
 
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    expect(callbackMessages).toHaveLength(1);
-    expect(thinkingMessages.length).toBeGreaterThanOrEqual(2);
-    expect(thinkingMessages[0]).toContain('"seconds":1');
+    expect(completedEvents).toHaveLength(1);
+    expect(thinkingEvents.length).toBeGreaterThanOrEqual(2);
+    expect(thinkingEvents[0]?.payload).toEqual({ seconds: 1 });
   });
 
   it('returns worker OpenAPI schema', async () => {

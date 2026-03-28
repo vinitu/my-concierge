@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
+import { MysqlService } from '../persistence/mysql.service';
 import { AssistantWorkerMetricsController } from './observability/assistant-worker-metrics.controller';
 import { AssistantWorkerMetricsService } from './observability/assistant-worker-metrics.service';
 import { HttpRequestMetricsInterceptor } from './observability/http-request-metrics.interceptor';
@@ -14,12 +15,15 @@ import {
 import { AssistantWorkerProcessorService } from './worker/assistant-worker-processor.service';
 import { AssistantWorkerConfigService } from './worker/assistant-worker-config.service';
 import { AssistantWorkerConversationService } from './worker/assistant-worker-conversation.service';
+import { AssistantLangchainRuntimeService } from './worker/assistant-langchain-runtime.service';
+import { AssistantMemoryClientService } from './worker/assistant-memory-client.service';
+import { AssistantToolDispatcherService } from './worker/assistant-tool-dispatcher.service';
 import { AssistantLlmProviderService } from './worker/assistant-llm-provider.service';
 import { AssistantLlmProviderStatusService } from './worker/assistant-llm-provider-status.service';
 import { AssistantWorkerPromptService } from './worker/assistant-worker-prompt.service';
 import { AssistantWorkerPromptTemplateService } from './worker/assistant-worker-prompt-template.service';
 import { AssistantWorkerRuntimeContextService } from './worker/assistant-worker-runtime-context.service';
-import { CallbackDeliveryService } from './worker/callback-delivery.service';
+import { AssistantToolCatalogService } from './worker/assistant-tool-catalog.service';
 import { ASSISTANT_LLM_PROVIDER } from './worker/assistant-llm-provider';
 import { DeepseekChatService } from './worker/deepseek-chat.service';
 import { DeepseekProviderStatusService } from './worker/deepseek-provider-status.service';
@@ -29,6 +33,11 @@ import { OllamaProviderStatusService } from './worker/ollama-provider-status.ser
 import { XaiProviderStatusService } from './worker/xai-provider-status.service';
 import { AssistantWorkerRootController } from './root.controller';
 import { AssistantWorkerStatusController } from './status.controller';
+import { RedisRunEventPublisherService } from './run-events/redis-run-event-publisher.service';
+import {
+  RUN_EVENT_PUBLISHER,
+  type RunEventPublisher,
+} from './run-events/run-event-publisher';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -41,6 +50,10 @@ import { AssistantWorkerStatusController } from './status.controller';
   providers: [
     AssistantWorkerMetricsService,
     HttpRequestMetricsInterceptor,
+    AssistantMemoryClientService,
+    AssistantLangchainRuntimeService,
+    AssistantToolDispatcherService,
+    MysqlService,
     AssistantWorkerProcessorService,
     AssistantWorkerConfigService,
     AssistantWorkerConversationService,
@@ -48,16 +61,17 @@ import { AssistantWorkerStatusController } from './status.controller';
     AssistantLlmProviderStatusService,
     DeepseekChatService,
     DeepseekProviderStatusService,
+    AssistantToolCatalogService,
     AssistantWorkerPromptService,
     AssistantWorkerPromptTemplateService,
     AssistantWorkerRuntimeContextService,
-    CallbackDeliveryService,
     FileQueueConsumerService,
     GrokResponsesService,
     OllamaChatService,
     OllamaProviderStatusService,
     XaiProviderStatusService,
     RedisQueueConsumerService,
+    RedisRunEventPublisherService,
     {
       provide: ASSISTANT_LLM_PROVIDER,
       useExisting: AssistantLlmProviderService,
@@ -82,6 +96,10 @@ import { AssistantWorkerStatusController } from './status.controller';
 
         return redisQueueConsumerService;
       },
+    },
+    {
+      provide: RUN_EVENT_PUBLISHER,
+      useExisting: RedisRunEventPublisherService,
     },
   ],
 })

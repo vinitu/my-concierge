@@ -6,12 +6,15 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { AssistantApiMetricsService } from './observability/assistant-api-metrics.service';
 import { QueueService } from './queue/queue.service';
 
 interface ConversationBody {
+  callback?: {
+    base_url?: string;
+  };
   conversation_id?: string;
-  host?: string;
   message?: string;
 }
 
@@ -29,17 +32,18 @@ export class ConversationController {
     @Param('chat') chat: string,
     @Param('contact') contact: string,
     @Body() body: ConversationBody,
-  ): Promise<{ status: string }> {
+  ): Promise<{ request_id: string; status: string }> {
     const message = body.message?.trim() ?? '';
-    const host = body.host?.trim() ?? '';
+    const callbackBaseUrl = body.callback?.base_url?.trim() ?? '';
     const conversationId = body.conversation_id?.trim() ?? '';
+    const requestId = randomUUID();
 
     if (!message) {
       throw new BadRequestException('message must not be empty');
     }
 
-    if (!host) {
-      throw new BadRequestException('host must not be empty');
+    if (!callbackBaseUrl) {
+      throw new BadRequestException('callback.base_url must not be empty');
     }
 
     if (!conversationId) {
@@ -47,18 +51,23 @@ export class ConversationController {
     }
 
     await this.queueService.enqueue({
+      accepted_at: new Date().toISOString(),
+      callback: {
+        base_url: callbackBaseUrl,
+      },
       chat,
       conversation_id: conversationId,
       contact,
       direction,
-      host,
       message,
+      request_id: requestId,
     });
 
     this.metricsService.recordAcceptedConversation();
     await this.metricsService.refreshQueueDepth();
 
     return {
+      request_id: requestId,
       status: 'accepted',
     };
   }

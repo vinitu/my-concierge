@@ -1,5 +1,10 @@
 import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
+import { AssistantToolCatalogService } from './assistant-tool-catalog.service';
 import type { AssistantWorkerRuntimeContext } from './assistant-worker-runtime-context.service';
+
+function createService(): AssistantWorkerPromptService {
+  return new AssistantWorkerPromptService(new AssistantToolCatalogService());
+}
 
 describe('AssistantWorkerPromptService', () => {
   it('formats SYSTEM.js as a raw array', () => {
@@ -14,7 +19,7 @@ describe('AssistantWorkerPromptService', () => {
       memory: [],
       soul: null,
     };
-    const service = new AssistantWorkerPromptService();
+    const service = createService();
 
     expect(service.buildAgentsSection(runtimeContext)).toBe(
       `[
@@ -39,7 +44,7 @@ describe('AssistantWorkerPromptService', () => {
   "Be helpful without unnecessary explanation."
 ]`,
     };
-    const service = new AssistantWorkerPromptService();
+    const service = createService();
 
     expect(service.buildSoulSection(runtimeContext)).toBe(
       `[
@@ -63,7 +68,7 @@ describe('AssistantWorkerPromptService', () => {
       memory: [],
       soul: null,
     };
-    const service = new AssistantWorkerPromptService();
+    const service = createService();
 
     expect(service.buildIdentitySection(runtimeContext)).toBe(
       `[
@@ -74,7 +79,7 @@ describe('AssistantWorkerPromptService', () => {
   });
 
   it('formats conversation context as a JSON string', () => {
-    const service = new AssistantWorkerPromptService();
+    const service = createService();
 
     expect(
       service.buildConversationContextJsonSection({
@@ -87,19 +92,22 @@ describe('AssistantWorkerPromptService', () => {
           updated_at: null,
         },
         message: {
+          accepted_at: new Date().toISOString(),
+          callback: { base_url: 'http://example.test' },
           chat: 'direct',
           conversation_id: 'alex',
           contact: 'alex',
           direction: 'api',
-          host: 'http://example.test',
           message: 'hi',
+          request_id: 'req-1',
         },
+        retrieved_memory: [],
       }),
     ).toBe('"The active topic is dinner planning."');
   });
 
   it('formats recent conversation messages as JSON', () => {
-    const service = new AssistantWorkerPromptService();
+    const service = createService();
 
     expect(
       service.buildRecentMessagesSection({
@@ -118,13 +126,16 @@ describe('AssistantWorkerPromptService', () => {
           updated_at: null,
         },
         message: {
+          accepted_at: new Date().toISOString(),
+          callback: { base_url: 'http://example.test' },
           chat: 'direct',
           conversation_id: 'alex',
           contact: 'alex',
           direction: 'api',
-          host: 'http://example.test',
           message: 'hi',
+          request_id: 'req-1',
         },
+        retrieved_memory: [],
       }),
     ).toBe(
       JSON.stringify(
@@ -142,7 +153,7 @@ describe('AssistantWorkerPromptService', () => {
   });
 
   it('formats current user message as JSON', () => {
-    const service = new AssistantWorkerPromptService();
+    const service = createService();
 
     expect(
       service.buildCurrentUserMessageSection({
@@ -155,13 +166,16 @@ describe('AssistantWorkerPromptService', () => {
           updated_at: null,
         },
         message: {
+          accepted_at: new Date().toISOString(),
+          callback: { base_url: 'http://example.test' },
           chat: 'direct',
           conversation_id: 'alex',
           contact: 'alex',
           direction: 'api',
-          host: 'http://example.test',
           message: 'hi',
+          request_id: 'req-1',
         },
+        retrieved_memory: [],
       }),
     ).toBe(
       JSON.stringify(
@@ -185,7 +199,7 @@ describe('AssistantWorkerPromptService', () => {
       memory: [],
       soul: '["Stay calm"]',
     };
-    const service = new AssistantWorkerPromptService();
+    const service = createService();
 
     expect(
       service.buildRequestSection(
@@ -205,13 +219,31 @@ describe('AssistantWorkerPromptService', () => {
             updated_at: null,
           },
           message: {
+            accepted_at: new Date().toISOString(),
+            callback: { base_url: 'http://example.test' },
             chat: 'direct',
             conversation_id: 'alex',
             contact: 'alex',
             direction: 'api',
-            host: 'http://example.test',
             message: 'hi',
+            request_id: 'req-1',
           },
+          retrieved_memory: [
+            {
+              archivedAt: null,
+              confidence: 0.88,
+              content: 'Alex likes concise answers.',
+              conversationThreadId: 'alex',
+              createdAt: '2026-03-27T09:00:00.000Z',
+              id: 'mem_1',
+              kind: 'preference',
+              lastAccessedAt: null,
+              scope: 'conversation',
+              source: 'assistant-worker',
+              tags: ['api'],
+              updatedAt: '2026-03-27T09:00:00.000Z',
+            },
+          ],
         },
         runtimeContext,
       ),
@@ -219,6 +251,38 @@ describe('AssistantWorkerPromptService', () => {
       JSON.stringify(
         {
           behavior: ['Stay calm'],
+          available_tools: [
+            {
+              description: 'Return current date, time, and timezone-aware temporal context.',
+              name: 'time_current',
+              use_when: 'Current time or date is required to answer correctly.',
+            },
+            {
+              description:
+                'Search durable memory for relevant profile, fact, preference, project, routine, rule, or episode entries.',
+              name: 'memory_search',
+              use_when:
+                'The answer depends on stable remembered facts or preferences not present in recent messages.',
+            },
+            {
+              description:
+                'Store durable memory candidates after the run passes memory write policy.',
+              name: 'memory_write',
+              use_when: 'New stable memory should be persisted after a run completes.',
+            },
+            {
+              description:
+                'Search recent canonical conversation turns and summaries for the current thread.',
+              name: 'conversation_search',
+              use_when:
+                'Recent thread context must be reloaded beyond the current in-memory window.',
+            },
+            {
+              description: 'Execute a registered assistant skill or integration action.',
+              name: 'skill_execute',
+              use_when: 'The assistant must call a skill or integration to complete the task.',
+            },
+          ],
           conversation_context: 'Current topic is dinner.',
           current_user_message: {
             chat: 'direct',
@@ -227,6 +291,22 @@ describe('AssistantWorkerPromptService', () => {
             message: 'hi',
           },
           identity: ['Name: MyConcierge'],
+          retrieved_memory: [
+            {
+              archivedAt: null,
+              confidence: 0.88,
+              content: 'Alex likes concise answers.',
+              conversationThreadId: 'alex',
+              createdAt: '2026-03-27T09:00:00.000Z',
+              id: 'mem_1',
+              kind: 'preference',
+              lastAccessedAt: null,
+              scope: 'conversation',
+              source: 'assistant-worker',
+              tags: ['api'],
+              updatedAt: '2026-03-27T09:00:00.000Z',
+            },
+          ],
           recent_messages: [
             {
               content: 'hello',
@@ -237,13 +317,14 @@ describe('AssistantWorkerPromptService', () => {
           system_instructions: ['instruction 1'],
           task: [
             'Answer as the assistant inside the dialogue.',
-            'Preserve continuity with the conversation history and context.',
-            'Use runtime instructions and conversation context when relevant.',
+            'Preserve continuity with the conversation history, retrieved memory, and context.',
+            'Use runtime instructions, retrieved memory, and conversation context when relevant.',
             'Update the compact conversation context for future turns.',
             'Keep the context short, useful, and reusable.',
             'Keep stable user facts when they matter.',
             'Keep the active conversation topic when it matters.',
             'Keep important entities, decisions, preferences, and unresolved questions when they matter.',
+            'Prefer the documented tool catalog when external actions or retrieval are needed.',
             'Drop greetings, filler, repeated wording, gibberish, and temporary noise from the context.',
             'Do not reduce the context to language preference only when there is a more important active topic.',
             'If the dialogue is about a person, place, task, or problem, keep that active topic in the context.',

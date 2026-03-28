@@ -9,13 +9,19 @@ import { AssistantApiOpenApiController } from './openapi.controller';
 import { AssistantApiRootController } from './root.controller';
 import { QueueService } from './queue/queue.service';
 import { FileQueueAdapter } from './queue/file-queue.adapter';
-import { MemoryQueueAdapter } from './queue/memory-queue.adapter';
 import { RedisQueueAdapter } from './queue/redis-queue.adapter';
 import { AssistantApiStatusController } from './status.controller';
 import {
   QUEUE_ADAPTER,
   type QueueAdapter,
 } from './queue/queue-adapter';
+import { CallbackDeliveryService } from './run-events/callback-delivery.service';
+import { RedisRunEventQueueConsumer } from './run-events/redis-run-event-queue.consumer';
+import { RunEventProcessorService } from './run-events/run-event-processor.service';
+import {
+  RUN_EVENT_QUEUE_CONSUMER,
+  type RunEventQueueConsumer,
+} from './run-events/run-event-queue';
 
 @Module({
   imports: [ConfigModule.forRoot({ isGlobal: true })],
@@ -28,29 +34,26 @@ import {
   ],
   providers: [
     AssistantApiMetricsService,
+    CallbackDeliveryService,
     HttpRequestMetricsInterceptor,
     FileQueueAdapter,
-    MemoryQueueAdapter,
     RedisQueueAdapter,
+    RedisRunEventQueueConsumer,
     QueueService,
+    RunEventProcessorService,
     {
       provide: APP_INTERCEPTOR,
       useClass: HttpRequestMetricsInterceptor,
     },
     {
       provide: QUEUE_ADAPTER,
-      inject: [ConfigService, FileQueueAdapter, MemoryQueueAdapter, RedisQueueAdapter],
+      inject: [ConfigService, FileQueueAdapter, RedisQueueAdapter],
       useFactory: (
         configService: ConfigService,
         fileQueueAdapter: FileQueueAdapter,
-        memoryQueueAdapter: MemoryQueueAdapter,
         redisQueueAdapter: RedisQueueAdapter,
       ): QueueAdapter => {
         const queueAdapter = configService.get<string>('QUEUE_ADAPTER', 'redis');
-
-        if (queueAdapter === 'memory') {
-          return memoryQueueAdapter;
-        }
 
         if (queueAdapter === 'file') {
           return fileQueueAdapter;
@@ -58,6 +61,10 @@ import {
 
         return redisQueueAdapter;
       },
+    },
+    {
+      provide: RUN_EVENT_QUEUE_CONSUMER,
+      useExisting: RedisRunEventQueueConsumer,
     },
   ],
 })

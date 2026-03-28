@@ -8,7 +8,7 @@ import {
   rm,
 } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { QueueMessage } from '../../assistant-api-app/queue/queue-adapter';
+import type { ExecutionJob } from '../../contracts/assistant-transport';
 import type {
   ProcessingQueueMessage,
   QueueConsumer,
@@ -37,9 +37,7 @@ export class FileQueueConsumerService implements QueueConsumer {
     const processingPath = `${sourcePath}.processing`;
 
     await rename(sourcePath, processingPath);
-    const payload = JSON.parse(await readFile(processingPath, 'utf8')) as QueueMessage & {
-      accepted_at?: string;
-    };
+    const payload = JSON.parse(await readFile(processingPath, 'utf8')) as ExecutionJob;
 
     return {
       ...payload,
@@ -58,8 +56,8 @@ export class FileQueueConsumerService implements QueueConsumer {
       return;
     }
 
-    const originalPath = processingPath.slice(0, -'.processing'.length);
-    await rename(processingPath, originalPath);
+    const failedPath = `${processingPath.slice(0, -'.processing'.length)}.failed`;
+    await rename(processingPath, failedPath);
   }
 
   async depth(): Promise<number> {

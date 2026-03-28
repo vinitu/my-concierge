@@ -67,6 +67,7 @@ describe('gateway-web (e2e)', () => {
       ready: true,
       service: 'gateway-web',
       status: 'ok',
+      uptime_seconds: expect.any(Number),
     });
   });
 

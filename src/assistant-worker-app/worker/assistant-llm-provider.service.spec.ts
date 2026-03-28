@@ -11,80 +11,42 @@ describe('AssistantLlmProviderService', () => {
         read: jest.fn().mockResolvedValue({ provider: 'xai' }),
       } as unknown as AssistantWorkerConfigService,
       {
-        generateReply: jest.fn().mockResolvedValue({ context: 'deepseek context', message: 'deepseek reply' }),
+        generateText: jest.fn().mockResolvedValue('deepseek reply'),
       } as unknown as DeepseekChatService,
       {
-        generateReply: jest.fn().mockResolvedValue({ context: 'xai context', message: 'xai reply' }),
+        generateText: jest.fn().mockResolvedValue('xai reply'),
       } as unknown as GrokResponsesService,
       {
-        generateReply: jest.fn().mockResolvedValue({ context: 'ollama context', message: 'ollama reply' }),
+        generateText: jest.fn().mockResolvedValue('ollama reply'),
       } as unknown as OllamaChatService,
     );
 
-    await expect(
-      service.generateReply({
-        conversation: {
-          chat: 'direct',
-          contact: 'alex',
-          context: '',
-          direction: 'api',
-          messages: [],
-          updated_at: null,
-        },
-        message: {
-          chat: 'direct',
-          conversation_id: 'alex',
-          contact: 'alex',
-          direction: 'api',
-          host: 'http://example.test',
-          message: 'hello',
-        },
-      }),
-    ).resolves.toEqual({ context: 'xai context', message: 'xai reply' });
+    await expect(service.generateText('prompt')).resolves.toEqual('xai reply');
   });
 
   it('routes requests to ollama when configured', async () => {
     const ollamaChatService = {
-      generateReply: jest.fn().mockResolvedValue({ context: 'ollama context', message: 'ollama reply' }),
+      generateText: jest.fn().mockResolvedValue('ollama reply'),
     } as unknown as OllamaChatService;
     const service = new AssistantLlmProviderService(
       {
         read: jest.fn().mockResolvedValue({ provider: 'ollama' }),
       } as unknown as AssistantWorkerConfigService,
       {
-        generateReply: jest.fn().mockResolvedValue({ context: 'deepseek context', message: 'deepseek reply' }),
+        generateText: jest.fn().mockResolvedValue('deepseek reply'),
       } as unknown as DeepseekChatService,
       {
-        generateReply: jest.fn().mockResolvedValue({ context: 'xai context', message: 'xai reply' }),
+        generateText: jest.fn().mockResolvedValue('xai reply'),
       } as unknown as GrokResponsesService,
       ollamaChatService,
     );
 
-    await expect(
-      service.generateReply({
-        conversation: {
-          chat: 'direct',
-          contact: 'alex',
-          context: '',
-          direction: 'api',
-          messages: [],
-          updated_at: null,
-        },
-        message: {
-          chat: 'direct',
-          conversation_id: 'alex',
-          contact: 'alex',
-          direction: 'api',
-          host: 'http://example.test',
-          message: 'hello',
-        },
-      }),
-    ).resolves.toEqual({ context: 'ollama context', message: 'ollama reply' });
+    await expect(service.generateText('prompt')).resolves.toEqual('ollama reply');
   });
 
   it('routes requests to deepseek when configured', async () => {
     const deepseekChatService = {
-      generateReply: jest.fn().mockResolvedValue({ context: 'deepseek context', message: 'deepseek reply' }),
+      generateText: jest.fn().mockResolvedValue('deepseek reply'),
     } as unknown as DeepseekChatService;
     const service = new AssistantLlmProviderService(
       {
@@ -92,32 +54,13 @@ describe('AssistantLlmProviderService', () => {
       } as unknown as AssistantWorkerConfigService,
       deepseekChatService,
       {
-        generateReply: jest.fn().mockResolvedValue({ context: 'xai context', message: 'xai reply' }),
+        generateText: jest.fn().mockResolvedValue('xai reply'),
       } as unknown as GrokResponsesService,
       {
-        generateReply: jest.fn().mockResolvedValue({ context: 'ollama context', message: 'ollama reply' }),
+        generateText: jest.fn().mockResolvedValue('ollama reply'),
       } as unknown as OllamaChatService,
     );
 
-    await expect(
-      service.generateReply({
-        conversation: {
-          chat: 'direct',
-          contact: 'alex',
-          context: '',
-          direction: 'api',
-          messages: [],
-          updated_at: null,
-        },
-        message: {
-          chat: 'direct',
-          conversation_id: 'alex',
-          contact: 'alex',
-          direction: 'api',
-          host: 'http://example.test',
-          message: 'hello',
-        },
-      }),
-    ).resolves.toEqual({ context: 'deepseek context', message: 'deepseek reply' });
+    await expect(service.generateText('prompt')).resolves.toEqual('deepseek reply');
   });
 });

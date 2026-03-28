@@ -1,27 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { AssistantLlmProviderStatus } from './assistant-llm-provider-status';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 
 @Injectable()
 export class DeepseekProviderStatusService {
-  constructor(
-    private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly assistantWorkerConfigService: AssistantWorkerConfigService) {}
 
   async getStatus(): Promise<AssistantLlmProviderStatus> {
-    const apiKey = this.configService.get<string>('DEEPSEEK_API_KEY', '').trim();
     const config = await this.assistantWorkerConfigService.read();
-    const model =
-      config.provider === 'deepseek'
-        ? config.model
-        : this.configService.get<string>('DEEPSEEK_MODEL', 'deepseek-chat');
+    const apiKey = config.deepseek_api_key.trim();
+    const model = config.provider === 'deepseek' ? config.model : 'deepseek-chat';
 
     if (!apiKey) {
       return {
         apiKeyConfigured: false,
-        message: 'DEEPSEEK_API_KEY is not configured',
+        message: 'DeepSeek API key is not configured in assistant-worker web settings',
         model,
         provider: 'deepseek',
         reachable: false,
@@ -29,11 +22,8 @@ export class DeepseekProviderStatusService {
       };
     }
 
-    const baseUrl = this.configService.get<string>('DEEPSEEK_BASE_URL', 'https://api.deepseek.com');
-    const timeoutMs = Number.parseInt(
-      this.configService.get<string>('DEEPSEEK_TIMEOUT_MS', '360000'),
-      10,
-    );
+    const baseUrl = config.deepseek_base_url;
+    const timeoutMs = config.deepseek_timeout_ms;
 
     try {
       const response = await fetch(`${baseUrl}/models`, {

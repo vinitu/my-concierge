@@ -1,0 +1,49 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { GatewayTelegramMetricsService } from './observability/gateway-telegram-metrics.service';
+
+function trimTrailingSlash(value: string): string {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
+
+@Injectable()
+export class GatewayTelegramAssistantApiClientService {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly metricsService: GatewayTelegramMetricsService,
+  ) {}
+
+  async sendConversation(input: {
+    chat: string;
+    contact: string;
+    conversationId: string;
+    message: string;
+  }): Promise<void> {
+    const assistantApiUrl = trimTrailingSlash(
+      this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:3000'),
+    );
+    const callbackBaseUrl = trimTrailingSlash(
+      this.configService.get<string>('CALLBACK_BASE_URL', 'http://localhost:3003'),
+    );
+    const url = `${assistantApiUrl}/conversation/telegram/${encodeURIComponent(input.chat)}/${encodeURIComponent(input.contact)}`;
+
+    const response = await fetch(url, {
+      body: JSON.stringify({
+        callback: {
+          base_url: callbackBaseUrl,
+        },
+        conversation_id: input.conversationId,
+        message: input.message,
+      }),
+      headers: {
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
+    this.metricsService.recordUpstreamRequest('assistant-api', response.ok);
+
+    if (!response.ok) {
+      throw new Error(`assistant-api returned ${response.status}`);
+    }
+  }
+}

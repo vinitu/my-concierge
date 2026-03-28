@@ -50,15 +50,16 @@ describe('assistant-api (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/conversation/api/direct/alex')
       .send({
+        callback: {
+          base_url: 'http://gateway-web:3000',
+        },
         conversation_id: 'alex',
-        host: 'http://gateway-web:3000',
         message: 'Turn on the kitchen lights',
       });
 
     expect(response.status).toBe(202);
-    expect(response.body).toEqual({
-      status: 'accepted',
-    });
+    expect(response.body.status).toBe('accepted');
+    expect(typeof response.body.request_id).toBe('string');
 
     const files = await readdir(queueDir);
     expect(files).toHaveLength(1);
@@ -68,8 +69,10 @@ describe('assistant-api (e2e)', () => {
     const response = await request(app.getHttpServer())
       .post('/conversation/api/direct/alex')
       .send({
+        callback: {
+          base_url: 'http://gateway-web:3000',
+        },
         conversation_id: 'alex',
-        host: 'http://gateway-web:3000',
         message: '   ',
       });
 
@@ -85,6 +88,7 @@ describe('assistant-api (e2e)', () => {
       ready: true,
       service: 'assistant-api',
       status: 'ok',
+      uptime_seconds: expect.any(Number),
     });
   });
 

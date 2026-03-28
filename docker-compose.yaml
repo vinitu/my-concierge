@@ -5,6 +5,20 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "no"]
 
+  mysql:
+    image: mysql:8.4
+    container_name: myconcierge-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-my_concierge}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-myconcierge}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_USER: ${MYSQL_USER:-myconcierge}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
   assistant-api:
     build:
       context: .
@@ -33,9 +47,16 @@ services:
     restart: unless-stopped
     depends_on:
       - queue
+      - mysql
     environment:
       APP_ROLE: assistant-worker
       ASSISTANT_DATADIR: ${ASSISTANT_DATADIR:-/app/runtime}
+      ASSISTANT_MEMORY_URL: http://assistant-memory:3000
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-my_concierge}
+      MYSQL_HOST: mysql
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-myconcierge}
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-myconcierge}
       NODE_ENV: production
       PORT: 3000
       QUEUE_ADAPTER: redis
@@ -58,18 +79,47 @@ services:
     volumes:
       - ./runtime/assistant-worker:/app/runtime
 
+  assistant-memory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myconcierge-assistant-memory:local
+    container_name: myconcierge-assistant-memory
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      APP_ROLE: assistant-memory
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-my_concierge}
+      MYSQL_HOST: mysql
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-myconcierge}
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-myconcierge}
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "3002:3000"
+
   gateway-telegram:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: myconcierge-gateway-telegram:local
     container_name: myconcierge-gateway-telegram
     restart: unless-stopped
     depends_on:
       - assistant-api
     environment:
+      APP_ROLE: gateway-telegram
+      ASSISTANT_API_URL: http://assistant-api:3000
+      CALLBACK_BASE_URL: http://gateway-telegram:3000
+      GATEWAY_TELEGRAM_RUNTIME_DIR: ${GATEWAY_TELEGRAM_RUNTIME_DIR:-/app/runtime}
       NODE_ENV: production
       PORT: 3000
-      ASSISTANT_API_URL: http://assistant-api:3000
     ports:
       - "8081:3000"
+    volumes:
+      - ./runtime/gateway-telegram:/app/runtime
 
   gateway-web:
     build:
@@ -88,22 +138,58 @@ services:
       CALLBACK_BASE_URL: http://gateway-web:3000
       GATEWAY_WEB_RUNTIME_DIR: ${GATEWAY_WEB_RUNTIME_DIR:-/app/runtime}
     ports:
-      - "8080:3000"
+      - "8079:3000"
     volumes:
       - ./runtime/gateway-web:/app/runtime
 
   gateway-email:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: myconcierge-gateway-email:local
     container_name: myconcierge-gateway-email
     restart: unless-stopped
     depends_on:
       - assistant-api
     environment:
+      APP_ROLE: gateway-email
+      GATEWAY_EMAIL_RUNTIME_DIR: ${GATEWAY_EMAIL_RUNTIME_DIR:-/app/runtime}
       NODE_ENV: production
       PORT: 3000
       ASSISTANT_API_URL: http://assistant-api:3000
     ports:
       - "8082:3000"
+    volumes:
+      - ./runtime/gateway-email:/app/runtime
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myconcierge-dashboard:local
+    container_name: myconcierge-dashboard
+    restart: unless-stopped
+    depends_on:
+      - assistant-api
+      - assistant-worker
+      - assistant-memory
+      - gateway-web
+      - gateway-telegram
+      - gateway-email
+    environment:
+      APP_ROLE: dashboard
+      PORT: 3000
+      NODE_ENV: production
+      REDIS_URL: redis://queue:6379
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-my_concierge}
+      MYSQL_HOST: mysql
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-myconcierge}
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-myconcierge}
+      DASHBOARD_GATEWAY_WEB_PANEL_URL: http://localhost:8079
+      DASHBOARD_PANEL_URL: http://localhost:8080
+    ports:
+      - "8080:3000"
 
   swagger:
     image: swaggerapi/swagger-ui:latest
@@ -112,23 +198,23 @@ services:
     depends_on:
       - assistant-api
       - assistant-worker
+      - assistant-memory
+      - gateway-telegram
+      - gateway-email
+      - dashboard
     environment:
       URLS: |
         [
           { "url": "http://localhost:3000/openapi.json", "name": "assistant-api" },
           { "url": "http://localhost:3001/openapi.json", "name": "assistant-worker" },
-          { "url": "http://localhost:8080/openapi.json", "name": "gateway-web" }
+          { "url": "http://localhost:3002/openapi.json", "name": "assistant-memory" },
+          { "url": "http://localhost:8079/openapi.json", "name": "gateway-web" },
+          { "url": "http://localhost:8081/openapi.json", "name": "gateway-telegram" },
+          { "url": "http://localhost:8082/openapi.json", "name": "gateway-email" },
+          { "url": "http://localhost:8080/openapi.json", "name": "dashboard" }
         ]
     ports:
       - "8088:8080"
 
-  scheduler:
-    image: myconcierge-scheduler:local
-    container_name: myconcierge-scheduler
-    restart: unless-stopped
-    depends_on:
-      - assistant-api
-    environment:
-      NODE_ENV: production
-      ASSISTANT_API_URL: http://assistant-api:3000
-      CRON_SCHEDULE: "*/5 * * * *"
+volumes:
+  mysql-data:

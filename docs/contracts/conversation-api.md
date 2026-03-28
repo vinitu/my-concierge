@@ -6,8 +6,8 @@
 2. `assistant-api` validates the request and enqueues it.
 3. `assistant-api` returns an immediate acceptance response.
 4. `assistant-worker` reads the queued job later.
-5. `assistant-worker` sends periodic thinking callbacks while the LLM request is still running.
-6. `assistant-worker` sends the final assistant reply to the gateway host.
+5. `assistant-worker` publishes periodic `thinking` run events while the worker run is active.
+6. `assistant-api` consumes those run events and sends callbacks to the gateway host.
 
 ## Endpoint
 
@@ -32,13 +32,15 @@ Accept a conversation event and place it into the queue.
 | Field | Type | Required | Description |
 |---------|---------|---------|-------------|
 | `conversation_id` | `string` | yes | Stable gateway-side conversation identifier |
-| `host` | `string` | yes | Gateway base URL that will receive callback requests |
 | `message` | `string` | yes | User message to process |
+| callback routing metadata | `object` | yes | Gateway routing metadata stored by `assistant-api` for later callback delivery |
 
 ```json
 {
   "conversation_id": "alex",
-  "host": "https://client.example.com",
+  "callback": {
+    "base_url": "https://client.example.com"
+  },
   "message": "Turn on the kitchen lights"
 }
 ```
@@ -81,7 +83,7 @@ Examples:
 ```json
 {
   "statusCode": 400,
-  "message": "host must not be empty",
+  "message": "callback.base_url must not be empty",
   "error": "Bad Request"
 }
 ```
@@ -97,9 +99,9 @@ Examples:
 ## Client Expectations
 
 - The client should treat `202 Accepted` as acceptance only, not as the final assistant answer.
-- The client should wait for asynchronous callback requests on `host`.
-- In the current V1 flow, one accepted request produces one final callback message.
-- While the LLM request is running, the worker may also send periodic `thinking` callbacks.
+- The client should wait for asynchronous callback requests on the stored callback target.
+- One accepted request produces one final callback message.
+- While the worker run is active, `assistant-api` may also send periodic `thinking` callbacks.
 
 ## Current `gateway-web` Contact Rule
 
@@ -108,4 +110,4 @@ For the browser flow:
 - `contact` is the stable browser `session_id`
 - `gateway-web` stores `session_id` in the `myconcierge_session_id` cookie
 - `gateway-web` uses that `session_id` both for the websocket session mapping and for `conversation_id`
-- `gateway-web` sends `host` as its own base URL
+- `gateway-web` sends callback routing metadata with its own base URL

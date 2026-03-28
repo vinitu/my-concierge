@@ -10,6 +10,7 @@
   --chat-assistant: #c7f9e5;
   --chat-system: #d4d7dd;
   min-height: 100vh;
+  overflow: hidden;
   background:
     radial-gradient(circle at top, rgba(125, 211, 252, 0.08), transparent 22%),
     linear-gradient(180deg, #090b10 0%, #0d1016 100%);
@@ -18,14 +19,16 @@
 }
 
 .chat-layout {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .chat-shell {
   width: 100%;
-  min-height: calc(100vh - 2rem);
+  height: calc(100vh - 1.5rem);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .chat-form-panel,
@@ -43,6 +46,12 @@
   gap: 10px;
   justify-content: flex-end;
   flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 4px 0 12px;
+  background: linear-gradient(180deg, rgba(9, 11, 16, 0.98), rgba(9, 11, 16, 0.82) 72%, transparent);
+  backdrop-filter: blur(8px);
 }
 
 .status-pill {
@@ -121,7 +130,9 @@
   gap: 14px;
   padding: 22px;
   overflow-y: auto;
+  overflow-x: hidden;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent);
+  scroll-behavior: smooth;
 }
 
 .message {
@@ -193,6 +204,14 @@
 
 .chat-form-panel {
   padding: 16px;
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin-top: 12px;
+  background:
+    linear-gradient(180deg, rgba(9, 11, 16, 0.2), rgba(17, 20, 27, 0.98) 28%),
+    var(--chat-surface);
+  backdrop-filter: blur(8px);
 }
 
 .composer-shell {
@@ -256,6 +275,7 @@
 
   .chat-form-panel {
     padding: 14px;
+    margin-top: 10px;
   }
 
   .chat-input {
