@@ -26,6 +26,10 @@ import {
   type RunEventPublisher,
 } from '../run-events/run-event-publisher';
 import { AssistantRuntimeError } from './assistant-runtime-error';
+import type {
+  AssistantConversationMessage,
+  AssistantConversationState,
+} from './assistant-worker-conversation.service';
 
 @Injectable()
 export class AssistantWorkerProcessorService
@@ -138,9 +142,14 @@ export class AssistantWorkerProcessorService
         `Reading conversation state runId=${runId} conversationId=${item.conversation_id}`,
       );
       const conversation = await this.conversationService.read(item);
+      const effectiveConversation = await this.buildEffectiveConversation(
+        item,
+        conversation,
+        workerConfig.memory_window,
+      );
       this.logger.log(
         `Conversation state loaded runId=${runId} conversationId=${item.conversation_id} messageCount=${String(
-          conversation.messages.length,
+          effectiveConversation.messages.length,
         )}`,
       );
       this.logger.log(
@@ -156,16 +165,16 @@ export class AssistantWorkerProcessorService
         )}`,
       );
       this.logger.log(
-        `Loaded run context runId=${runId} messages=${String(conversation.messages.length)} retrievedMemory=${String(memorySearch.entries.length)}`,
+        `Loaded run context runId=${runId} messages=${String(effectiveConversation.messages.length)} retrievedMemory=${String(memorySearch.entries.length)}`,
       );
 
       stopThinking = this.startThinkingLoop(item, workerConfig, runId, () => ++sequence);
       const result = await this.withRunTimeout(
         this.assistantLangchainRuntimeService.run({
-          conversation,
+          conversation: effectiveConversation,
           message: item,
           retrieved_memory: memorySearch.entries,
-        }),
+        }, workerConfig.enabled_tools),
         workerConfig.run_timeout_seconds,
       );
 
@@ -173,7 +182,7 @@ export class AssistantWorkerProcessorService
       stopThinking = null;
       await this.conversationService.appendExchange(item, result, runId);
       await this.assistantMemoryClientService.safeWrite(
-        this.buildMemoryCandidates(item, conversation.context, result.context),
+        this.buildMemoryCandidates(item, effectiveConversation.context, result.context),
       );
       await this.publishRunEvent(item, runId, ++sequence, 'run.completed', {
         message: result.message,
@@ -199,6 +208,110 @@ export class AssistantWorkerProcessorService
       );
       throw item;
     }
+  }
+
+  private async buildEffectiveConversation(
+    item: ProcessingQueueMessage,
+    conversation: AssistantConversationState,
+    memoryWindow: number,
+  ): Promise<AssistantConversationState> {
+    const expansionDecision = this.shouldExpandConversationContext(
+      item.message,
+      conversation.context,
+    );
+
+    if (!expansionDecision.expand) {
+      this.metricsService.recordContextExpansion(expansionDecision.reason, true);
+      return conversation;
+    }
+
+    const expandedLimit = Math.min(40, Math.max(memoryWindow * 4, 12));
+
+    try {
+      const thread = await this.conversationService.searchThread(
+        item.conversation_id,
+        expandedLimit,
+      );
+      const mergedMessages = this.mergeConversationMessages(
+        thread.messages,
+        conversation.messages,
+      );
+      const mergedTail = mergedMessages.slice(-expandedLimit);
+      const context =
+        conversation.context.trim() || thread.summary.trim() || conversation.context;
+
+      this.metricsService.recordContextExpansion(expansionDecision.reason, true);
+      this.logger.log(
+        `Adaptive context expansion conversationId=${item.conversation_id} reason=${expansionDecision.reason} base=${String(
+          conversation.messages.length,
+        )} expanded=${String(mergedTail.length)}`,
+      );
+
+      return {
+        ...conversation,
+        context,
+        messages: mergedTail,
+      };
+    } catch (error) {
+      this.metricsService.recordContextExpansion(expansionDecision.reason, false);
+      this.logger.warn(
+        `Adaptive context expansion failed conversationId=${item.conversation_id} reason=${expansionDecision.reason}: ${this.unwrapErrorMessage(
+          error,
+        )}`,
+      );
+      return conversation;
+    }
+  }
+
+  private shouldExpandConversationContext(
+    userMessage: string,
+    compactContext: string,
+  ): { expand: boolean; reason: string } {
+    const normalizedMessage = userMessage.trim().toLowerCase();
+
+    if (!normalizedMessage) {
+      return { expand: false, reason: 'empty_message' };
+    }
+
+    const explicitHistoryPattern =
+      /(как\s+(раньше|в\s+прошл|мы\s+решили|договаривались)|мы\s+решили|что\s+мы\s+решили|договаривались|продолж(им|ай)|напомни|вернись|предыдущ|снова|ещ[её]\s+раз|what did we decide|as before|continue|previous|remind me|again)/i;
+
+    if (explicitHistoryPattern.test(normalizedMessage)) {
+      return { expand: true, reason: 'history_reference' };
+    }
+
+    const referentialPattern =
+      /\b(это|эта|этот|этом|эту|тот|та|те|this|that|it|they|them|he|she)\b/i;
+    const shortMessage = normalizedMessage.length <= 80;
+    const hasCompactContext = compactContext.trim().length > 0;
+
+    if (shortMessage && hasCompactContext && referentialPattern.test(normalizedMessage)) {
+      return { expand: true, reason: 'referential_short_message' };
+    }
+
+    return { expand: false, reason: 'not_needed' };
+  }
+
+  private mergeConversationMessages(
+    historical: AssistantConversationMessage[],
+    recent: AssistantConversationMessage[],
+  ): AssistantConversationMessage[] {
+    const combined = [...historical, ...recent];
+    const seen = new Set<string>();
+    const deduped: AssistantConversationMessage[] = [];
+
+    for (const message of combined) {
+      const key = `${message.created_at}|${message.role}|${message.content}`;
+
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      deduped.push(message);
+    }
+
+    return deduped;
   }
 
   private buildMemoryCandidates(
@@ -348,21 +461,43 @@ export class AssistantWorkerProcessorService
     const message = this.unwrapErrorMessage(error).toLowerCase();
 
     if (message.includes('api key is not configured')) {
+      if (message.includes('brave')) {
+        return 'assistant-worker web search is enabled, but the Brave API key is missing. Open the Tools section in the assistant-worker web panel and save the Brave settings.';
+      }
       return `assistant-worker is not configured: ${this.providerLabel(
         provider,
       )} API key is missing. Open the assistant-worker web panel and save the AI settings.`;
     }
 
     if (message.includes('timed out')) {
+      if (message.includes('brave')) {
+        return 'assistant-worker web search timed out while calling Brave. Increase the Brave timeout or try again later.';
+      }
       return `assistant-worker timed out while waiting for ${this.providerLabel(
         provider,
       )}. Reduce the model timeout or switch the provider in the assistant-worker web panel.`;
     }
 
     if (message.includes('returned 401') || message.includes('returned 403')) {
+      if (message.includes('brave')) {
+        return 'assistant-worker could not authenticate with Brave web search. Check the Brave API key in the Tools section.';
+      }
       return `assistant-worker could not authenticate with ${this.providerLabel(
         provider,
       )}. Check the AI settings in the assistant-worker web panel.`;
+    }
+
+    if (message.includes('brave web search returned')) {
+      return 'assistant-worker web search failed because Brave returned an error. Check the Brave settings or try again later.';
+    }
+
+    if (message.includes('brave web search request failed')) {
+      return 'assistant-worker could not reach Brave web search. Check the Brave base URL, timeout, or network connectivity.';
+    }
+
+    if (message.includes('tool is disabled in assistant-worker settings:')) {
+      const toolName = this.extractDisabledToolName(this.unwrapErrorMessage(error));
+      return `assistant-worker tried to use a disabled tool: ${toolName}. Enable it in the Tools section or keep only the tools you want the model to use.`;
     }
 
     if (message.includes('ollama')) {
@@ -392,6 +527,14 @@ export class AssistantWorkerProcessorService
     }
 
     return String(error);
+  }
+
+  private extractDisabledToolName(message: string): string {
+    const match = message.match(
+      /Tool is disabled in assistant-worker settings:\s*([a-z_]+)/i,
+    );
+
+    return match?.[1] ?? 'unknown_tool';
   }
 
   private providerLabel(provider: AssistantWorkerConfig['provider']): string {

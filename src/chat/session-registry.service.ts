@@ -5,15 +5,15 @@ export interface SocketEmitter {
 }
 
 @Injectable()
-export class SessionRegistryService {
-  private readonly sessions = new Map<string, SocketEmitter>();
+export class ConversationRegistryService {
+  private readonly conversations = new Map<string, SocketEmitter>();
 
-  register(sessionId: string, client: SocketEmitter): void {
-    this.sessions.set(sessionId, client);
+  register(conversationId: string, client: SocketEmitter): void {
+    this.conversations.set(conversationId, client);
   }
 
-  unregister(sessionId: string, client?: SocketEmitter): void {
-    const currentClient = this.sessions.get(sessionId);
+  unregister(conversationId: string, client?: SocketEmitter): void {
+    const currentClient = this.conversations.get(conversationId);
 
     if (!currentClient) {
       return;
@@ -23,19 +23,19 @@ export class SessionRegistryService {
       return;
     }
 
-    this.sessions.delete(sessionId);
+    this.conversations.delete(conversationId);
   }
 
-  has(sessionId: string): boolean {
-    return this.sessions.has(sessionId);
+  has(conversationId: string): boolean {
+    return this.conversations.has(conversationId);
   }
 
   count(): number {
-    return this.sessions.size;
+    return this.conversations.size;
   }
 
-  sendAssistantMessage(sessionId: string, message: string): boolean {
-    const client = this.sessions.get(sessionId);
+  sendAssistantMessage(conversationId: string, message: string): boolean {
+    const client = this.conversations.get(conversationId);
 
     if (!client) {
       return false;
@@ -45,8 +45,8 @@ export class SessionRegistryService {
     return true;
   }
 
-  sendAssistantThinking(sessionId: string, seconds: number): boolean {
-    const client = this.sessions.get(sessionId);
+  sendAssistantThinking(conversationId: string, seconds: number): boolean {
+    const client = this.conversations.get(conversationId);
 
     if (!client) {
       return false;
@@ -56,3 +56,6 @@ export class SessionRegistryService {
     return true;
   }
 }
+
+// Backward-compatible alias for existing imports during migration.
+export { ConversationRegistryService as SessionRegistryService };

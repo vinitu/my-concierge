@@ -14,10 +14,12 @@ import { AssistantWorkerAppModule } from '../src/assistant-worker-app/assistant-
 import { RUN_EVENT_PUBLISHER } from '../src/assistant-worker-app/run-events/run-event-publisher';
 import { AssistantLangchainRuntimeService } from '../src/assistant-worker-app/worker/assistant-langchain-runtime.service';
 import { AssistantLlmProviderStatusService } from '../src/assistant-worker-app/worker/assistant-llm-provider-status.service';
+import { OllamaProviderStatusService } from '../src/assistant-worker-app/worker/ollama-provider-status.service';
 
 describe('assistant-worker (e2e)', () => {
   let app: NestExpressApplication;
   let completedEvents: Array<Record<string, unknown>> = [];
+  let failedEvents: Array<Record<string, unknown>> = [];
   let thinkingEvents: Array<Record<string, unknown>> = [];
   let datadir: string;
   const langchainRuntime = {
@@ -31,6 +33,9 @@ describe('assistant-worker (e2e)', () => {
   const providerStatus = {
     getStatus: jest.fn(),
   };
+  const ollamaProviderStatus = {
+    listAvailableModels: jest.fn(),
+  };
   let queueDir: string;
   const runEventPublisher = {
     driverName: jest.fn().mockReturnValue('memory'),
@@ -39,6 +44,8 @@ describe('assistant-worker (e2e)', () => {
         thinkingEvents.push(event as Record<string, unknown>);
       } else if (event.eventType === 'run.completed') {
         completedEvents.push(event as Record<string, unknown>);
+      } else if (event.eventType === 'run.failed') {
+        failedEvents.push(event as Record<string, unknown>);
       }
 
       return event;
@@ -58,6 +65,8 @@ describe('assistant-worker (e2e)', () => {
       .useValue(runEventPublisher)
       .overrideProvider(AssistantLlmProviderStatusService)
       .useValue(providerStatus)
+      .overrideProvider(OllamaProviderStatusService)
+      .useValue(ollamaProviderStatus)
       .overrideProvider(ConfigService)
       .useValue(
         new ConfigService({
@@ -80,6 +89,7 @@ describe('assistant-worker (e2e)', () => {
 
   beforeEach(() => {
     completedEvents = [];
+    failedEvents = [];
     thinkingEvents = [];
     jest.clearAllMocks();
     providerStatus.getStatus.mockResolvedValue({
@@ -90,6 +100,10 @@ describe('assistant-worker (e2e)', () => {
       reachable: true,
       status: 'ready',
     });
+    ollamaProviderStatus.listAvailableModels.mockResolvedValue([
+      'llama3.2:3b',
+      'qwen2.5:7b',
+    ]);
   });
 
   it('returns the service root endpoint', async () => {
@@ -98,15 +112,25 @@ describe('assistant-worker (e2e)', () => {
     expect(response.status).toBe(200);
     expect(response.text).toContain('assistant-worker');
     expect(response.text).toContain('runtime/assistant-worker/config/worker.json');
+    expect(response.text).toContain('Integrations');
+    expect(response.text).toContain('>Brave<');
     expect(response.text).toContain('<option value="deepseek">deepseek</option>');
     expect(response.text).toContain('<option value="xai" selected>');
     expect(response.text).toContain('<option value="ollama">ollama</option>');
     expect(response.text).toContain('value="3"');
     expect(response.text).toContain('value="2"');
     expect(response.text).toContain('name="run_timeout_seconds"');
+    expect(response.text).toContain('name="enabled_tools"');
+    expect(response.text).toContain('value="web_search" checked');
+    expect(response.text).toContain('value="memory_search_federated" checked');
+    expect(response.text).toContain('name="brave_api_key"');
+    expect(response.text).toContain('name="brave_base_url"');
+    expect(response.text).toContain('name="brave_timeout_ms"');
     expect(response.text).toContain('name="xai_api_key"');
     expect(response.text).toContain('name="deepseek_api_key"');
     expect(response.text).toContain('name="ollama_base_url"');
+    expect(response.text).toContain('Available local models');
+    expect(response.text).toContain('llama3.2:3b, qwen2.5:7b');
     expect(response.text).toContain('Credential: <span id="provider-credential">configured</span>');
     expect(response.text).toContain('Reachability: <span id="provider-reachable">working</span>');
   });
@@ -116,9 +140,31 @@ describe('assistant-worker (e2e)', () => {
 
     expect(getResponse.status).toBe(200);
     expect(getResponse.body).toEqual({
+      brave_api_key: '',
+      brave_base_url: 'https://api.search.brave.com',
+      brave_timeout_ms: 30000,
       deepseek_api_key: '',
       deepseek_base_url: 'https://api.deepseek.com',
       deepseek_timeout_ms: 360000,
+      enabled_tools: [
+        'time_current',
+        'web_search',
+        'memory_search_federated',
+        'memory_search_preference',
+        'memory_search_fact',
+        'memory_search_routine',
+        'memory_search_project',
+        'memory_search_episode',
+        'memory_search_rule',
+        'memory_write_preference',
+        'memory_write_fact',
+        'memory_write_routine',
+        'memory_write_project',
+        'memory_write_episode',
+        'memory_write_rule',
+        'conversation_search',
+        'skill_execute',
+      ],
       model: 'grok-4',
       memory_window: 3,
       ollama_base_url: 'http://host.docker.internal:11434',
@@ -132,9 +178,13 @@ describe('assistant-worker (e2e)', () => {
     });
 
     const putResponse = await request(app.getHttpServer()).put('/config').send({
+      brave_api_key: 'brave-key',
+      brave_base_url: 'https://brave.example.test',
+      brave_timeout_ms: 20000,
       deepseek_api_key: 'deepseek-key',
       deepseek_base_url: 'https://deepseek.example.test',
       deepseek_timeout_ms: 240000,
+      enabled_tools: ['time_current', 'memory_search_federated'],
       model: 'deepseek-chat',
       memory_window: 5,
       ollama_base_url: 'http://ollama.example.test:11434',
@@ -149,9 +199,13 @@ describe('assistant-worker (e2e)', () => {
 
     expect(putResponse.status).toBe(200);
     expect(putResponse.body).toEqual({
+      brave_api_key: 'brave-key',
+      brave_base_url: 'https://brave.example.test',
+      brave_timeout_ms: 20000,
       deepseek_api_key: 'deepseek-key',
       deepseek_base_url: 'https://deepseek.example.test',
       deepseek_timeout_ms: 240000,
+      enabled_tools: ['time_current', 'memory_search_federated'],
       model: 'deepseek-chat',
       memory_window: 5,
       ollama_base_url: 'http://ollama.example.test:11434',
@@ -165,6 +219,12 @@ describe('assistant-worker (e2e)', () => {
     });
 
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"brave_api_key": "brave-key"',
+    );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"brave_base_url": "https://brave.example.test"',
+    );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
       '"memory_window": 5',
     );
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
@@ -177,6 +237,9 @@ describe('assistant-worker (e2e)', () => {
       '"thinking_interval_seconds": 4',
     );
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"enabled_tools": [',
+    );
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
       '"xai_api_key": "xai-key"',
     );
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
@@ -184,6 +247,34 @@ describe('assistant-worker (e2e)', () => {
     );
     await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
       '"run_timeout_seconds": 25',
+    );
+  });
+
+  it('persists an explicit empty tool selection instead of restoring all tools', async () => {
+    const putResponse = await request(app.getHttpServer()).put('/config').send({
+      brave_api_key: '',
+      brave_base_url: 'https://api.search.brave.com',
+      brave_timeout_ms: 30000,
+      deepseek_api_key: '',
+      deepseek_base_url: 'https://api.deepseek.com',
+      deepseek_timeout_ms: 360000,
+      enabled_tools: [],
+      model: 'grok-4',
+      memory_window: 3,
+      ollama_base_url: 'http://host.docker.internal:11434',
+      ollama_timeout_ms: 360000,
+      provider: 'xai',
+      run_timeout_seconds: 30,
+      thinking_interval_seconds: 2,
+      xai_api_key: '',
+      xai_base_url: 'https://api.x.ai/v1',
+      xai_timeout_ms: 360000,
+    });
+
+    expect(putResponse.status).toBe(200);
+    expect(putResponse.body.enabled_tools).toEqual([]);
+    await expect(readFile(join(datadir, 'config', 'worker.json'), 'utf8')).resolves.toContain(
+      '"enabled_tools": []',
     );
   });
 
@@ -388,6 +479,55 @@ describe('assistant-worker (e2e)', () => {
     expect(completedEvents).toHaveLength(1);
     expect(thinkingEvents.length).toBeGreaterThanOrEqual(2);
     expect(thinkingEvents[0]?.payload).toEqual({ seconds: 1 });
+  });
+
+  it('publishes a failed run event and removes the queue file when the runtime fails', async () => {
+    langchainRuntime.run.mockRejectedValueOnce(new Error('xAI returned 401 for chat completion'));
+
+    await writeFile(
+      join(queueDir, 'failed.json'),
+      JSON.stringify({
+        accepted_at: new Date().toISOString(),
+        callback: {
+          base_url: 'http://gateway-web:3000',
+        },
+        chat: 'direct',
+        conversation_id: 'alex',
+        contact: 'alex',
+        direction: 'api',
+        message: 'broken job',
+        request_id: 'req-failed',
+      }),
+      'utf8',
+    );
+
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      if (failedEvents.length > 0) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+
+    expect(failedEvents).toHaveLength(1);
+    expect(completedEvents).toHaveLength(0);
+    expect(failedEvents[0]?.payload).toEqual({
+      code: 'RUN_FAILED',
+      message: 'assistant-worker could not authenticate with xAI. Check the AI settings in the assistant-worker web panel.',
+    });
+
+    let files = await readdir(queueDir);
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (files.length === 0) {
+        break;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      files = await readdir(queueDir);
+    }
+
+    expect(files).toEqual(['failed.json.failed']);
   });
 
   it('returns worker OpenAPI schema', async () => {

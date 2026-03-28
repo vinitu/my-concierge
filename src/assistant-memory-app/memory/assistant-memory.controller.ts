@@ -10,6 +10,12 @@ import {
 } from '@nestjs/common';
 import type {
   AssistantProfile,
+  ConversationAppendRequest,
+  ConversationReadRequest,
+  ConversationSearchRequest,
+  ConversationSearchResponse,
+  ConversationState,
+  ConversationThreadListResponse,
   EpisodeWriteCandidate,
   FactWriteCandidate,
   FederatedMemorySearchRequest,
@@ -217,6 +223,31 @@ export class AssistantMemoryController {
   @HttpCode(200)
   reindexMemories(): Promise<MemoryReindexResponse> {
     return this.assistantMemoryService.reindex();
+  }
+
+  @Get('conversations')
+  listConversations(): Promise<ConversationThreadListResponse> {
+    return this.assistantMemoryService.listConversations();
+  }
+
+  @Post('conversations/read')
+  @HttpCode(200)
+  readConversation(@Body() body: ConversationReadRequest): Promise<ConversationState> {
+    return this.assistantMemoryService.readConversation(body);
+  }
+
+  @Post('conversations/append')
+  @HttpCode(200)
+  appendConversation(@Body() body: ConversationAppendRequest): Promise<ConversationState> {
+    return this.assistantMemoryService.appendConversation(body);
+  }
+
+  @Post('conversations/search')
+  @HttpCode(200)
+  searchConversation(
+    @Body() body: ConversationSearchRequest,
+  ): Promise<ConversationSearchResponse> {
+    return this.assistantMemoryService.searchConversation(body);
   }
 
   static typePath(kind: MemoryKind): string {

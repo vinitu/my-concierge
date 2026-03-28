@@ -6,8 +6,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { MetricsService } from '../observability/metrics.service';
-import { GatewayWebRuntimeService } from './gateway-web-runtime.service';
-import { SessionRegistryService } from './session-registry.service';
+import { ConversationRegistryService } from './session-registry.service';
 
 interface CallbackBody {
   message: string;
@@ -20,8 +19,7 @@ interface ThinkingBody {
 @Controller()
 export class CallbackController {
   constructor(
-    private readonly gatewayWebRuntimeService: GatewayWebRuntimeService,
-    private readonly sessionRegistryService: SessionRegistryService,
+    private readonly conversationRegistryService: ConversationRegistryService,
     private readonly metricsService: MetricsService,
   ) {}
 
@@ -45,7 +43,7 @@ export class CallbackController {
       typeof body.seconds === 'number' && Number.isFinite(body.seconds)
         ? Math.max(1, Math.floor(body.seconds))
         : 1;
-    const delivered = this.sessionRegistryService.sendAssistantThinking(
+    const delivered = this.conversationRegistryService.sendAssistantThinking(
       conversationId,
       seconds,
     );
@@ -54,7 +52,7 @@ export class CallbackController {
 
     return {
       delivered,
-      response: delivered ? 'Thinking callback delivered' : 'WebSocket session not found',
+      response: delivered ? 'Thinking callback delivered' : 'WebSocket conversation not found',
     };
   }
 
@@ -62,22 +60,15 @@ export class CallbackController {
     conversationId: string,
     message: string,
   ): Promise<{ delivered: boolean; response: string }> {
-    if (message.length > 0) {
-      await this.gatewayWebRuntimeService.appendAssistantMessage(
-        conversationId,
-        message,
-      );
-    }
-
     const delivered =
       message.length > 0 &&
-      this.sessionRegistryService.sendAssistantMessage(conversationId, message);
+      this.conversationRegistryService.sendAssistantMessage(conversationId, message);
 
     this.metricsService.recordCallback(delivered);
 
     return {
       delivered,
-      response: delivered ? 'Callback delivered' : 'WebSocket session not found',
+      response: delivered ? 'Callback delivered' : 'WebSocket conversation not found',
     };
   }
 }

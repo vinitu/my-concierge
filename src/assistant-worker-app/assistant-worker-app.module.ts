@@ -18,6 +18,7 @@ import { AssistantWorkerConversationService } from './worker/assistant-worker-co
 import { AssistantLangchainRuntimeService } from './worker/assistant-langchain-runtime.service';
 import { AssistantMemoryClientService } from './worker/assistant-memory-client.service';
 import { AssistantToolDispatcherService } from './worker/assistant-tool-dispatcher.service';
+import { BraveSearchService } from './worker/brave-search.service';
 import { AssistantLlmProviderService } from './worker/assistant-llm-provider.service';
 import { AssistantLlmProviderStatusService } from './worker/assistant-llm-provider-status.service';
 import { AssistantWorkerPromptService } from './worker/assistant-worker-prompt.service';
@@ -51,6 +52,7 @@ import {
     AssistantWorkerMetricsService,
     HttpRequestMetricsInterceptor,
     AssistantMemoryClientService,
+    BraveSearchService,
     AssistantLangchainRuntimeService,
     AssistantToolDispatcherService,
     MysqlService,

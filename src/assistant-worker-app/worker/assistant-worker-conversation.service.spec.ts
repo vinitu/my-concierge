@@ -7,7 +7,6 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MysqlService } from '../../persistence/mysql.service';
 import { AssistantWorkerConversationService } from './assistant-worker-conversation.service';
 
 describe('AssistantWorkerConversationService', () => {
@@ -21,7 +20,6 @@ describe('AssistantWorkerConversationService', () => {
         ASSISTANT_DATADIR: datadir,
         ASSISTANT_CONVERSATION_STORE_DRIVER: 'file',
       }),
-      { getPool: jest.fn() } as unknown as MysqlService,
     );
 
     await service.appendExchange(
@@ -79,7 +77,6 @@ describe('AssistantWorkerConversationService', () => {
         ASSISTANT_DATADIR: datadir,
         ASSISTANT_CONVERSATION_STORE_DRIVER: 'file',
       }),
-      { getPool: jest.fn() } as unknown as MysqlService,
     );
 
     const result = await service.appendExchange(
@@ -146,7 +143,6 @@ describe('AssistantWorkerConversationService', () => {
         ASSISTANT_DATADIR: datadir,
         ASSISTANT_CONVERSATION_STORE_DRIVER: 'file',
       }),
-      { getPool: jest.fn() } as unknown as MysqlService,
     );
 
     const result = await service.appendExchange(

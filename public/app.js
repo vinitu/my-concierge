@@ -1,15 +1,14 @@
 const bootstrap = window.__MYCONCIERGE_BOOTSTRAP__ ?? {
+  conversationId: 'unknown',
   history: [],
-  sessionId: 'unknown',
+  userId: 'unknown',
 };
-const sessionId = bootstrap.sessionId;
-const socket = io({
-  auth: {
-    sessionId,
-  },
-  path: '/ws',
-  transports: ['websocket'],
-});
+const userId = bootstrap.userId;
+let conversationId = bootstrap.conversationId;
+const appBasePath = window.location.pathname.startsWith('/gateway-web')
+  ? '/gateway-web'
+  : '';
+let socket = null;
 
 const messages = document.getElementById('messages');
 const form = document.getElementById('chat-form');
@@ -17,7 +16,8 @@ const input = document.getElementById('message-input');
 const clearConversationButton = document.getElementById('clear-conversation-button');
 const connectionStatus = document.getElementById('connection-status');
 const connectionStatusLabel = document.getElementById('connection-status-label');
-const sessionNameLabel = document.getElementById('session-name-label');
+const userIdLabel = document.getElementById('user-id-label');
+const conversationIdLabel = document.getElementById('conversation-id-label');
 const maxComposerHeight = 180;
 let thinkingTimer = null;
 let thinkingMessage = null;
@@ -105,38 +105,54 @@ function showThinking(seconds) {
   }, Math.max(1, Number(seconds) || 1) * 1000);
 }
 
-socket.on('connect', () => {
-  setConnectionStatus('connected');
-});
-
-socket.on('session.ready', (payload) => {
-  if (payload?.sessionId) {
-    sessionNameLabel.textContent = payload.sessionId;
+function connectSocket() {
+  if (socket) {
+    socket.removeAllListeners();
+    socket.close();
   }
-});
 
-socket.on('connect_error', () => {
-  setConnectionStatus('disconnected');
-  appendMessage('system', 'WebSocket connection failed');
-});
+  socket = io({
+    auth: {
+      conversationId,
+    },
+    path: `${appBasePath}/ws`,
+    transports: ['websocket'],
+  });
 
-socket.on('disconnect', () => {
-  setConnectionStatus('disconnected');
-});
+  socket.on('connect', () => {
+    setConnectionStatus('connected');
+  });
 
-socket.on('assistant.message', (payload) => {
-  clearThinking();
-  appendMessage('assistant', payload.message);
-});
+  socket.on('conversation.ready', (payload) => {
+    if (payload?.conversationId) {
+      conversationId = payload.conversationId;
+      conversationIdLabel.textContent = conversationId;
+    }
+  });
 
-socket.on('assistant.thinking', (payload) => {
-  showThinking(payload?.seconds);
-});
+  socket.on('connect_error', () => {
+    setConnectionStatus('disconnected');
+    appendMessage('system', 'WebSocket connection failed');
+  });
 
-socket.on('assistant.error', (payload) => {
-  clearThinking();
-  appendMessage('system', payload.message);
-});
+  socket.on('disconnect', () => {
+    setConnectionStatus('disconnected');
+  });
+
+  socket.on('assistant.message', (payload) => {
+    clearThinking();
+    appendMessage('assistant', payload.message);
+  });
+
+  socket.on('assistant.thinking', (payload) => {
+    showThinking(payload?.seconds);
+  });
+
+  socket.on('assistant.error', (payload) => {
+    clearThinking();
+    appendMessage('system', payload.message);
+  });
+}
 
 form.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -157,7 +173,7 @@ clearConversationButton.addEventListener('click', async () => {
   clearConversationButton.disabled = true;
 
   try {
-    const response = await fetch('/conversation', {
+    const response = await fetch(`${appBasePath}/conversation`, {
       method: 'DELETE',
     });
 
@@ -166,6 +182,12 @@ clearConversationButton.addEventListener('click', async () => {
       return;
     }
 
+    const payload = await response.json();
+    if (payload?.conversation_id) {
+      conversationId = payload.conversation_id;
+      conversationIdLabel.textContent = conversationId;
+      connectSocket();
+    }
     clearMessages();
   } catch {
     appendMessage('system', 'Failed to clear conversation');
@@ -186,7 +208,9 @@ input.addEventListener('input', () => {
 });
 
 setConnectionStatus('connecting');
-sessionNameLabel.textContent = sessionId;
+userIdLabel.textContent = userId;
+conversationIdLabel.textContent = conversationId;
+connectSocket();
 for (const entry of bootstrap.history) {
   appendMessage(entry.role, entry.content);
 }

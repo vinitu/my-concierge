@@ -1,0 +1,6 @@
+{
+  "assistant_api_url": "http://assistant-api:3000",
+  "assistant_memory_url": "http://localhost:3002",
+  "callback_base_url": "http://gateway-web:3000",
+  "user_id": "default-user"
+}

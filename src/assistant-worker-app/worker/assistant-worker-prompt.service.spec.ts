@@ -6,6 +6,10 @@ function createService(): AssistantWorkerPromptService {
   return new AssistantWorkerPromptService(new AssistantToolCatalogService());
 }
 
+function fullToolCatalog() {
+  return new AssistantToolCatalogService().listTools();
+}
+
 describe('AssistantWorkerPromptService', () => {
   it('formats SYSTEM.js as a raw array', () => {
     const runtimeContext: AssistantWorkerRuntimeContext = {
@@ -251,38 +255,7 @@ describe('AssistantWorkerPromptService', () => {
       JSON.stringify(
         {
           behavior: ['Stay calm'],
-          available_tools: [
-            {
-              description: 'Return current date, time, and timezone-aware temporal context.',
-              name: 'time_current',
-              use_when: 'Current time or date is required to answer correctly.',
-            },
-            {
-              description:
-                'Search durable memory for relevant profile, fact, preference, project, routine, rule, or episode entries.',
-              name: 'memory_search',
-              use_when:
-                'The answer depends on stable remembered facts or preferences not present in recent messages.',
-            },
-            {
-              description:
-                'Store durable memory candidates after the run passes memory write policy.',
-              name: 'memory_write',
-              use_when: 'New stable memory should be persisted after a run completes.',
-            },
-            {
-              description:
-                'Search recent canonical conversation turns and summaries for the current thread.',
-              name: 'conversation_search',
-              use_when:
-                'Recent thread context must be reloaded beyond the current in-memory window.',
-            },
-            {
-              description: 'Execute a registered assistant skill or integration action.',
-              name: 'skill_execute',
-              use_when: 'The assistant must call a skill or integration to complete the task.',
-            },
-          ],
+          available_tools: fullToolCatalog(),
           conversation_context: 'Current topic is dinner.',
           current_user_message: {
             chat: 'direct',
@@ -335,5 +308,58 @@ describe('AssistantWorkerPromptService', () => {
         2,
       ),
     );
+  });
+
+  it('filters available tools when assistant-worker settings disable some of them', () => {
+    const runtimeContext: AssistantWorkerRuntimeContext = {
+      agents: '[]',
+      datadir: '/runtime',
+      identity: '[]',
+      memory: [],
+      soul: '[]',
+    };
+    const service = createService();
+    const request = JSON.parse(
+      service.buildRequestSection(
+        {
+          conversation: {
+            chat: 'direct',
+            contact: 'alex',
+            context: '',
+            direction: 'api',
+            messages: [],
+            updated_at: null,
+          },
+          message: {
+            accepted_at: new Date().toISOString(),
+            callback: { base_url: 'http://example.test' },
+            chat: 'direct',
+            conversation_id: 'alex',
+            contact: 'alex',
+            direction: 'api',
+            message: 'hi',
+            request_id: 'req-1',
+          },
+          retrieved_memory: [],
+        },
+        runtimeContext,
+        ['time_current', 'memory_search_federated'],
+      ),
+    ) as { available_tools: Array<{ name: string }> };
+
+    expect(request.available_tools).toEqual([
+      {
+        description: 'Return current date, time, and timezone-aware temporal context.',
+        name: 'time_current',
+        use_when: 'Current time or date is required to answer correctly.',
+      },
+      {
+        description:
+          'Search durable memory across all kinds (federated fallback when kind is unknown).',
+        name: 'memory_search_federated',
+        use_when:
+          'Use first when you need memory retrieval but the target kind is not yet clear.',
+      },
+    ]);
   });
 });

@@ -8,15 +8,14 @@ import {
   readFile,
   writeFile,
 } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import type {
-  PoolConnection,
-  RowDataPacket,
-} from 'mysql2/promise';
+  ConversationThreadListResponse,
+  ConversationSearchResponse,
+  ConversationState,
+} from '../../contracts/assistant-memory';
 import type { ExecutionJob } from '../../contracts/assistant-transport';
-import { MysqlService } from '../../persistence/mysql.service';
-import type { AssistantLlmGenerateResult } from './assistant-llm-response-parser';
+import type { AssistantLlmGenerateResult } from './assistant-llm-output-schema';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 
 export interface AssistantConversationMessage {
@@ -40,15 +39,25 @@ export interface AssistantConversationSearchResult {
   summary: string;
 }
 
+export interface AssistantConversationThreadListItem {
+  chat: string;
+  contact: string;
+  direction: string;
+  thread_id: string;
+  updated_at: string | null;
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+}
+
 @Injectable()
 export class AssistantWorkerConversationService {
   private readonly logger = new Logger(AssistantWorkerConversationService.name);
-  private schemaReady = false;
 
   constructor(
     private readonly assistantWorkerConfigService: AssistantWorkerConfigService,
     private readonly configService: ConfigService,
-    private readonly mysqlService: MysqlService,
   ) {}
 
   async read(message: ExecutionJob): Promise<AssistantConversationState> {
@@ -82,44 +91,32 @@ export class AssistantWorkerConversationService {
       throw new Error('conversation_search is not available in file mode');
     }
 
-    await this.assertMysqlSchemaReady();
-    const pool = await this.mysqlService.getPool();
-    const [summaryRows] = await pool.query<
-      Array<RowDataPacket & { summary: string }>
-    >(
-      `
-        SELECT summary
-        FROM conversation_summaries
-        WHERE thread_id = ?
-        LIMIT 1
-      `,
-      [conversationId],
-    );
-    const [messageRows] = await pool.query<
-      Array<RowDataPacket & { created_at: Date | string; message: string; role: 'assistant' | 'user' }>
-    >(
-      `
-        SELECT role, message, created_at
-        FROM conversation_turns
-        WHERE thread_id = ?
-        ORDER BY sequence_no DESC
-        LIMIT ?
-      `,
-      [conversationId, Math.max(1, Math.min(20, Math.floor(limit)))],
-    );
+    const response = await this.fetchMemoryEndpoint('/v1/conversations/search', {
+      conversation_id: conversationId,
+      limit: Math.max(1, Math.min(20, Math.floor(limit))),
+    });
+    const payload = (await response.json()) as ConversationSearchResponse;
 
-    return {
-      messages: messageRows
-        .slice()
-        .reverse()
-        .map((row) => ({
-          content: row.message,
-          created_at: this.toIsoString(row.created_at) ?? new Date().toISOString(),
-          role: row.role,
-        })),
-      summary: summaryRows[0]?.summary ?? '',
-      thread_id: conversationId,
-    };
+    return payload;
+  }
+
+  async listConversations(): Promise<AssistantConversationThreadListItem[]> {
+    if (this.storeDriver() === 'file') {
+      return [];
+    }
+
+    const baseUrl = trimTrailingSlash(
+      this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:3002'),
+    );
+    const response = await fetch(`${baseUrl}/v1/conversations`);
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`assistant-memory returned ${response.status} for /v1/conversations: ${body}`);
+    }
+
+    const payload = (await response.json()) as ConversationThreadListResponse;
+    return payload.threads;
   }
 
   private async readFromFile(message: ExecutionJob): Promise<AssistantConversationState> {
@@ -170,78 +167,19 @@ export class AssistantWorkerConversationService {
   }
 
   private async readFromMysql(message: ExecutionJob): Promise<AssistantConversationState> {
-    await this.assertMysqlSchemaReady();
-    this.logger.log(`Conversation MySQL schema ready conversationId=${message.conversation_id}`);
-    const pool = await this.mysqlService.getPool();
-    const [threads] = await pool.query<
-      Array<
-        RowDataPacket & {
-          chat: string;
-          contact: string;
-          direction: string;
-          updated_at: Date | string | null;
-        }
-      >
-    >(
-      `
-        SELECT chat, contact, direction, updated_at
-        FROM conversation_threads
-        WHERE id = ?
-        LIMIT 1
-      `,
-      [message.conversation_id],
-    );
+    const response = await this.fetchMemoryEndpoint('/v1/conversations/read', {
+      chat: message.chat,
+      contact: message.contact,
+      conversation_id: message.conversation_id,
+      direction: message.direction,
+    });
 
-    if (threads.length === 0) {
-      this.logger.log(`Conversation thread missing conversationId=${message.conversation_id}`);
-      return this.emptyState(message);
-    }
-
-    const [summaries] = await pool.query<
-      Array<RowDataPacket & { summary: string }>
-    >(
-      `
-        SELECT summary
-        FROM conversation_summaries
-        WHERE thread_id = ?
-        LIMIT 1
-      `,
-      [message.conversation_id],
-    );
+    const payload = (await response.json()) as ConversationState;
     const maxMessages = await this.memoryWindow();
-    const [turnRows] = await pool.query<
-      Array<
-        RowDataPacket & {
-          created_at: Date | string;
-          message: string;
-          role: 'assistant' | 'user';
-        }
-      >
-    >(
-      `
-        SELECT role, message, created_at
-        FROM conversation_turns
-        WHERE thread_id = ?
-        ORDER BY sequence_no DESC
-        LIMIT ?
-      `,
-      [message.conversation_id, maxMessages],
-    );
 
     return {
-      chat: threads[0].chat,
-      contact: threads[0].contact,
-      context: summaries[0]?.summary ?? '',
-      direction: threads[0].direction,
-      messages: turnRows
-        .slice()
-        .reverse()
-        .map((row) => ({
-          content: row.message,
-          created_at: this.toIsoString(row.created_at) ?? new Date().toISOString(),
-          role: row.role,
-        })),
-      updated_at: this.toIsoString(threads[0].updated_at),
+      ...payload,
+      messages: payload.messages.slice(-maxMessages),
     };
   }
 
@@ -250,94 +188,26 @@ export class AssistantWorkerConversationService {
     reply: AssistantLlmGenerateResult,
     runId?: string,
   ): Promise<AssistantConversationState> {
-    await this.assertMysqlSchemaReady();
-    const pool = await this.mysqlService.getPool();
-    const connection = await pool.getConnection();
+    const response = await this.fetchMemoryEndpoint('/v1/conversations/append', {
+      chat: message.chat,
+      contact: message.contact,
+      conversation_id: message.conversation_id,
+      direction: message.direction,
+      message: message.message,
+      reply: {
+        context: reply.context,
+        message: reply.message,
+      },
+      run_id: runId,
+    });
 
-    try {
-      await connection.beginTransaction();
-      const now = this.toMysqlDateTime(new Date());
-      const nextContext = reply.context.trim();
-      const currentState = await this.readFromMysql(message);
-      const summary = nextContext || currentState.context;
-      await connection.query(
-        `
-          INSERT INTO conversation_threads (
-            id, direction, chat, contact, status, created_at, updated_at, last_message_at
-          )
-          VALUES (?, ?, ?, ?, 'active', ?, ?, ?)
-          ON DUPLICATE KEY UPDATE
-            direction = VALUES(direction),
-            chat = VALUES(chat),
-            contact = VALUES(contact),
-            updated_at = VALUES(updated_at),
-            last_message_at = VALUES(last_message_at)
-        `,
-        [
-          message.conversation_id,
-          message.direction,
-          message.chat,
-          message.contact,
-          now,
-          now,
-          now,
-        ],
-      );
-      const [sequenceRows] = await connection.query<
-        Array<RowDataPacket & { max_sequence: number | null }>
-      >(
-        `
-          SELECT COALESCE(MAX(sequence_no), 0) AS max_sequence
-          FROM conversation_turns
-          WHERE thread_id = ?
-        `,
-        [message.conversation_id],
-      );
-      const nextSequence = Number(sequenceRows[0]?.max_sequence ?? 0);
-      await connection.query(
-        `
-          INSERT INTO conversation_turns (
-            id, thread_id, run_id, role, message, sequence_no, created_at
-          )
-          VALUES (?, ?, ?, 'user', ?, ?, ?), (?, ?, ?, 'assistant', ?, ?, ?)
-        `,
-        [
-          `turn_${randomUUID()}`,
-          message.conversation_id,
-          runId ?? null,
-          message.message,
-          nextSequence + 1,
-          now,
-          `turn_${randomUUID()}`,
-          message.conversation_id,
-          runId ?? null,
-          reply.message,
-          nextSequence + 2,
-          now,
-        ],
-      );
-      await connection.query(
-        `
-          INSERT INTO conversation_summaries (
-            thread_id, summary, summary_version, updated_at
-          )
-          VALUES (?, ?, 1, ?)
-          ON DUPLICATE KEY UPDATE
-            summary = VALUES(summary),
-            summary_version = summary_version + 1,
-            updated_at = VALUES(updated_at)
-        `,
-        [message.conversation_id, summary, now],
-      );
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
+    const payload = (await response.json()) as ConversationState;
+    const maxMessages = await this.memoryWindow();
 
-    return this.readFromMysql(message);
+    return {
+      ...payload,
+      messages: payload.messages.slice(-maxMessages),
+    };
   }
 
   conversationPath(message: ExecutionJob): string {
@@ -429,56 +299,26 @@ export class AssistantWorkerConversationService {
     return config.memory_window;
   }
 
-  private async assertMysqlSchemaReady(): Promise<void> {
-    if (this.schemaReady) {
-      return;
-    }
+  private async fetchMemoryEndpoint(path: string, body: unknown): Promise<Response> {
+    const baseUrl = trimTrailingSlash(
+      this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:3002'),
+    );
+    const response = await fetch(`${baseUrl}${path}`, {
+      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
 
-    this.logger.log('Checking conversation MySQL schema');
-    const pool = await this.mysqlService.getPool();
-    for (const tableName of [
-      'conversation_threads',
-      'conversation_turns',
-      'conversation_summaries',
-    ]) {
-      this.logger.log(`Checking conversation MySQL table table=${tableName}`);
-      const [rows] = await pool.query<Array<RowDataPacket & { table_name: string }>>(
-        `
-          SELECT TABLE_NAME AS table_name
-          FROM information_schema.tables
-          WHERE table_schema = DATABASE()
-            AND table_name = ?
-          LIMIT 1
-        `,
-        [tableName],
+    if (!response.ok) {
+      const responseBody = await response.text();
+      throw new Error(
+        `assistant-memory returned ${response.status} for ${path}: ${responseBody}`,
       );
-
-      if (rows.length === 0) {
-        this.logger.error(`Missing conversation MySQL table table=${tableName}`);
-        throw new Error(`Missing MySQL schema table: ${tableName}. Run npm run db:migrate first.`);
-      }
-
-      this.logger.log(`Conversation MySQL table ready table=${tableName}`);
     }
 
-    this.schemaReady = true;
-    this.logger.log('Conversation MySQL schema check completed');
+    return response;
   }
 
-  private toIsoString(value: Date | string | null): string | null {
-    if (!value) {
-      return null;
-    }
-
-    if (value instanceof Date) {
-      return value.toISOString();
-    }
-
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-  }
-
-  private toMysqlDateTime(value: Date): string {
-    return value.toISOString().slice(0, 23).replace('T', ' ');
-  }
 }

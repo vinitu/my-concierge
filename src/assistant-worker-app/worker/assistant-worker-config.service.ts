@@ -11,11 +11,19 @@ import {
   defaultModelForProvider,
   STATIC_PROVIDER_MODELS,
 } from './assistant-llm-model-catalog';
+import {
+  type AssistantToolName,
+  SUPPORTED_ASSISTANT_TOOL_NAMES,
+} from './assistant-tool-catalog.service';
 
 export interface AssistantWorkerConfig {
+  brave_api_key: string;
+  brave_base_url: string;
+  brave_timeout_ms: number;
   deepseek_api_key: string;
   deepseek_base_url: string;
   deepseek_timeout_ms: number;
+  enabled_tools: AssistantToolName[];
   model: string;
   memory_window: number;
   ollama_base_url: string;
@@ -43,6 +51,18 @@ export class AssistantWorkerConfigService {
       const provider = this.normalizeProvider(parsed.provider);
 
       return {
+        brave_api_key: this.normalizeSecret(
+          parsed.brave_api_key,
+          this.configService.get<string>('BRAVE_API_KEY', ''),
+        ),
+        brave_base_url: this.normalizeUrl(
+          parsed.brave_base_url,
+          this.configService.get<string>('BRAVE_BASE_URL', 'https://api.search.brave.com'),
+        ),
+        brave_timeout_ms: this.normalizeTimeoutMs(
+          parsed.brave_timeout_ms,
+          this.configService.get<string>('BRAVE_TIMEOUT_MS', '30000'),
+        ),
         deepseek_api_key: this.normalizeSecret(
           parsed.deepseek_api_key,
           this.configService.get<string>('DEEPSEEK_API_KEY', ''),
@@ -55,6 +75,7 @@ export class AssistantWorkerConfigService {
           parsed.deepseek_timeout_ms,
           this.configService.get<string>('DEEPSEEK_TIMEOUT_MS', '360000'),
         ),
+        enabled_tools: this.normalizeEnabledTools(parsed.enabled_tools),
         model: this.normalizeModel(
           provider,
           parsed.model,
@@ -103,6 +124,18 @@ export class AssistantWorkerConfigService {
     const provider = this.normalizeProvider(config.provider);
     const defaults = this.defaultConfig();
     const normalizedConfig: AssistantWorkerConfig = {
+      brave_api_key: this.normalizeSecret(
+        config.brave_api_key,
+        defaults.brave_api_key,
+      ),
+      brave_base_url: this.normalizeUrl(
+        config.brave_base_url,
+        defaults.brave_base_url,
+      ),
+      brave_timeout_ms: this.normalizeTimeoutMs(
+        config.brave_timeout_ms,
+        defaults.brave_timeout_ms,
+      ),
       deepseek_api_key: this.normalizeSecret(
         config.deepseek_api_key,
         defaults.deepseek_api_key,
@@ -115,6 +148,7 @@ export class AssistantWorkerConfigService {
         config.deepseek_timeout_ms,
         defaults.deepseek_timeout_ms,
       ),
+      enabled_tools: this.normalizeEnabledTools(config.enabled_tools),
       model: this.normalizeModel(provider, config.model),
       memory_window: this.normalizeMemoryWindow(config.memory_window),
       ollama_base_url: this.normalizeUrl(
@@ -221,6 +255,22 @@ export class AssistantWorkerConfigService {
     return this.defaultConfig().thinking_interval_seconds;
   }
 
+  private normalizeEnabledTools(value: unknown): AssistantToolName[] {
+    if (Array.isArray(value)) {
+      const normalized = value
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim())
+        .filter(
+          (entry): entry is AssistantToolName =>
+            (SUPPORTED_ASSISTANT_TOOL_NAMES as readonly string[]).includes(entry),
+        );
+
+      return [...new Set(normalized)];
+    }
+
+    return [...SUPPORTED_ASSISTANT_TOOL_NAMES];
+  }
+
   private normalizeRunTimeoutSeconds(value: unknown): number {
     return this.normalizeNumber(value, this.defaultConfig().run_timeout_seconds, 5, 600);
   }
@@ -269,6 +319,14 @@ export class AssistantWorkerConfigService {
 
   private defaultConfig(): AssistantWorkerConfig {
     return {
+      brave_api_key: this.configService.get<string>('BRAVE_API_KEY', '').trim(),
+      brave_base_url: this.configService
+        .get<string>('BRAVE_BASE_URL', 'https://api.search.brave.com')
+        .trim(),
+      brave_timeout_ms: this.normalizeTimeoutMs(
+        this.configService.get<string>('BRAVE_TIMEOUT_MS', '30000'),
+        30000,
+      ),
       deepseek_api_key: this.configService.get<string>('DEEPSEEK_API_KEY', '').trim(),
       deepseek_base_url: this.configService
         .get<string>('DEEPSEEK_BASE_URL', 'https://api.deepseek.com')
@@ -277,6 +335,7 @@ export class AssistantWorkerConfigService {
         this.configService.get<string>('DEEPSEEK_TIMEOUT_MS', '360000'),
         360000,
       ),
+      enabled_tools: [...SUPPORTED_ASSISTANT_TOOL_NAMES],
       memory_window: 3,
       model: defaultModelForProvider('xai'),
       ollama_base_url: this.configService

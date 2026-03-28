@@ -1,17 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { AssistantMemoryClientService } from './assistant-memory-client.service';
 import { AssistantWorkerConversationService } from './assistant-worker-conversation.service';
-import type { MemoryWriteCandidate } from '../../contracts/assistant-memory';
+import type {
+  BaseMemoryWriteCandidate,
+  MemoryKind,
+  MemoryWriteCandidate,
+} from '../../contracts/assistant-memory';
 import { AssistantRuntimeError } from './assistant-runtime-error';
+import type { AssistantToolName } from './assistant-tool-catalog.service';
+import { BraveSearchService } from './brave-search.service';
 
 export interface AssistantToolCall {
   arguments: Record<string, unknown>;
-  name:
-    | 'conversation_search'
-    | 'memory_search'
-    | 'memory_write'
-    | 'skill_execute'
-    | 'time_current';
+  name: AssistantToolName;
 }
 
 export interface AssistantToolObservation {
@@ -24,14 +25,23 @@ export interface AssistantToolObservation {
 export class AssistantToolDispatcherService {
   constructor(
     private readonly assistantMemoryClientService: AssistantMemoryClientService,
+    private readonly braveSearchService: BraveSearchService,
     private readonly conversationService: AssistantWorkerConversationService,
   ) {}
 
   async execute(
     toolCall: AssistantToolCall,
     conversationId: string,
+    enabledTools?: AssistantToolName[],
   ): Promise<AssistantToolObservation> {
     try {
+      if (enabledTools && !enabledTools.includes(toolCall.name)) {
+        throw new AssistantRuntimeError(
+          'TOOL_ERROR',
+          `Tool is disabled in assistant-worker settings: ${toolCall.name}`,
+        );
+      }
+
       switch (toolCall.name) {
         case 'time_current':
           return {
@@ -42,21 +52,68 @@ export class AssistantToolDispatcherService {
             },
             tool_name: toolCall.name,
           };
-        case 'memory_search': {
+        case 'web_search': {
           const query =
             typeof toolCall.arguments.query === 'string' ? toolCall.arguments.query : '';
-          const result = await this.assistantMemoryClientService.search(query, conversationId);
+          const count =
+            typeof toolCall.arguments.count === 'number'
+              ? toolCall.arguments.count
+              : undefined;
+          const result = await this.braveSearchService.search(query, count);
           return {
             ok: true,
             result,
             tool_name: toolCall.name,
           };
         }
-        case 'memory_write': {
-          const entries = Array.isArray(toolCall.arguments.entries)
-            ? (toolCall.arguments.entries as MemoryWriteCandidate[])
-            : [];
-          const result = await this.assistantMemoryClientService.write(entries);
+        case 'memory_search_federated': {
+          const query =
+            typeof toolCall.arguments.query === 'string' ? toolCall.arguments.query : '';
+          const result = await this.assistantMemoryClientService.searchFederated(
+            query,
+            conversationId,
+          );
+          return {
+            ok: true,
+            result,
+            tool_name: toolCall.name,
+          };
+        }
+        case 'memory_search_preference':
+        case 'memory_search_fact':
+        case 'memory_search_routine':
+        case 'memory_search_project':
+        case 'memory_search_episode':
+        case 'memory_search_rule': {
+          const query =
+            typeof toolCall.arguments.query === 'string' ? toolCall.arguments.query : '';
+          const memoryKind = this.kindFromMemoryTool(toolCall.name);
+          const result = await this.assistantMemoryClientService.searchByKind(
+            memoryKind,
+            query,
+            conversationId,
+          );
+          return {
+            ok: true,
+            result,
+            tool_name: toolCall.name,
+          };
+        }
+        case 'memory_write_preference':
+        case 'memory_write_fact':
+        case 'memory_write_routine':
+        case 'memory_write_project':
+        case 'memory_write_episode':
+        case 'memory_write_rule': {
+          const memoryKind = this.kindFromMemoryTool(toolCall.name);
+          const entries = this.normalizeTypedWriteEntries(
+            memoryKind,
+            toolCall.arguments.entries,
+          );
+          const result = await this.assistantMemoryClientService.writeByKind(
+            memoryKind,
+            entries,
+          );
           return {
             ok: true,
             result: result ?? { created: 0, entries: [], updated: 0 },
@@ -98,5 +155,80 @@ export class AssistantToolDispatcherService {
         error,
       );
     }
+  }
+
+  private kindFromMemoryTool(toolName: AssistantToolName): MemoryKind {
+    switch (toolName) {
+      case 'memory_search_preference':
+      case 'memory_write_preference':
+        return 'preference';
+      case 'memory_search_fact':
+      case 'memory_write_fact':
+        return 'fact';
+      case 'memory_search_routine':
+      case 'memory_write_routine':
+        return 'routine';
+      case 'memory_search_project':
+      case 'memory_write_project':
+        return 'project';
+      case 'memory_search_episode':
+      case 'memory_write_episode':
+        return 'episode';
+      case 'memory_search_rule':
+      case 'memory_write_rule':
+        return 'rule';
+      default:
+        throw new AssistantRuntimeError(
+          'TOOL_ERROR',
+          `Tool does not map to typed memory kind: ${toolName}`,
+        );
+    }
+  }
+
+  private normalizeTypedWriteEntries(
+    kind: MemoryKind,
+    value: unknown,
+  ): BaseMemoryWriteCandidate[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .filter((entry): entry is BaseMemoryWriteCandidate | MemoryWriteCandidate =>
+        typeof entry === 'object' && entry !== null,
+      )
+      .map((entry) => {
+        if ('kind' in entry) {
+          const { kind: ignored, ...rest } = entry;
+          return rest;
+        }
+        return entry as BaseMemoryWriteCandidate;
+      })
+      .filter((entry) => typeof entry.content === 'string' && entry.content.trim().length > 0)
+      .map((entry) => ({
+        confidence:
+          typeof entry.confidence === 'number' && Number.isFinite(entry.confidence)
+            ? entry.confidence
+            : 0.6,
+        content: entry.content.trim(),
+        conversationThreadId:
+          typeof entry.conversationThreadId === 'string' && entry.conversationThreadId.trim()
+            ? entry.conversationThreadId.trim()
+            : undefined,
+        scope:
+          typeof entry.scope === 'string' && entry.scope.trim()
+            ? entry.scope.trim()
+            : 'conversation',
+        source:
+          typeof entry.source === 'string' && entry.source.trim()
+            ? entry.source.trim()
+            : `assistant-worker:${kind}`,
+        tags: Array.isArray(entry.tags)
+          ? entry.tags
+              .filter((tag): tag is string => typeof tag === 'string')
+              .map((tag) => tag.trim())
+              .filter((tag) => tag.length > 0)
+          : [],
+      }));
   }
 }

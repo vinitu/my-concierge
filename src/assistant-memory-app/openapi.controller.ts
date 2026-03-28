@@ -118,6 +118,30 @@ export class AssistantMemoryOpenApiController {
             summary: 'Rebuild memory retrieval metadata',
           },
         },
+        '/v1/conversations': {
+          get: {
+            responses: { '200': { description: 'Conversation thread list' } },
+            summary: 'List canonical conversation threads',
+          },
+        },
+        '/v1/conversations/read': {
+          post: {
+            responses: { '200': { description: 'Conversation state' } },
+            summary: 'Read one canonical conversation state',
+          },
+        },
+        '/v1/conversations/append': {
+          post: {
+            responses: { '200': { description: 'Updated conversation state' } },
+            summary: 'Append one user/assistant exchange to canonical conversation state',
+          },
+        },
+        '/v1/conversations/search': {
+          post: {
+            responses: { '200': { description: 'Conversation search result' } },
+            summary: 'Search one conversation thread window and summary',
+          },
+        },
         ...typedPaths,
       },
     };

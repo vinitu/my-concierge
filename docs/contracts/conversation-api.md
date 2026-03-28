@@ -107,7 +107,7 @@ Examples:
 
 For the browser flow:
 
-- `contact` is the stable browser `session_id`
-- `gateway-web` stores `session_id` in the `myconcierge_session_id` cookie
-- `gateway-web` uses that `session_id` both for the websocket session mapping and for `conversation_id`
+- `contact` is the configured singleton browser `user_id`
+- `gateway-web` stores `conversation_id` in the `myconcierge_conversation_id` cookie
+- `gateway-web` uses that cookie-backed `conversation_id` for websocket session mapping and for `conversation_id`
 - `gateway-web` sends callback routing metadata with its own base URL

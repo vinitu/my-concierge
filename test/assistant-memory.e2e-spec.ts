@@ -35,7 +35,9 @@ describe('assistant-memory (e2e)', () => {
   it('returns service root and status', async () => {
     const rootResponse = await request(app.getHttpServer()).get('/');
     expect(rootResponse.status).toBe(200);
-    expect(rootResponse.body.service).toBe('assistant-memory');
+    expect(rootResponse.text).toContain('assistant-memory');
+    expect(rootResponse.text).toContain('Durable memory service');
+    expect(rootResponse.text).toContain('/v1/profile');
 
     const statusResponse = await request(app.getHttpServer()).get('/status');
     expect(statusResponse.status).toBe(200);

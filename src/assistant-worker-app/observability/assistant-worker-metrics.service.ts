@@ -52,6 +52,12 @@ export class AssistantWorkerMetricsService {
     labelNames: ['service', 'status', 'tool_name'] as const,
     registers: [this.registry],
   });
+  private readonly contextExpansionCounter = new Counter({
+    name: 'conversation_context_expansions_total',
+    help: 'Total number of adaptive conversation context expansion attempts',
+    labelNames: ['reason', 'service', 'status'] as const,
+    registers: [this.registry],
+  });
 
   recordProcessedJob(): void {
     this.processedJobsCounter.inc({ service: 'assistant-worker' });
@@ -93,6 +99,14 @@ export class AssistantWorkerMetricsService {
       service: 'assistant-worker',
       status: success ? 'success' : 'error',
       tool_name: toolName,
+    });
+  }
+
+  recordContextExpansion(reason: string, success: boolean): void {
+    this.contextExpansionCounter.inc({
+      reason,
+      service: 'assistant-worker',
+      status: success ? 'success' : 'error',
     });
   }
 

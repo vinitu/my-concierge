@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { GatewayWebConfigService } from '../chat/gateway-web-config.service';
 import { MetricsService } from '../observability/metrics.service';
 
 interface ConversationRequest {
   conversationId: string;
   message: string;
+  userId: string;
 }
 
 function trimTrailingSlash(value: string): string {
@@ -14,19 +15,15 @@ function trimTrailingSlash(value: string): string {
 @Injectable()
 export class AssistantApiClientService {
   constructor(
-    private readonly configService: ConfigService,
+    private readonly gatewayWebConfigService: GatewayWebConfigService,
     private readonly metricsService: MetricsService,
   ) {}
 
   async sendConversation(request: ConversationRequest): Promise<void> {
-    const assistantApiUrl = trimTrailingSlash(
-      this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:3000'),
-    );
-    const localPort = this.configService.get<string>('PORT', '3000');
-    const callbackBaseUrl = trimTrailingSlash(
-      this.configService.get<string>('CALLBACK_BASE_URL', `http://localhost:${localPort}`),
-    );
-    const url = `${assistantApiUrl}/conversation/api/direct/${encodeURIComponent(request.conversationId)}`;
+    const config = await this.gatewayWebConfigService.read();
+    const assistantApiUrl = trimTrailingSlash(config.assistant_api_url);
+    const callbackBaseUrl = trimTrailingSlash(config.callback_base_url);
+    const url = `${assistantApiUrl}/conversation/api/direct/${encodeURIComponent(request.userId)}`;
 
     const response = await fetch(url, {
       method: 'POST',

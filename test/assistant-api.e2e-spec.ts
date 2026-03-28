@@ -38,12 +38,11 @@ describe('assistant-api (e2e)', () => {
     const response = await request(app.getHttpServer()).get('/');
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      docs: '/openapi.json',
-      metrics: '/metrics',
-      service: 'assistant-api',
-      status: '/status',
-    });
+    expect(response.text).toContain('assistant-api');
+    expect(response.text).toContain('HTTP intake service for assistant conversations');
+    expect(response.text).toContain('/openapi.json');
+    expect(response.text).toContain('/metrics');
+    expect(response.text).toContain('/status');
   });
 
   it('accepts a conversation and writes it into the file queue', async () => {

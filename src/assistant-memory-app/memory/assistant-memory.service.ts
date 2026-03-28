@@ -21,6 +21,12 @@ import type {
 import type {
   AssistantProfile,
   BaseMemoryWriteCandidate,
+  ConversationAppendRequest,
+  ConversationReadRequest,
+  ConversationSearchRequest,
+  ConversationSearchResponse,
+  ConversationState,
+  ConversationThreadListResponse,
   FederatedMemorySearchRequest,
   MemoryArchiveResponse,
   MemoryCompactResponse,
@@ -64,6 +70,7 @@ const EMPTY_PROFILE: AssistantProfile = {
 @Injectable()
 export class AssistantMemoryService {
   private schemaReady = false;
+  private conversationSchemaReady = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -169,6 +176,215 @@ export class AssistantMemoryService {
     }
 
     return this.reindexInMysql();
+  }
+
+  async listConversations(): Promise<ConversationThreadListResponse> {
+    if (this.storeDriver() === 'file') {
+      return {
+        count: 0,
+        threads: [],
+      };
+    }
+
+    await this.assertConversationMysqlSchemaReady();
+    const pool = await this.mysqlService.getPool();
+    const [rows] = await pool.query<
+      Array<
+        RowDataPacket & {
+          chat: string;
+          contact: string;
+          direction: string;
+          thread_id: string;
+          updated_at: Date | string | null;
+        }
+      >
+    >(
+      `
+        SELECT id AS thread_id, direction, chat, contact, updated_at
+        FROM conversation_threads
+        ORDER BY COALESCE(updated_at, created_at) DESC
+        LIMIT 100
+      `,
+    );
+
+    return {
+      count: rows.length,
+      threads: rows.map((row) => ({
+        chat: row.chat,
+        contact: row.contact,
+        direction: row.direction,
+        thread_id: row.thread_id,
+        updated_at: this.toIsoString(row.updated_at),
+      })),
+    };
+  }
+
+  async readConversation(body: ConversationReadRequest): Promise<ConversationState> {
+    const conversationMessage = {
+      chat: body.chat,
+      contact: body.contact,
+      conversation_id: body.conversation_id,
+      direction: body.direction,
+      message: '',
+    };
+
+    if (this.storeDriver() === 'file') {
+      return this.emptyConversationState(conversationMessage);
+    }
+
+    return this.readConversationFromMysql(conversationMessage);
+  }
+
+  async appendConversation(body: ConversationAppendRequest): Promise<ConversationState> {
+    const message = {
+      chat: body.chat,
+      contact: body.contact,
+      conversation_id: body.conversation_id,
+      direction: body.direction,
+      message: body.message,
+    };
+
+    if (this.storeDriver() === 'file') {
+      return this.emptyConversationState(message);
+    }
+
+    await this.assertConversationMysqlSchemaReady();
+    const pool = await this.mysqlService.getPool();
+    const connection = await pool.getConnection();
+
+    try {
+      await connection.beginTransaction();
+      const now = this.toMysqlDateTime(new Date());
+      const currentState = await this.readConversationFromMysql(message, connection);
+      const nextContext = body.reply.context.trim();
+      const summary = nextContext || currentState.context;
+      await connection.query(
+        `
+          INSERT INTO conversation_threads (
+            id, direction, chat, contact, status, created_at, updated_at, last_message_at
+          )
+          VALUES (?, ?, ?, ?, 'active', ?, ?, ?)
+          ON DUPLICATE KEY UPDATE
+            direction = VALUES(direction),
+            chat = VALUES(chat),
+            contact = VALUES(contact),
+            updated_at = VALUES(updated_at),
+            last_message_at = VALUES(last_message_at)
+        `,
+        [
+          message.conversation_id,
+          message.direction,
+          message.chat,
+          message.contact,
+          now,
+          now,
+          now,
+        ],
+      );
+      const [sequenceRows] = await connection.query<
+        Array<RowDataPacket & { max_sequence: number | null }>
+      >(
+        `
+          SELECT COALESCE(MAX(sequence_no), 0) AS max_sequence
+          FROM conversation_turns
+          WHERE thread_id = ?
+        `,
+        [message.conversation_id],
+      );
+      const nextSequence = Number(sequenceRows[0]?.max_sequence ?? 0);
+      await connection.query(
+        `
+          INSERT INTO conversation_turns (
+            id, thread_id, run_id, role, message, sequence_no, created_at
+          )
+          VALUES (?, ?, ?, 'user', ?, ?, ?), (?, ?, ?, 'assistant', ?, ?, ?)
+        `,
+        [
+          `turn_${randomUUID()}`,
+          message.conversation_id,
+          body.run_id ?? null,
+          message.message,
+          nextSequence + 1,
+          now,
+          `turn_${randomUUID()}`,
+          message.conversation_id,
+          body.run_id ?? null,
+          body.reply.message,
+          nextSequence + 2,
+          now,
+        ],
+      );
+      await connection.query(
+        `
+          INSERT INTO conversation_summaries (
+            thread_id, summary, summary_version, updated_at
+          )
+          VALUES (?, ?, 1, ?)
+          ON DUPLICATE KEY UPDATE
+            summary = VALUES(summary),
+            summary_version = summary_version + 1,
+            updated_at = VALUES(updated_at)
+        `,
+        [message.conversation_id, summary, now],
+      );
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+
+    return this.readConversationFromMysql(message);
+  }
+
+  async searchConversation(
+    body: ConversationSearchRequest,
+  ): Promise<ConversationSearchResponse> {
+    if (this.storeDriver() === 'file') {
+      return {
+        messages: [],
+        summary: '',
+        thread_id: body.conversation_id,
+      };
+    }
+
+    await this.assertConversationMysqlSchemaReady();
+    const pool = await this.mysqlService.getPool();
+    const [summaryRows] = await pool.query<Array<RowDataPacket & { summary: string }>>(
+      `
+        SELECT summary
+        FROM conversation_summaries
+        WHERE thread_id = ?
+        LIMIT 1
+      `,
+      [body.conversation_id],
+    );
+    const [messageRows] = await pool.query<
+      Array<RowDataPacket & { created_at: Date | string; message: string; role: 'assistant' | 'user' }>
+    >(
+      `
+        SELECT role, message, created_at
+        FROM conversation_turns
+        WHERE thread_id = ?
+        ORDER BY sequence_no DESC
+        LIMIT ?
+      `,
+      [body.conversation_id, Math.max(1, Math.min(20, Math.floor(body.limit)))],
+    );
+
+    return {
+      messages: messageRows
+        .slice()
+        .reverse()
+        .map((row) => ({
+          content: row.message,
+          created_at: this.toIsoString(row.created_at) ?? new Date().toISOString(),
+          role: row.role,
+        })),
+      summary: summaryRows[0]?.summary ?? '',
+      thread_id: body.conversation_id,
+    };
   }
 
   private async getProfileFromMysql(): Promise<AssistantProfile> {
@@ -1239,6 +1455,101 @@ export class AssistantMemoryService {
     await writeFile(this.storagePath(), `${JSON.stringify(store, null, 2)}\n`, 'utf8');
   }
 
+  private async readConversationFromMysql(
+    message: {
+      chat: string;
+      contact: string;
+      conversation_id: string;
+      direction: string;
+      message: string;
+    },
+    connectionOverride?: MysqlQueryable,
+  ): Promise<ConversationState> {
+    await this.assertConversationMysqlSchemaReady();
+    const connection = connectionOverride ?? (await this.mysqlService.getPool());
+    const [threads] = await connection.query<
+      Array<
+        RowDataPacket & {
+          chat: string;
+          contact: string;
+          direction: string;
+          updated_at: Date | string | null;
+        }
+      >
+    >(
+      `
+        SELECT chat, contact, direction, updated_at
+        FROM conversation_threads
+        WHERE id = ?
+        LIMIT 1
+      `,
+      [message.conversation_id],
+    );
+
+    if (threads.length === 0) {
+      return this.emptyConversationState(message);
+    }
+
+    const [summaries] = await connection.query<Array<RowDataPacket & { summary: string }>>(
+      `
+        SELECT summary
+        FROM conversation_summaries
+        WHERE thread_id = ?
+        LIMIT 1
+      `,
+      [message.conversation_id],
+    );
+    const [turnRows] = await connection.query<
+      Array<
+        RowDataPacket & {
+          created_at: Date | string;
+          message: string;
+          role: 'assistant' | 'user';
+        }
+      >
+    >(
+      `
+        SELECT role, message, created_at
+        FROM conversation_turns
+        WHERE thread_id = ?
+        ORDER BY sequence_no DESC
+        LIMIT 20
+      `,
+      [message.conversation_id],
+    );
+
+    return {
+      chat: threads[0].chat,
+      contact: threads[0].contact,
+      context: summaries[0]?.summary ?? '',
+      direction: threads[0].direction,
+      messages: turnRows
+        .slice()
+        .reverse()
+        .map((row) => ({
+          content: row.message,
+          created_at: this.toIsoString(row.created_at) ?? new Date().toISOString(),
+          role: row.role,
+        })),
+      updated_at: this.toIsoString(threads[0].updated_at),
+    };
+  }
+
+  private emptyConversationState(message: {
+    chat: string;
+    contact: string;
+    direction: string;
+  }): ConversationState {
+    return {
+      chat: message.chat,
+      contact: message.contact,
+      context: '',
+      direction: message.direction,
+      messages: [],
+      updated_at: null,
+    };
+  }
+
   private async assertMysqlSchemaReady(): Promise<void> {
     if (this.schemaReady) {
       return;
@@ -1268,6 +1579,36 @@ export class AssistantMemoryService {
     }
 
     this.schemaReady = true;
+  }
+
+  private async assertConversationMysqlSchemaReady(): Promise<void> {
+    if (this.conversationSchemaReady) {
+      return;
+    }
+
+    const pool = await this.mysqlService.getPool();
+    for (const tableName of [
+      'conversation_threads',
+      'conversation_turns',
+      'conversation_summaries',
+    ]) {
+      const [rows] = await pool.query<Array<RowDataPacket & { table_name: string }>>(
+        `
+          SELECT TABLE_NAME AS table_name
+          FROM information_schema.tables
+          WHERE table_schema = DATABASE()
+            AND table_name = ?
+          LIMIT 1
+        `,
+        [tableName],
+      );
+
+      if (rows.length === 0) {
+        throw new Error(`Missing MySQL schema table: ${tableName}. Run npm run db:migrate first.`);
+      }
+    }
+
+    this.conversationSchemaReady = true;
   }
 
   private parseJsonObject(value: unknown): Record<string, unknown> {

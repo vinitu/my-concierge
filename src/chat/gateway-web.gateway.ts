@@ -9,14 +9,14 @@ import {
 import type { Socket } from 'socket.io';
 import { AssistantApiClientService } from '../assistant-api/assistant-api-client.service';
 import { MetricsService } from '../observability/metrics.service';
-import { GatewayWebRuntimeService } from './gateway-web-runtime.service';
+import { GatewayWebConfigService } from './gateway-web-config.service';
 import {
-  ensureGatewayWebSessionId,
-  GATEWAY_WEB_SESSION_COOKIE,
-  normalizeGatewayWebSessionId,
+  ensureGatewayWebConversationId,
+  GATEWAY_WEB_CONVERSATION_COOKIE,
+  normalizeGatewayWebConversationId,
   parseCookieValue,
 } from './gateway-web-session';
-import { SessionRegistryService } from './session-registry.service';
+import { ConversationRegistryService } from './session-registry.service';
 
 interface ChatMessagePayload {
   message?: string;
@@ -33,25 +33,25 @@ export class GatewayWebGateway
 {
   constructor(
     private readonly assistantApiClientService: AssistantApiClientService,
-    private readonly gatewayWebRuntimeService: GatewayWebRuntimeService,
-    private readonly sessionRegistryService: SessionRegistryService,
+    private readonly gatewayWebConfigService: GatewayWebConfigService,
+    private readonly conversationRegistryService: ConversationRegistryService,
     private readonly metricsService: MetricsService,
   ) {}
 
   handleConnection(client: Socket): void {
-    const sessionId = this.resolveSessionId(client);
+    const conversationId = this.resolveConversationId(client);
 
-    client.data.sessionId = sessionId;
-    this.sessionRegistryService.register(sessionId, client);
-    client.emit('session.ready', { sessionId });
-    this.metricsService.setActiveSessions(this.sessionRegistryService.count());
+    client.data.conversationId = conversationId;
+    this.conversationRegistryService.register(conversationId, client);
+    client.emit('conversation.ready', { conversationId });
+    this.metricsService.setActiveSessions(this.conversationRegistryService.count());
   }
 
   handleDisconnect(client: Socket): void {
-    const sessionId = this.resolveSessionId(client);
+    const conversationId = this.resolveConversationId(client);
 
-    this.sessionRegistryService.unregister(sessionId, client);
-    this.metricsService.setActiveSessions(this.sessionRegistryService.count());
+    this.conversationRegistryService.unregister(conversationId, client);
+    this.metricsService.setActiveSessions(this.conversationRegistryService.count());
   }
 
   @SubscribeMessage('chat.message')
@@ -71,12 +71,13 @@ export class GatewayWebGateway
     this.metricsService.recordIncomingWebSocketMessage();
 
     try {
-      const sessionId = this.resolveSessionId(client);
+      const conversationId = this.resolveConversationId(client);
+      const config = await this.gatewayWebConfigService.read();
 
-      await this.gatewayWebRuntimeService.appendUserMessage(sessionId, message);
       await this.assistantApiClientService.sendConversation({
-        conversationId: sessionId,
+        conversationId,
         message,
+        userId: config.user_id,
       });
     } catch {
       client.emit('assistant.error', {
@@ -85,18 +86,22 @@ export class GatewayWebGateway
     }
   }
 
-  private resolveSessionId(client: Socket): string {
-    const existing = normalizeGatewayWebSessionId(client.data.sessionId);
+  private resolveConversationId(client: Socket): string {
+    const existing = normalizeGatewayWebConversationId(client.data.conversationId);
 
     if (existing) {
       return existing;
     }
 
-    const authSessionId = normalizeGatewayWebSessionId(client.handshake.auth?.sessionId);
-    const cookieSessionId = normalizeGatewayWebSessionId(
-      parseCookieValue(client.handshake.headers.cookie, GATEWAY_WEB_SESSION_COOKIE),
+    const authConversationId = normalizeGatewayWebConversationId(
+      client.handshake.auth?.conversationId,
+    );
+    const cookieConversationId = normalizeGatewayWebConversationId(
+      parseCookieValue(client.handshake.headers.cookie, GATEWAY_WEB_CONVERSATION_COOKIE),
     );
 
-    return ensureGatewayWebSessionId(authSessionId ?? cookieSessionId ?? client.id);
+    return ensureGatewayWebConversationId(
+      authConversationId ?? cookieConversationId ?? client.id,
+    );
   }
 }

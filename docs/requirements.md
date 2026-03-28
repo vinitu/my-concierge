@@ -68,7 +68,7 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - `assistant-worker` reads `SYSTEM.js`, `SOUL.js`, `IDENTITY.js`, and `skills/` from `runtime/assistant-worker/`.
 - conversation state lives in MySQL under `assistant-worker` ownership.
 - durable memory lives behind `assistant-memory`.
-- `gateway-web` stores browser chat history in `runtime/gateway-web/conversations/`.
+- `gateway-web` conversation history is canonical in `assistant-memory`; local runtime is used for gateway config only.
 
 ### Done checks
 - The documentation is split into overview, architecture, services, contracts, deployment, and operations.

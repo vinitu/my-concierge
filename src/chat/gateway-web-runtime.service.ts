@@ -1,11 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import {
-  mkdir,
-  readFile,
-  writeFile,
-} from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import type { ConversationState } from '../contracts/assistant-memory';
+import { GatewayWebConfigService } from './gateway-web-config.service';
 
 export interface GatewayWebConversationMessage {
   content: string;
@@ -14,130 +9,79 @@ export interface GatewayWebConversationMessage {
 }
 
 export interface GatewayWebConversationState {
+  conversation_id: string;
   messages: GatewayWebConversationMessage[];
-  session_id: string;
   updated_at: string | null;
+  user_id: string;
 }
-
-const MAX_GATEWAY_WEB_MESSAGES = 100;
 
 @Injectable()
 export class GatewayWebRuntimeService {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(private readonly gatewayWebConfigService: GatewayWebConfigService) {}
 
-  async readConversation(sessionId: string): Promise<GatewayWebConversationState> {
-    const path = this.conversationPath(sessionId);
+  async readConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<GatewayWebConversationState> {
+    const response = await this.fetchMemoryEndpoint('/v1/conversations/read', {
+      chat: 'direct',
+      contact: userId,
+      conversation_id: conversationId,
+      direction: 'api',
+    });
 
-    try {
-      const content = await readFile(path, 'utf8');
-      return this.normalizeState(sessionId, JSON.parse(content) as Partial<GatewayWebConversationState>);
-    } catch (error) {
-      if (!this.isMissingPath(error)) {
-        throw error;
-      }
-
-      return this.emptyState(sessionId);
+    if (!response.ok) {
+      return this.emptyConversation(userId, conversationId);
     }
-  }
 
-  async appendUserMessage(sessionId: string, message: string): Promise<GatewayWebConversationState> {
-    return this.appendMessage(sessionId, 'user', message);
-  }
+    const payload = (await response.json()) as ConversationState;
 
-  async appendAssistantMessage(
-    sessionId: string,
-    message: string,
-  ): Promise<GatewayWebConversationState> {
-    return this.appendMessage(sessionId, 'assistant', message);
-  }
-
-  async clearConversation(sessionId: string): Promise<GatewayWebConversationState> {
-    const nextState = this.emptyState(sessionId);
-
-    await mkdir(dirname(this.conversationPath(sessionId)), { recursive: true });
-    await writeFile(
-      this.conversationPath(sessionId),
-      `${JSON.stringify(nextState, null, 2)}\n`,
-      'utf8',
-    );
-
-    return nextState;
-  }
-
-  conversationPath(sessionId: string): string {
-    return join(this.runtimeDirectory(), 'conversations', `${sessionId}.json`);
-  }
-
-  private async appendMessage(
-    sessionId: string,
-    role: GatewayWebConversationMessage['role'],
-    content: string,
-  ): Promise<GatewayWebConversationState> {
-    const trimmed = content.trim();
-    const currentState = await this.readConversation(sessionId);
-    const nextState: GatewayWebConversationState = {
-      messages: [
-        ...currentState.messages,
-        {
-          content: trimmed,
-          created_at: new Date().toISOString(),
-          role,
-        },
-      ].slice(-MAX_GATEWAY_WEB_MESSAGES),
-      session_id: sessionId,
-      updated_at: new Date().toISOString(),
-    };
-
-    await mkdir(dirname(this.conversationPath(sessionId)), { recursive: true });
-    await writeFile(this.conversationPath(sessionId), `${JSON.stringify(nextState, null, 2)}\n`, 'utf8');
-
-    return nextState;
-  }
-
-  private runtimeDirectory(): string {
-    return this.configService.get<string>(
-      'GATEWAY_WEB_RUNTIME_DIR',
-      join(process.cwd(), 'runtime', 'gateway-web'),
-    );
-  }
-
-  private emptyState(sessionId: string): GatewayWebConversationState {
     return {
-      messages: [],
-      session_id: sessionId,
-      updated_at: null,
+      conversation_id: conversationId,
+      messages: payload.messages,
+      updated_at: payload.updated_at,
+      user_id: userId,
     };
   }
 
-  private normalizeState(
-    sessionId: string,
-    state: Partial<GatewayWebConversationState>,
+  clearConversation(
+    userId: string,
+    conversationId: string,
   ): GatewayWebConversationState {
-    const normalizedMessages = Array.isArray(state.messages)
-      ? state.messages.filter(
-          (entry): entry is GatewayWebConversationMessage =>
-            typeof entry === 'object' &&
-            entry !== null &&
-            (entry.role === 'user' || entry.role === 'assistant') &&
-            typeof entry.content === 'string' &&
-            typeof entry.created_at === 'string',
-        )
-      : [];
+    return this.emptyConversation(userId, conversationId);
+  }
 
+  private emptyConversation(
+    userId: string,
+    conversationId: string,
+  ): GatewayWebConversationState {
     return {
-      messages: normalizedMessages.slice(-MAX_GATEWAY_WEB_MESSAGES),
-      session_id:
-        typeof state.session_id === 'string' && state.session_id ? state.session_id : sessionId,
-      updated_at: typeof state.updated_at === 'string' ? state.updated_at : null,
+      conversation_id: conversationId,
+      messages: [],
+      updated_at: null,
+      user_id: userId,
     };
   }
 
-  private isMissingPath(error: unknown): boolean {
-    return (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === 'ENOENT'
+  private async fetchMemoryEndpoint(path: string, body: unknown): Promise<Response> {
+    const config = await this.gatewayWebConfigService.read();
+    const baseUrl = config.assistant_memory_url.endsWith('/')
+      ? config.assistant_memory_url.slice(0, -1)
+      : config.assistant_memory_url;
+
+    return fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }).catch(() =>
+      new Response(JSON.stringify({ message: 'assistant-memory unavailable' }), {
+        headers: {
+          'content-type': 'application/json',
+        },
+        status: 503,
+      }),
     );
   }
 }

@@ -116,3 +116,58 @@ export interface MemoryReindexResponse {
   indexed: number;
   status: 'reindexed';
 }
+
+export interface ConversationMessage {
+  content: string;
+  created_at: string;
+  role: 'assistant' | 'user';
+}
+
+export interface ConversationState {
+  chat: string;
+  contact: string;
+  context: string;
+  direction: string;
+  messages: ConversationMessage[];
+  updated_at: string | null;
+}
+
+export interface ConversationReadRequest {
+  chat: string;
+  contact: string;
+  conversation_id: string;
+  direction: string;
+}
+
+export type ConversationAppendRequest = ConversationReadRequest & {
+  message: string;
+  reply: {
+    context: string;
+    message: string;
+  };
+  run_id?: string;
+};
+
+export interface ConversationSearchRequest {
+  conversation_id: string;
+  limit: number;
+}
+
+export interface ConversationSearchResponse {
+  messages: ConversationMessage[];
+  summary: string;
+  thread_id: string;
+}
+
+export interface ConversationThreadListItem {
+  chat: string;
+  contact: string;
+  direction: string;
+  thread_id: string;
+  updated_at: string | null;
+}
+
+export interface ConversationThreadListResponse {
+  count: number;
+  threads: ConversationThreadListItem[];
+}

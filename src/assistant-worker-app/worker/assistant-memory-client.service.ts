@@ -2,10 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import type {
+  BaseMemoryWriteCandidate,
   FederatedMemorySearchRequest,
   MemoryEntry,
   MemoryKind,
   MemorySearchResponse,
+  TypedMemorySearchRequest,
   MemoryWriteCandidate,
   MemoryWriteResult,
 } from '../../contracts/assistant-memory';
@@ -20,28 +22,60 @@ export class AssistantMemoryClientService {
 
   constructor(private readonly configService: ConfigService) {}
 
-  async search(query: string, conversationThreadId: string): Promise<MemorySearchResponse> {
+  async searchFederated(
+    query: string,
+    conversationThreadId: string,
+  ): Promise<MemorySearchResponse> {
     const body: FederatedMemorySearchRequest = {
       conversationThreadId,
       limit: 8,
       query,
     };
-    const baseUrl = trimTrailingSlash(
-      this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:3002'),
-    );
-    const response = await fetch(`${baseUrl}/v1/search`, {
-      body: JSON.stringify(body),
+    return this.postSearch('/v1/search', body);
+  }
+
+  async searchByKind(
+    kind: MemoryKind,
+    query: string,
+    conversationThreadId: string,
+  ): Promise<MemorySearchResponse> {
+    const body: TypedMemorySearchRequest = {
+      conversationThreadId,
+      limit: 8,
+      query,
+    };
+    return this.postSearch(`/v1/${this.kindResource(kind)}/search`, body);
+  }
+
+  async writeByKind(
+    kind: MemoryKind,
+    entries: BaseMemoryWriteCandidate[],
+  ): Promise<MemoryWriteResult | null> {
+    if (entries.length === 0) {
+      return null;
+    }
+
+    const baseUrl = this.baseUrl();
+    const response = await fetch(`${baseUrl}/v1/${this.kindResource(kind)}/write`, {
+      body: JSON.stringify({
+        entries,
+      }),
       headers: {
         'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
       },
       method: 'POST',
     });
 
     if (!response.ok) {
-      throw new Error(`assistant-memory returned ${response.status} for search`);
+      throw new Error(`assistant-memory returned ${response.status} for ${kind} write`);
     }
 
-    return (await response.json()) as MemorySearchResponse;
+    return (await response.json()) as MemoryWriteResult;
+  }
+
+  async search(query: string, conversationThreadId: string): Promise<MemorySearchResponse> {
+    return this.searchFederated(query, conversationThreadId);
   }
 
   async write(entries: MemoryWriteCandidate[]): Promise<MemoryWriteResult | null> {
@@ -49,31 +83,21 @@ export class AssistantMemoryClientService {
       return null;
     }
 
-    const baseUrl = trimTrailingSlash(
-      this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:3002'),
-    );
     const grouped = this.groupByKind(entries);
     let created = 0;
     let updated = 0;
     const savedEntries: MemoryEntry[] = [];
 
     for (const [kind, kindEntries] of grouped.entries()) {
-      const response = await fetch(`${baseUrl}/v1/${this.kindResource(kind)}/write`, {
-        body: JSON.stringify({
-          entries: kindEntries.map(({ kind: ignored, ...entry }) => entry),
-        }),
-        headers: {
-          'content-type': 'application/json',
-          'idempotency-key': randomUUID(),
-        },
-        method: 'POST',
-      });
+      const payload = await this.writeByKind(
+        kind,
+        kindEntries.map(({ kind: ignored, ...entry }) => entry),
+      );
 
-      if (!response.ok) {
-        throw new Error(`assistant-memory returned ${response.status} for ${kind} write`);
+      if (!payload) {
+        continue;
       }
 
-      const payload = (await response.json()) as MemoryWriteResult;
       created += payload.created;
       updated += payload.updated;
       savedEntries.push(...payload.entries);
@@ -106,6 +130,33 @@ export class AssistantMemoryClientService {
     } catch (error) {
       this.logger.warn(`assistant-memory write failed: ${this.errorMessage(error)}`);
     }
+  }
+
+  private async postSearch(
+    path: string,
+    body: FederatedMemorySearchRequest | TypedMemorySearchRequest,
+  ): Promise<MemorySearchResponse> {
+    const baseUrl = this.baseUrl();
+
+    const response = await fetch(`${baseUrl}${path}`, {
+      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json',
+      },
+      method: 'POST',
+    });
+
+    if (!response.ok) {
+      throw new Error(`assistant-memory returned ${response.status} for search`);
+    }
+
+    return (await response.json()) as MemorySearchResponse;
+  }
+
+  private baseUrl(): string {
+    return trimTrailingSlash(
+      this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:3002'),
+    );
   }
 
   private errorMessage(error: unknown): string {

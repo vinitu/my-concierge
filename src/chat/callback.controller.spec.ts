@@ -1,79 +1,64 @@
 import { CallbackController } from './callback.controller';
-import { GatewayWebRuntimeService } from './gateway-web-runtime.service';
 import { MetricsService } from '../observability/metrics.service';
-import { SessionRegistryService } from './session-registry.service';
+import { ConversationRegistryService } from './session-registry.service';
 
 describe('CallbackController', () => {
-  it('delivers callback messages to a registered session', async () => {
-    const gatewayWebRuntimeService = {
-      appendAssistantMessage: jest.fn().mockResolvedValue(undefined),
-    } as unknown as GatewayWebRuntimeService;
-    const sessionRegistryService = {
+  it('delivers callback messages to a registered conversation', async () => {
+    const conversationRegistryService = {
       sendAssistantMessage: jest.fn().mockReturnValue(true),
-    } as unknown as SessionRegistryService;
+    } as unknown as ConversationRegistryService;
     const metricsService = {
       recordCallback: jest.fn(),
     } as unknown as MetricsService;
 
     const controller = new CallbackController(
-      gatewayWebRuntimeService,
-      sessionRegistryService,
+      conversationRegistryService,
       metricsService,
     );
 
     await expect(
-      controller.deliverAssistantResponse('session-1', { message: 'hello back' }),
+      controller.deliverAssistantResponse('conversation-1', { message: 'hello back' }),
     ).resolves.toEqual({
       delivered: true,
       response: 'Callback delivered',
     });
-    expect(gatewayWebRuntimeService.appendAssistantMessage).toHaveBeenCalledWith(
-      'session-1',
-      'hello back',
-    );
   });
 
-  it('returns not delivered when the session does not exist', async () => {
-    const gatewayWebRuntimeService = {
-      appendAssistantMessage: jest.fn().mockResolvedValue(undefined),
-    } as unknown as GatewayWebRuntimeService;
-    const sessionRegistryService = {
+  it('returns not delivered when the conversation does not exist', async () => {
+    const conversationRegistryService = {
       sendAssistantMessage: jest.fn().mockReturnValue(false),
-    } as unknown as SessionRegistryService;
+    } as unknown as ConversationRegistryService;
     const metricsService = {
       recordCallback: jest.fn(),
     } as unknown as MetricsService;
 
     const controller = new CallbackController(
-      gatewayWebRuntimeService,
-      sessionRegistryService,
+      conversationRegistryService,
       metricsService,
     );
 
     await expect(
-      controller.deliverAssistantResponse('session-1', { message: 'hello back' }),
+      controller.deliverAssistantResponse('conversation-1', { message: 'hello back' }),
     ).resolves.toEqual({
       delivered: false,
-      response: 'WebSocket session not found',
+      response: 'WebSocket conversation not found',
     });
   });
 
-  it('delivers thinking notifications to a registered session', () => {
-    const gatewayWebRuntimeService = {} as unknown as GatewayWebRuntimeService;
-    const sessionRegistryService = {
+  it('delivers thinking notifications to a registered conversation', () => {
+    const conversationRegistryService = {
       sendAssistantThinking: jest.fn().mockReturnValue(true),
-    } as unknown as SessionRegistryService;
+    } as unknown as ConversationRegistryService;
     const metricsService = {
       recordCallback: jest.fn(),
     } as unknown as MetricsService;
 
     const controller = new CallbackController(
-      gatewayWebRuntimeService,
-      sessionRegistryService,
+      conversationRegistryService,
       metricsService,
     );
 
-    expect(controller.deliverAssistantThinking('session-1', { seconds: 2 })).toEqual({
+    expect(controller.deliverAssistantThinking('conversation-1', { seconds: 2 })).toEqual({
       delivered: true,
       response: 'Thinking callback delivered',
     });

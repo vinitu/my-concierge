@@ -1,73 +1,99 @@
-import { ConfigService } from '@nestjs/config';
-import { mkdtemp, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { GatewayWebRuntimeService } from './gateway-web-runtime.service';
+import { GatewayWebConfigService } from './gateway-web-config.service';
 
 describe('GatewayWebRuntimeService', () => {
-  it('stores conversation history in the gateway-web runtime directory', async () => {
-    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'gateway-web-runtime-'));
-    const service = new GatewayWebRuntimeService(
-      new ConfigService({
-        GATEWAY_WEB_RUNTIME_DIR: runtimeDirectory,
-      }),
-    );
+  const originalFetch = global.fetch;
 
-    await service.appendUserMessage('session-1', 'hello');
-    await service.appendAssistantMessage('session-1', 'hi');
-
-    const stored = JSON.parse(
-      await readFile(join(runtimeDirectory, 'conversations', 'session-1.json'), 'utf8'),
-    ) as {
-      messages: Array<{ content: string; role: string }>;
-      session_id: string;
-    };
-
-    expect(stored.session_id).toBe('session-1');
-    expect(stored.messages).toEqual([
-      expect.objectContaining({ content: 'hello', role: 'user' }),
-      expect.objectContaining({ content: 'hi', role: 'assistant' }),
-    ]);
+  afterEach(() => {
+    global.fetch = originalFetch;
+    jest.restoreAllMocks();
   });
 
-  it('keeps only the last 100 messages', async () => {
-    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'gateway-web-runtime-'));
-    const service = new GatewayWebRuntimeService(
-      new ConfigService({
-        GATEWAY_WEB_RUNTIME_DIR: runtimeDirectory,
+  it('reads conversation history from assistant-memory', async () => {
+    global.fetch = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          chat: 'direct',
+          contact: 'default-user',
+          context: '',
+          direction: 'api',
+          messages: [
+            {
+              content: 'hello',
+              created_at: '2026-03-28T10:00:00.000Z',
+              role: 'user',
+            },
+          ],
+          updated_at: '2026-03-28T10:00:00.000Z',
+        }),
+        {
+          headers: {
+            'content-type': 'application/json',
+          },
+          status: 200,
+        },
+      ),
+    ) as typeof fetch;
+
+    const configService = {
+      read: jest.fn().mockResolvedValue({
+        assistant_api_url: 'http://assistant-api:3000',
+        assistant_memory_url: 'http://assistant-memory:3000',
+        callback_base_url: 'http://gateway-web:3000',
+        user_id: 'default-user',
       }),
-    );
+    } as unknown as GatewayWebConfigService;
+    const service = new GatewayWebRuntimeService(configService);
 
-    for (let index = 0; index < 105; index += 1) {
-      await service.appendUserMessage('session-1', `message-${String(index)}`);
-    }
-
-    const stored = JSON.parse(
-      await readFile(join(runtimeDirectory, 'conversations', 'session-1.json'), 'utf8'),
-    ) as {
-      messages: Array<{ content: string; role: string }>;
-    };
-
-    expect(stored.messages).toHaveLength(100);
-    expect(stored.messages[0]?.content).toBe('message-5');
-    expect(stored.messages[99]?.content).toBe('message-104');
+    await expect(
+      service.readConversation('default-user', 'conv-1'),
+    ).resolves.toEqual({
+      conversation_id: 'conv-1',
+      messages: [
+        expect.objectContaining({
+          content: 'hello',
+          role: 'user',
+        }),
+      ],
+      updated_at: '2026-03-28T10:00:00.000Z',
+      user_id: 'default-user',
+    });
   });
 
-  it('clears stored conversation history', async () => {
-    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'gateway-web-runtime-'));
-    const service = new GatewayWebRuntimeService(
-      new ConfigService({
-        GATEWAY_WEB_RUNTIME_DIR: runtimeDirectory,
+  it('returns empty state when assistant-memory is unavailable', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ message: 'down' }), { status: 503 })) as typeof fetch;
+
+    const configService = {
+      read: jest.fn().mockResolvedValue({
+        assistant_api_url: 'http://assistant-api:3000',
+        assistant_memory_url: 'http://assistant-memory:3000',
+        callback_base_url: 'http://gateway-web:3000',
+        user_id: 'default-user',
       }),
-    );
+    } as unknown as GatewayWebConfigService;
+    const service = new GatewayWebRuntimeService(configService);
 
-    await service.appendUserMessage('session-1', 'hello');
-    await service.appendAssistantMessage('session-1', 'hi');
+    await expect(
+      service.readConversation('default-user', 'conv-1'),
+    ).resolves.toEqual({
+      conversation_id: 'conv-1',
+      messages: [],
+      updated_at: null,
+      user_id: 'default-user',
+    });
+  });
 
-    const cleared = await service.clearConversation('session-1');
+  it('clearConversation returns empty state for the new conversation id', () => {
+    const configService = {} as GatewayWebConfigService;
+    const service = new GatewayWebRuntimeService(configService);
 
-    expect(cleared.messages).toEqual([]);
-    expect(cleared.session_id).toBe('session-1');
-    expect(cleared.updated_at).toBeNull();
+    expect(service.clearConversation('default-user', 'conv-2')).toEqual({
+      conversation_id: 'conv-2',
+      messages: [],
+      updated_at: null,
+      user_id: 'default-user',
+    });
   });
 });

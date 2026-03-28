@@ -10,65 +10,97 @@ import {
 
 describe('dashboard (e2e)', () => {
   let app: NestExpressApplication;
+  const registryServices = [
+    {
+      key: 'assistant-api',
+      kind: 'application',
+      name: 'assistant-api',
+      notes: 'Ingress',
+      upstream_url: 'http://assistant-api:3000',
+      prefix: '/assistant-api',
+      panel_url: 'http://localhost:3000',
+      status_url: 'http://assistant-api:3000/status',
+      config_path: null,
+      entities: [],
+    },
+    {
+      key: 'assistant-worker',
+      kind: 'application',
+      name: 'assistant-worker',
+      notes: 'Worker runtime',
+      upstream_url: 'http://assistant-worker:3000',
+      prefix: '/assistant-worker',
+      panel_url: 'http://localhost:3001',
+      status_url: 'http://assistant-worker:3000/status',
+      config_path: '/config',
+      entities: [{ id: 'provider-status', label: 'Provider status', path: '/provider-status' }],
+    },
+    {
+      key: 'redis',
+      kind: 'infrastructure',
+      name: 'redis',
+      notes: 'Redis transport',
+      upstream_url: null,
+      prefix: null,
+      panel_url: null,
+      status_url: null,
+      config_path: null,
+      entities: [],
+    },
+  ] as const;
   const registry = {
-    list: jest.fn().mockReturnValue([
-      {
-        kind: 'application',
-        name: 'assistant-api',
-        notes: 'Ingress',
-        panel_url: 'http://localhost:3000',
-        status_url: 'http://assistant-api:3000/status',
-      },
-      {
-        kind: 'application',
-        name: 'gateway-web',
-        notes: 'Browser chat',
-        panel_url: 'http://localhost:8080',
-        status_url: 'http://gateway-web:3000/status',
-      },
-      {
-        kind: 'infrastructure',
-        name: 'redis',
-        notes: 'Redis transport',
-        panel_url: null,
-        status_url: null,
-      },
-    ]),
+    list: jest.fn().mockReturnValue(registryServices),
+    findByKey: jest.fn((key: string) => registryServices.find((service) => service.key === key) ?? null),
   };
   const statusService = {
     listStatuses: jest.fn<Promise<DashboardServiceStatus[]>, []>().mockResolvedValue([
       {
+        key: 'assistant-api',
         kind: 'application',
         name: 'assistant-api',
         notes: 'Ingress',
+        upstream_url: 'http://assistant-api:3000',
+        prefix: '/assistant-api',
         panel_url: 'http://localhost:3000',
         ready: true,
         response_time_ms: 12.4,
         service_status: 'ok',
         status_url: 'http://assistant-api:3000/status',
         uptime_seconds: 321,
+        config_path: null,
+        entities: [],
       },
       {
+        key: 'assistant-worker',
         kind: 'application',
-        name: 'gateway-web',
-        notes: 'Browser chat',
-        panel_url: 'http://localhost:8080',
+        name: 'assistant-worker',
+        notes: 'Worker runtime',
+        upstream_url: 'http://assistant-worker:3000',
+        prefix: '/assistant-worker',
+        panel_url: 'http://localhost:3001',
         ready: false,
         response_time_ms: null,
         service_status: 'unreachable',
-        status_url: 'http://gateway-web:3000/status',
+        status_url: 'http://assistant-worker:3000/status',
         uptime_seconds: null,
+        config_path: '/config',
+        entities: [{ id: 'provider-status', label: 'Provider status', path: '/provider-status' }],
       },
       {
+        key: 'redis',
         kind: 'infrastructure',
         name: 'redis',
         notes: 'Redis transport',
+        upstream_url: null,
+        prefix: null,
         panel_url: null,
         ready: null,
         response_time_ms: null,
         service_status: 'not_exposed',
         status_url: null,
         uptime_seconds: null,
+        config_path: null,
+        entities: [],
       },
     ]),
     refreshSeconds: jest.fn().mockReturnValue(5),
@@ -96,20 +128,13 @@ describe('dashboard (e2e)', () => {
     jest.clearAllMocks();
   });
 
-  it('renders dashboard page with links and service statuses', async () => {
+  it('renders dashboard page with service menu and status tiles', async () => {
     const response = await request(app.getHttpServer()).get('/');
     expect(response.status).toBe(200);
     expect(response.text).toContain('dashboard');
-    expect(response.text).toContain('assistant-api');
-    expect(response.text).toContain('gateway-web');
-    expect(response.text).toContain('redis');
-    expect(response.text).toContain('http://localhost:3000');
-    expect(response.text).toContain('Auto refresh every 5 seconds.');
-    expect(response.text).toContain('UP');
-    expect(response.text).toContain('DOWN');
-    expect(response.text).toContain('5m 21s');
-    expect(response.text).toContain('unreachable');
-    expect(statusService.listStatuses).toHaveBeenCalled();
+    expect(response.text).toContain('Unified panel for all services.');
+    expect(response.text).toContain('service-menu');
+    expect(response.text).toContain('/services/catalog');
   });
 
   it('returns aggregated service statuses for polling', async () => {
@@ -118,6 +143,14 @@ describe('dashboard (e2e)', () => {
     expect(response.body.refresh_seconds).toBe(5);
     expect(response.body.services).toHaveLength(3);
     expect(response.body.services[0].name).toBe('assistant-api');
+  });
+
+  it('returns service catalog', async () => {
+    const response = await request(app.getHttpServer()).get('/services/catalog');
+    expect(response.status).toBe(200);
+    expect(response.body.refresh_seconds).toBe(5);
+    expect(response.body.services).toHaveLength(3);
+    expect(response.body.services[1].key).toBe('assistant-worker');
   });
 
   it('returns dashboard status', async () => {

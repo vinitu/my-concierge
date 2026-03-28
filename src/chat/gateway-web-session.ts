@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
-export const GATEWAY_WEB_SESSION_COOKIE = 'myconcierge_session_id';
+export const GATEWAY_WEB_CONVERSATION_COOKIE = 'myconcierge_conversation_id';
 
-export function normalizeGatewayWebSessionId(value: unknown): string | null {
+export function normalizeGatewayWebConversationId(value: unknown): string | null {
   if (typeof value !== 'string') {
     return null;
   }
@@ -32,6 +32,6 @@ export function parseCookieValue(cookieHeader: string | undefined, name: string)
   return null;
 }
 
-export function ensureGatewayWebSessionId(value: unknown): string {
-  return normalizeGatewayWebSessionId(value) ?? randomUUID().replaceAll('-', '');
+export function ensureGatewayWebConversationId(value: unknown): string {
+  return normalizeGatewayWebConversationId(value) ?? randomUUID().replaceAll('-', '');
 }

@@ -1,19 +1,19 @@
 .chat-body {
-  --chat-bg: #090b10;
-  --chat-surface: #11141b;
-  --chat-surface-2: #171b24;
-  --chat-line: rgba(255, 255, 255, 0.07);
-  --chat-ink: #f3f4f6;
-  --chat-muted: #98a2b3;
-  --chat-accent: #7dd3fc;
-  --chat-user: #f3f4f6;
-  --chat-assistant: #c7f9e5;
-  --chat-system: #d4d7dd;
+  --chat-bg: #f4f7fb;
+  --chat-surface: #ffffff;
+  --chat-surface-2: #f6f8fb;
+  --chat-line: #d8e0ea;
+  --chat-ink: #172033;
+  --chat-muted: #64748b;
+  --chat-accent: #0f5ea8;
+  --chat-user: #172033;
+  --chat-assistant: #172033;
+  --chat-system: #64748b;
   min-height: 100vh;
   overflow: hidden;
   background:
-    radial-gradient(circle at top, rgba(125, 211, 252, 0.08), transparent 22%),
-    linear-gradient(180deg, #090b10 0%, #0d1016 100%);
+    radial-gradient(circle at top left, rgba(15, 94, 168, 0.08), transparent 28%),
+    linear-gradient(180deg, #f4f7fb 0%, #eef2f7 100%);
   color: var(--chat-ink);
   font-family: "Manrope", sans-serif;
 }
@@ -34,11 +34,9 @@
 .chat-form-panel,
 .messages {
   border: 1px solid var(--chat-line);
-  border-radius: 10px;
+  border-radius: 18px;
   background: var(--chat-surface);
-  box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: 0 10px 30px rgba(23, 32, 51, 0.06);
 }
 
 .status-cluster {
@@ -50,7 +48,7 @@
   top: 0;
   z-index: 20;
   padding: 4px 0 12px;
-  background: linear-gradient(180deg, rgba(9, 11, 16, 0.98), rgba(9, 11, 16, 0.82) 72%, transparent);
+  background: linear-gradient(180deg, rgba(244, 247, 251, 0.98), rgba(244, 247, 251, 0.82) 72%, transparent);
   backdrop-filter: blur(8px);
 }
 
@@ -61,10 +59,10 @@
   padding: 9px 13px;
   border-radius: 10px;
   background: var(--chat-surface-2);
-  color: #e5e7eb;
+  color: var(--chat-ink);
   font-size: 0.84rem;
   font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(23, 32, 51, 0.05);
 }
 
 .status-action-button {
@@ -77,8 +75,8 @@
 
 .status-action-button:hover,
 .status-action-button:focus {
-  background: #f3f4f6;
-  color: #0b0d12;
+  background: #172033;
+  color: #ffffff;
 }
 
 .status-name-pill {
@@ -93,7 +91,8 @@
   text-transform: uppercase;
 }
 
-#session-name-label {
+#user-id-label,
+#conversation-id-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -104,22 +103,22 @@
   height: 8px;
   border-radius: 999px;
   background: var(--chat-accent);
-  box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.08);
+  box-shadow: 0 0 0 5px rgba(15, 94, 168, 0.08);
 }
 
 .status-pill.status-connected .status-dot {
-  background: #7dd3fc;
-  box-shadow: 0 0 0 5px rgba(125, 211, 252, 0.08);
+  background: #0f766e;
+  box-shadow: 0 0 0 5px rgba(15, 118, 110, 0.08);
 }
 
 .status-pill.status-connecting .status-dot {
-  background: #fbbf24;
-  box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.08);
+  background: #b45309;
+  box-shadow: 0 0 0 5px rgba(180, 83, 9, 0.08);
 }
 
 .status-pill.status-disconnected .status-dot {
-  background: #f87171;
-  box-shadow: 0 0 0 5px rgba(248, 113, 113, 0.08);
+  background: #b91c1c;
+  box-shadow: 0 0 0 5px rgba(185, 28, 28, 0.08);
 }
 
 .messages {
@@ -131,35 +130,35 @@
   padding: 22px;
   overflow-y: auto;
   overflow-x: hidden;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent);
   scroll-behavior: smooth;
 }
 
 .message {
   max-width: min(80%, 34rem);
   padding: 14px 18px;
-  border-radius: 10px;
+  border-radius: 16px;
   line-height: 1.5;
   font-size: 0.98rem;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--chat-line);
 }
 
 .message-user {
   align-self: flex-end;
-  background: #f3f4f6;
-  color: #111827;
+  background: #172033;
+  color: #ffffff;
 }
 
 .message-assistant {
   align-self: flex-start;
-  background: #151922;
+  background: #ffffff;
   color: var(--chat-assistant);
 }
 
 .message-thinking {
   position: relative;
   align-self: flex-start;
-  background: #151922;
+  background: #ffffff;
   color: var(--chat-muted);
   border-style: dashed;
   overflow: hidden;
@@ -172,9 +171,9 @@
   background: linear-gradient(
     110deg,
     transparent 0%,
-    rgba(125, 211, 252, 0.06) 35%,
-    rgba(125, 211, 252, 0.16) 50%,
-    rgba(125, 211, 252, 0.06) 65%,
+    rgba(15, 94, 168, 0.04) 35%,
+    rgba(15, 94, 168, 0.12) 50%,
+    rgba(15, 94, 168, 0.04) 65%,
     transparent 100%
   );
   transform: translateX(-100%);
@@ -195,11 +194,11 @@
 .message-system {
   align-self: center;
   max-width: 100%;
-  border-radius: 10px;
+  border-radius: 16px;
   background: transparent;
   color: var(--chat-system);
   font-size: 0.84rem;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--chat-line);
 }
 
 .chat-form-panel {
@@ -209,7 +208,7 @@
   z-index: 20;
   margin-top: 12px;
   background:
-    linear-gradient(180deg, rgba(9, 11, 16, 0.2), rgba(17, 20, 27, 0.98) 28%),
+    linear-gradient(180deg, rgba(244, 247, 251, 0.2), rgba(255, 255, 255, 0.98) 28%),
     var(--chat-surface);
   backdrop-filter: blur(8px);
 }
@@ -223,24 +222,24 @@
   max-height: 180px;
   padding: 18px 112px 18px 18px;
   border: 0;
-  border-radius: 10px;
-  background: #0d1016;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  background: var(--chat-surface-2);
+  box-shadow: inset 0 0 0 1px rgba(23, 32, 51, 0.08);
   color: var(--chat-ink);
   line-height: 1.5;
   resize: vertical;
 }
 
 .chat-input::placeholder {
-  color: #7b8494;
+  color: #8b98aa;
 }
 
 .chat-input:focus {
   border-color: transparent;
   box-shadow:
-    inset 0 0 0 1px rgba(125, 211, 252, 0.34),
-    0 0 0 0.2rem rgba(125, 211, 252, 0.08);
-  background: #10141c;
+    inset 0 0 0 1px rgba(15, 94, 168, 0.35),
+    0 0 0 0.2rem rgba(15, 94, 168, 0.10);
+  background: #ffffff;
   color: var(--chat-ink);
 }
 
@@ -251,9 +250,9 @@
   min-width: 88px;
   min-height: 52px;
   border: 0;
-  border-radius: 10px;
-  background: #f3f4f6;
-  color: #0b0d12;
+  border-radius: 12px;
+  background: #172033;
+  color: #ffffff;
   font-weight: 700;
   box-shadow: none;
 }

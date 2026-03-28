@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { AssistantApiClientService } from './assistant-api-client.service';
 import { MetricsService } from '../observability/metrics.service';
+import { GatewayWebConfigService } from '../chat/gateway-web-config.service';
 
 describe('AssistantApiClientService', () => {
   const originalFetch = global.fetch;
@@ -18,16 +19,18 @@ describe('AssistantApiClientService', () => {
       ASSISTANT_API_URL: 'http://assistant-api:3000',
       CALLBACK_BASE_URL: 'http://gateway-web:3000',
     });
+    const gatewayWebConfigService = new GatewayWebConfigService(configService);
     const metricsService = { recordAssistantApiRequest: jest.fn() } as unknown as MetricsService;
-    const service = new AssistantApiClientService(configService, metricsService);
+    const service = new AssistantApiClientService(gatewayWebConfigService, metricsService);
 
     await service.sendConversation({
       conversationId: 'socket-1',
       message: 'hello',
+      userId: 'default-user',
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://assistant-api:3000/conversation/api/direct/socket-1',
+      'http://assistant-api:3000/conversation/api/direct/default-user',
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -51,13 +54,15 @@ describe('AssistantApiClientService', () => {
       ASSISTANT_API_URL: 'http://assistant-api:3000',
       CALLBACK_BASE_URL: 'http://gateway-web:3000',
     });
+    const gatewayWebConfigService = new GatewayWebConfigService(configService);
     const metricsService = { recordAssistantApiRequest: jest.fn() } as unknown as MetricsService;
-    const service = new AssistantApiClientService(configService, metricsService);
+    const service = new AssistantApiClientService(gatewayWebConfigService, metricsService);
 
     await expect(
       service.sendConversation({
         conversationId: 'socket-1',
         message: 'hello',
+        userId: 'default-user',
       }),
     ).rejects.toThrow('assistant-api returned 503');
   });

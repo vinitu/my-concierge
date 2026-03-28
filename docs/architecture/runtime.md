@@ -16,7 +16,7 @@ Describe the runtime model of `assistant`.
 
 The repository contains separate runtime directories in `./runtime`.
 `assistant-worker` reads bootstrap runtime context from `./runtime/assistant-worker`.
-`gateway-web` stores browser chat state in `./runtime/gateway-web`.
+`gateway-web` stores runtime config in `./runtime/gateway-web`.
 In Docker Compose, each service mounts its own runtime directory into the container as `/app/runtime`.
 
 Expected layout:
@@ -34,7 +34,8 @@ runtime/
     logs/
     cache/
   gateway-web/
-    conversations/
+    config/
+      gateway-web.json
     data/
     logs/
     cache/
@@ -46,7 +47,7 @@ runtime/
 - `runtime/assistant-worker/SOUL.js`: tone and boundaries
 - `runtime/assistant-worker/IDENTITY.js`: who the assistant is
 - `runtime/assistant-worker/skills/`: skill definitions
-- `runtime/gateway-web/conversations/`: per-session browser chat history
+- `runtime/gateway-web/config/gateway-web.json`: gateway-web runtime config
 
 Repository-owned files:
 
@@ -96,7 +97,7 @@ For each request, `assistant-worker` builds the provider input from:
 6. Connect `assistant-worker` to MySQL for conversation state.
 7. Connect `assistant-worker` to `assistant-memory` for durable memory operations.
 8. Connect `assistant-api` and `assistant-worker` to Redis for jobs and run events.
-9. Keep `runtime/gateway-web/conversations/` available for browser chat history.
+9. Keep `runtime/gateway-web/config/gateway-web.json` available for gateway-web runtime config.
 10. Build one shared runtime context model.
 11. Start `assistant-api`.
 12. Start `assistant-worker`.

@@ -3,7 +3,7 @@ import type { ExecutionJob } from '../../contracts/assistant-transport';
 import type {
   AssistantConversationState,
 } from './assistant-worker-conversation.service';
-import type { AssistantLlmGenerateResult } from './assistant-llm-response-parser';
+import type { AssistantLlmGenerateResult } from './assistant-llm-output-schema';
 
 export type AssistantWorkerProvider = 'deepseek' | 'ollama' | 'xai';
 

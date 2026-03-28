@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { DashboardOpenApiController } from './openapi.controller';
+import { DashboardProxyController } from './dashboard-proxy.controller';
 import { DashboardRootController } from './root.controller';
 import { DashboardServicesController } from './dashboard-services.controller';
 import { DashboardServiceRegistryService } from './dashboard-service-registry.service';
@@ -16,6 +17,7 @@ import { DashboardMetricsService } from './observability/dashboard-metrics.servi
   controllers: [
     DashboardMetricsController,
     DashboardOpenApiController,
+    DashboardProxyController,
     DashboardRootController,
     DashboardServicesController,
     DashboardStatusController,

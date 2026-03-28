@@ -33,6 +33,15 @@ export class GatewayTelegramRootController {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>gateway-telegram</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
     <style>
       :root {
         color-scheme: light;
@@ -42,7 +51,7 @@ export class GatewayTelegramRootController {
         --surface: #ffffff;
         --surface-2: #f4f7fb;
         --accent: #0f5ea8;
-        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+        font-family: "Manrope", sans-serif;
       }
       body { margin: 0; background: linear-gradient(180deg, #eef4fb 0%, #f8fbff 100%); color: var(--ink); }
       main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 40px; }

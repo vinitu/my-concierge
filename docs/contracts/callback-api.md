@@ -21,10 +21,10 @@ Describe what `assistant-api` sends to callback targets after consuming run even
 - `thinking` callbacks are transient and may happen every `N` seconds while the worker run is in progress.
 - `response` callbacks contain the final assistant message.
 - For `gateway-web`, callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
-- For `gateway-web`, `<conversation_id>` is the stable browser `session_id` stored in the `myconcierge_session_id` cookie.
+- For `gateway-web`, `<conversation_id>` is the stable browser `conversation_id` stored in the `myconcierge_conversation_id` cookie.
 - `gateway-web` should forward `thinking` callbacks to the browser through WebSocket without persisting them.
 - `gateway-web` should forward final `response` callbacks to the browser through WebSocket.
-- `gateway-web` should also persist final `response` callbacks in `runtime/gateway-web/conversations/{session_id}.json`.
+- `gateway-web` should not persist final callbacks locally; canonical conversation state is stored by `assistant-worker` in `assistant-memory`.
 - `gateway-email` callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
 - `gateway-email` should resolve the local mailbox thread by `conversation_id`, preserve `In-Reply-To` and `References`, and send the final `response` callback as an SMTP reply.
 - `gateway-telegram` callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
@@ -90,7 +90,7 @@ The implemented `gateway-web` callback endpoints currently return:
 ```json
 {
   "delivered": true,
-  "response": "Response callback delivered"
+  "response": "Callback delivered"
 }
 ```
 
@@ -122,15 +122,14 @@ If the browser session is not found, it returns:
 
 For the browser flow:
 
-- `gateway-web` creates or reads a stable `session_id` from the `myconcierge_session_id` cookie
-- the browser WebSocket authenticates with that `session_id`
-- `gateway-web` sends the same `session_id` as both `contact` and `conversation_id` to `assistant-api`
+- `gateway-web` creates or reads a stable `conversation_id` from the `myconcierge_conversation_id` cookie
+- the browser WebSocket authenticates with that `conversation_id`
+- `gateway-web` sends configured `user_id` as `contact` and cookie-backed `conversation_id` to `assistant-api`
 - `assistant-api` stores the callback routing metadata for that session
 - `assistant-worker` publishes `thinking` and `completed` run events to Redis
-- `assistant-api` calls back to `POST /thinking/{session_id}` while the worker run is active
-- `assistant-api` calls back to `POST /response/{session_id}` when the final reply is ready
-- `gateway-web` stores the final assistant reply in `runtime/gateway-web/conversations/{session_id}.json`
-- `gateway-web` forwards both thinking and final response events to the active WebSocket session with the same `session_id`
+- `assistant-api` calls back to `POST /thinking/{conversation_id}` while the worker run is active
+- `assistant-api` calls back to `POST /response/{conversation_id}` when the final reply is ready
+- `gateway-web` forwards both thinking and final response events to the active WebSocket session for that `conversation_id`
 
 ## `gateway-email` Mapping
 

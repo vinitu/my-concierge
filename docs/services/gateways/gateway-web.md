@@ -8,11 +8,11 @@ Provide a simple Web chat UI for the local assistant.
 
 - Serve the Web chat page
 - Accept WebSocket chat messages from the browser
-- Keep a stable browser session id in cookies
+- Keep a stable browser conversation id in cookies
 - Convert browser messages into `assistant-api` requests
 - Expose `response` and `thinking` callback endpoints for `assistant-api`
 - Send final responses and thinking signals back to the browser through WebSocket
-- Persist browser chat history in the gateway runtime directory
+- Read browser chat history from `assistant-memory`
 - Expose `GET /status`
 - Expose `GET /metrics`
 - Expose `GET /openapi.json`
@@ -45,7 +45,7 @@ flowchart LR
 - `assistant-api-client`: sends accepted browser messages to `assistant-api`
 - `callback-controller`: accepts `assistant-api` callback requests
 - `session-registry`: maps callback messages to the correct WebSocket connection
-- `runtime-store`: stores per-session browser chat history in `runtime/gateway-web/`
+- `runtime-store`: reads canonical conversation state from `assistant-memory`
 - `status`: returns service readiness
 - `metrics`: returns Prometheus metrics
 - `openapi`: returns the gateway OpenAPI schema
@@ -55,7 +55,7 @@ flowchart LR
 1. The browser opens `GET /`.
 2. The browser opens `WS /ws`.
 3. The browser sends a chat message through WebSocket.
-4. `gateway-web` resolves the stable browser session id from the cookie and maps the WebSocket connection to it.
+4. `gateway-web` resolves the stable browser `conversation_id` from the cookie and maps the WebSocket connection to it.
 5. `gateway-web` calls `assistant-api`.
 6. `assistant-api` accepts the message and writes it to the queue.
 7. `assistant-worker` processes the job.
@@ -63,7 +63,7 @@ flowchart LR
 9. `assistant-api` consumes those events and may send `POST /thinking/:conversationId`.
 10. `gateway-web` forwards the thinking state to the active browser session for the requested number of seconds.
 11. `assistant-api` sends the final callback to `POST /response/:conversationId`.
-12. `gateway-web` stores the assistant reply in `runtime/gateway-web/conversations/{session_id}.json`.
+12. `assistant-worker` appends the user/assistant exchange to canonical conversation state in `assistant-memory`.
 13. `gateway-web` finds the right WebSocket session.
 14. `gateway-web` sends the assistant message back to the browser.
 
@@ -72,8 +72,9 @@ flowchart LR
 - `gateway-web` should keep only light session state.
 - Assistant business state should stay outside `gateway-web`.
 - WebSocket session mapping may live in memory in the first MVP.
-- Browser chat history is stored locally in `runtime/gateway-web/conversations/`.
-- The browser identity is a stable `session_id` stored in a cookie.
+- Browser chat history is stored canonically in `assistant-memory`.
+- Browser chat continuity uses a stable `conversation_id` stored in a cookie.
+- `gateway-web` uses one configured singleton `user_id` for browser messages.
 - If `gateway-web` is scaled horizontally later, the session mapping will need a shared store or sticky sessions.
 
 ## Current Repository Location
@@ -108,7 +109,7 @@ If more services are implemented in the same repository later, `gateway-web` may
 - `gateway-web` sends callback routing metadata and `conversation_id` to `assistant-api`.
 - `assistant-api` owns callback routing and delivery.
 - `gateway-web` maps callbacks back to the correct WebSocket session.
-- `gateway-web` uses the cookie-backed `session_id` as the browser contact identifier and `conversation_id`.
+- `gateway-web` uses the configured `user_id` as the browser contact identifier and the cookie-backed `conversation_id` as thread id.
 - `gateway-web` exposes `GET /openapi.json` for the shared Swagger UI.
 
 ## Metrics

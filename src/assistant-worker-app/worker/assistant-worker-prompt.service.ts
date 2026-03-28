@@ -4,7 +4,10 @@ import {
   assistantPlanningOutputParser,
   assistantSynthesisOutputParser,
 } from './assistant-llm-output-schema';
-import { AssistantToolCatalogService } from './assistant-tool-catalog.service';
+import {
+  type AssistantToolName,
+  AssistantToolCatalogService,
+} from './assistant-tool-catalog.service';
 import type { AssistantWorkerRuntimeContext } from './assistant-worker-runtime-context.service';
 import type { AssistantToolObservation } from './assistant-tool-dispatcher.service';
 
@@ -61,18 +64,19 @@ export class AssistantWorkerPromptService {
     );
   }
 
-  buildAvailableToolsSection(): string {
-    return JSON.stringify(this.toolCatalogService.listTools(), null, 2);
+  buildAvailableToolsSection(enabledTools?: AssistantToolName[]): string {
+    return JSON.stringify(this.toolCatalogService.listTools(enabledTools), null, 2);
   }
 
   buildRequestSection(
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantWorkerRuntimeContext,
+    enabledTools?: AssistantToolName[],
   ): string {
     return JSON.stringify(
       {
         behavior: runtimeContext.soul ? JSON.parse(runtimeContext.soul) : [],
-        available_tools: this.toolCatalogService.listTools(),
+        available_tools: this.toolCatalogService.listTools(enabledTools),
         conversation_context: this.buildConversationContextSection(input),
         current_user_message: {
           chat: input.message.chat,
@@ -108,6 +112,7 @@ export class AssistantWorkerPromptService {
   buildPlanningPrompt(
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantWorkerRuntimeContext,
+    enabledTools?: AssistantToolName[],
   ): string {
     return [
       'You are the planning phase of the assistant runtime.',
@@ -118,7 +123,7 @@ export class AssistantWorkerPromptService {
       '',
       assistantPlanningOutputParser.getFormatInstructions(),
       '',
-      this.buildRequestSection(input, runtimeContext),
+      this.buildRequestSection(input, runtimeContext, enabledTools),
     ].join('\n');
   }
 
@@ -126,6 +131,7 @@ export class AssistantWorkerPromptService {
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantWorkerRuntimeContext,
     observation: AssistantToolObservation,
+    enabledTools?: AssistantToolName[],
   ): string {
     return [
       'You are the synthesis phase of the assistant runtime.',
@@ -136,7 +142,7 @@ export class AssistantWorkerPromptService {
       '',
       assistantSynthesisOutputParser.getFormatInstructions(),
       '',
-      this.buildRequestSection(input, runtimeContext),
+      this.buildRequestSection(input, runtimeContext, enabledTools),
       '',
       'tool_observation:',
       JSON.stringify(observation, null, 2),

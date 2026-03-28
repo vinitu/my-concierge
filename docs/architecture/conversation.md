@@ -8,13 +8,13 @@ Describe how conversation state works across gateways, `assistant-api`, `assista
 
 - gateways own channel-native session or thread state
 - `assistant-api` owns intake validation and callback routing metadata
-- `assistant-worker` owns canonical conversation state
-- MySQL is the canonical storage backend for conversation threads, turns, and summaries
+- `assistant-memory` owns canonical conversation state
+- MySQL is the canonical storage backend for conversation threads, turns, and summaries via `assistant-memory`
 
 This split is important:
 
 - gateways keep only transport-local runtime state
-- `assistant-worker` keeps the assistant-visible conversation state
+- `assistant-memory` keeps the assistant-visible canonical conversation state
 - durable memory is separate and is owned by `assistant-memory`
 
 ## Relations
@@ -24,8 +24,8 @@ flowchart LR
     Gateway["gateway-* runtime"] <--> API["assistant-api"]
     API <--> Queue["redis"]
     Queue <--> Worker["assistant-worker"]
-    Worker --> Conv["conversation tables in mysql"]
     Worker <--> Memory["assistant-memory"]
+    Memory --> Conv["conversation tables in mysql"]
 ```
 
 ## Conversation Identity
@@ -37,11 +37,11 @@ Rules:
 - the gateway creates or resolves the `conversation_id`
 - the same `conversation_id` must be reused for the same user-visible thread
 - `assistant-api` treats `conversation_id` as opaque and stable
-- `assistant-worker` uses `conversation_id` as the canonical thread id in MySQL
+- `assistant-memory` uses `conversation_id` as the canonical thread id in MySQL
 
 Examples:
 
-- `gateway-web`: browser session id
+- `gateway-web`: browser conversation id from cookie
 - `gateway-telegram`: telegram chat or thread mapping
 - `gateway-email`: email thread mapping derived from `Message-ID`, `In-Reply-To`, and `References`
 
@@ -68,15 +68,15 @@ It does not contain:
 3. The gateway sends the normalized message to `assistant-api`.
 4. `assistant-api` validates the request and writes an execution job to Redis.
 5. `assistant-worker` reads the job from Redis.
-6. `assistant-worker` loads the conversation summary and recent turns from MySQL.
+6. `assistant-worker` loads the conversation summary and recent turns from `assistant-memory`.
 7. `assistant-worker` calls `assistant-memory` only for durable memory retrieval.
 8. The LangChain.js runtime receives bootstrap context, conversation state, retrieved memory, and the current message.
 
 ## Write Path
 
 1. The LangChain.js runtime produces the final answer.
-2. `assistant-worker` appends the user turn and assistant turn to MySQL.
-3. `assistant-worker` updates the compact conversation summary in MySQL.
+2. `assistant-worker` appends the user turn and assistant turn through `assistant-memory`.
+3. `assistant-memory` updates the compact conversation summary in MySQL.
 4. `assistant-worker` emits run events to Redis.
 5. `assistant-api` consumes the run events and sends the external callback to the originating gateway.
 6. The gateway updates its own local transport runtime.
@@ -86,8 +86,8 @@ It does not contain:
 - conversation state is not durable memory
 - gateways do not own canonical assistant conversation history
 - `assistant-api` does not store or mutate canonical conversation turns
-- `assistant-memory` does not own conversation threads
-- channel-native thread state may exist in the gateway, but assistant-visible thread state lives in `assistant-worker`
+- `assistant-memory` owns canonical conversation threads and summaries
+- channel-native thread state may exist in the gateway, but assistant-visible thread state lives in `assistant-memory`
 
 ## Email Thread Example
 

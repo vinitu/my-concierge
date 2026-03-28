@@ -33,6 +33,24 @@ export class GatewayWebOpenApiController {
             },
           },
         },
+        '/config': {
+          get: {
+            summary: 'Get gateway-web runtime config',
+            responses: {
+              '200': {
+                description: 'Current gateway-web config',
+              },
+            },
+          },
+          put: {
+            summary: 'Update gateway-web runtime config',
+            responses: {
+              '200': {
+                description: 'Updated gateway-web config',
+              },
+            },
+          },
+        },
         '/response/{conversationId}': {
           post: {
             summary: 'Receive the final assistant response for a browser conversation',
