@@ -30,6 +30,8 @@ export interface AssistantWorkerConfig {
   ollama_timeout_ms: number;
   provider: AssistantWorkerProvider;
   run_timeout_seconds: number;
+  small_model_safe_mode: boolean;
+  structured_mode: boolean;
   thinking_interval_seconds: number;
   xai_api_key: string;
   xai_base_url: string;
@@ -37,6 +39,22 @@ export interface AssistantWorkerConfig {
 }
 
 const SUPPORTED_WORKER_PROVIDERS: AssistantWorkerProvider[] = ['xai', 'ollama', 'deepseek'];
+const LEGACY_TOOL_NAME_ALIASES: Record<string, AssistantToolName> = {
+  conversation_search: 'mem_conversation_search',
+  memory_search_episode: 'mem_episode_search',
+  memory_search_fact: 'mem_fact_search',
+  memory_search_federated: 'mem_search',
+  memory_search_preference: 'mem_preference_search',
+  memory_search_project: 'mem_project_search',
+  memory_search_routine: 'mem_routine_search',
+  memory_search_rule: 'mem_rule_search',
+  memory_write_episode: 'mem_episode_write',
+  memory_write_fact: 'mem_fact_write',
+  memory_write_preference: 'mem_preference_write',
+  memory_write_project: 'mem_project_write',
+  memory_write_routine: 'mem_routine_write',
+  memory_write_rule: 'mem_rule_write',
+};
 
 @Injectable()
 export class AssistantWorkerConfigService {
@@ -92,6 +110,14 @@ export class AssistantWorkerConfigService {
         provider,
         run_timeout_seconds: this.normalizeRunTimeoutSeconds(
           parsed.run_timeout_seconds,
+        ),
+        small_model_safe_mode: this.normalizeBoolean(
+          parsed.small_model_safe_mode,
+          this.defaultConfig().small_model_safe_mode,
+        ),
+        structured_mode: this.normalizeBoolean(
+          parsed.structured_mode,
+          this.defaultConfig().structured_mode,
         ),
         thinking_interval_seconds: this.normalizeThinkingIntervalSeconds(
           parsed.thinking_interval_seconds,
@@ -161,6 +187,14 @@ export class AssistantWorkerConfigService {
       ),
       provider,
       run_timeout_seconds: this.normalizeRunTimeoutSeconds(config.run_timeout_seconds),
+      small_model_safe_mode: this.normalizeBoolean(
+        config.small_model_safe_mode,
+        defaults.small_model_safe_mode,
+      ),
+      structured_mode: this.normalizeBoolean(
+        config.structured_mode,
+        defaults.structured_mode,
+      ),
       thinking_interval_seconds: this.normalizeThinkingIntervalSeconds(
         config.thinking_interval_seconds,
       ),
@@ -260,6 +294,7 @@ export class AssistantWorkerConfigService {
       const normalized = value
         .filter((entry): entry is string => typeof entry === 'string')
         .map((entry) => entry.trim())
+        .map((entry) => LEGACY_TOOL_NAME_ALIASES[entry] ?? entry)
         .filter(
           (entry): entry is AssistantToolName =>
             (SUPPORTED_ASSISTANT_TOOL_NAMES as readonly string[]).includes(entry),
@@ -295,6 +330,24 @@ export class AssistantWorkerConfigService {
 
       if (Number.isFinite(parsed)) {
         return Math.min(max, Math.max(min, parsed));
+      }
+    }
+
+    return fallback;
+  }
+
+  private normalizeBoolean(value: unknown, fallback: boolean): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') {
+        return true;
+      }
+      if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') {
+        return false;
       }
     }
 
@@ -352,6 +405,8 @@ export class AssistantWorkerConfigService {
         5,
         600,
       ),
+      small_model_safe_mode: false,
+      structured_mode: true,
       thinking_interval_seconds: 2,
       xai_api_key: this.configService.get<string>('XAI_API_KEY', '').trim(),
       xai_base_url: this.configService.get<string>('XAI_BASE_URL', 'https://api.x.ai/v1').trim(),

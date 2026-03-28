@@ -45,6 +45,36 @@ describe('CallbackController', () => {
     });
   });
 
+  it('delivers error callback as assistant error event', async () => {
+    const conversationRegistryService = {
+      sendAssistantError: jest.fn().mockReturnValue(true),
+      sendAssistantMessage: jest.fn().mockReturnValue(true),
+    } as unknown as ConversationRegistryService;
+    const metricsService = {
+      recordCallback: jest.fn(),
+    } as unknown as MetricsService;
+
+    const controller = new CallbackController(
+      conversationRegistryService,
+      metricsService,
+    );
+
+    await expect(
+      controller.deliverAssistantResponse('conversation-1', {
+        error: true,
+        message: 'The assistant run failed.',
+      }),
+    ).resolves.toEqual({
+      delivered: true,
+      response: 'Callback delivered',
+    });
+
+    expect(conversationRegistryService.sendAssistantError).toHaveBeenCalledWith(
+      'conversation-1',
+      'The assistant run failed.',
+    );
+  });
+
   it('delivers thinking notifications to a registered conversation', () => {
     const conversationRegistryService = {
       sendAssistantThinking: jest.fn().mockReturnValue(true),

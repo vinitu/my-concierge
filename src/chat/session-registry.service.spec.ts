@@ -40,4 +40,14 @@ describe('ConversationRegistryService', () => {
     expect(service.sendAssistantThinking('conversation-1', 2)).toBe(true);
     expect(client.emit).toHaveBeenCalledWith('assistant.thinking', { seconds: 2 });
   });
+
+  it('sends error notifications to a registered conversation', () => {
+    const service = new ConversationRegistryService();
+    const client: SocketEmitter = { emit: jest.fn() };
+
+    service.register('conversation-1', client);
+
+    expect(service.sendAssistantError('conversation-1', 'run failed')).toBe(true);
+    expect(client.emit).toHaveBeenCalledWith('assistant.error', { message: 'run failed' });
+  });
 });

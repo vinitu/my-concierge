@@ -11,42 +11,53 @@ describe('AssistantLlmProviderService', () => {
         read: jest.fn().mockResolvedValue({ provider: 'xai' }),
       } as unknown as AssistantWorkerConfigService,
       {
-        generateText: jest.fn().mockResolvedValue('deepseek reply'),
+        generateFromMessages: jest.fn().mockResolvedValue('deepseek reply'),
+        summarizeConversation: jest.fn().mockResolvedValue('deepseek summary'),
       } as unknown as DeepseekChatService,
       {
-        generateText: jest.fn().mockResolvedValue('xai reply'),
+        generateFromMessages: jest.fn().mockResolvedValue('xai reply'),
+        summarizeConversation: jest.fn().mockResolvedValue('xai summary'),
       } as unknown as GrokResponsesService,
       {
-        generateText: jest.fn().mockResolvedValue('ollama reply'),
+        generateFromMessages: jest.fn().mockResolvedValue('ollama reply'),
+        summarizeConversation: jest.fn().mockResolvedValue('ollama summary'),
       } as unknown as OllamaChatService,
     );
 
-    await expect(service.generateText('prompt')).resolves.toEqual('xai reply');
+    await expect(
+      service.generateFromMessages([{ content: 'prompt', role: 'system' }]),
+    ).resolves.toEqual('xai reply');
   });
 
   it('routes requests to ollama when configured', async () => {
     const ollamaChatService = {
-      generateText: jest.fn().mockResolvedValue('ollama reply'),
+      generateFromMessages: jest.fn().mockResolvedValue('ollama reply'),
+      summarizeConversation: jest.fn().mockResolvedValue('ollama summary'),
     } as unknown as OllamaChatService;
     const service = new AssistantLlmProviderService(
       {
         read: jest.fn().mockResolvedValue({ provider: 'ollama' }),
       } as unknown as AssistantWorkerConfigService,
       {
-        generateText: jest.fn().mockResolvedValue('deepseek reply'),
+        generateFromMessages: jest.fn().mockResolvedValue('deepseek reply'),
+        summarizeConversation: jest.fn().mockResolvedValue('deepseek summary'),
       } as unknown as DeepseekChatService,
       {
-        generateText: jest.fn().mockResolvedValue('xai reply'),
+        generateFromMessages: jest.fn().mockResolvedValue('xai reply'),
+        summarizeConversation: jest.fn().mockResolvedValue('xai summary'),
       } as unknown as GrokResponsesService,
       ollamaChatService,
     );
 
-    await expect(service.generateText('prompt')).resolves.toEqual('ollama reply');
+    await expect(
+      service.generateFromMessages([{ content: 'prompt', role: 'system' }]),
+    ).resolves.toEqual('ollama reply');
   });
 
   it('routes requests to deepseek when configured', async () => {
     const deepseekChatService = {
-      generateText: jest.fn().mockResolvedValue('deepseek reply'),
+      generateFromMessages: jest.fn().mockResolvedValue('deepseek reply'),
+      summarizeConversation: jest.fn().mockResolvedValue('deepseek summary'),
     } as unknown as DeepseekChatService;
     const service = new AssistantLlmProviderService(
       {
@@ -54,13 +65,42 @@ describe('AssistantLlmProviderService', () => {
       } as unknown as AssistantWorkerConfigService,
       deepseekChatService,
       {
-        generateText: jest.fn().mockResolvedValue('xai reply'),
+        generateFromMessages: jest.fn().mockResolvedValue('xai reply'),
+        summarizeConversation: jest.fn().mockResolvedValue('xai summary'),
       } as unknown as GrokResponsesService,
       {
-        generateText: jest.fn().mockResolvedValue('ollama reply'),
+        generateFromMessages: jest.fn().mockResolvedValue('ollama reply'),
+        summarizeConversation: jest.fn().mockResolvedValue('ollama summary'),
       } as unknown as OllamaChatService,
     );
 
-    await expect(service.generateText('prompt')).resolves.toEqual('deepseek reply');
+    await expect(
+      service.generateFromMessages([{ content: 'prompt', role: 'system' }]),
+    ).resolves.toEqual('deepseek reply');
+  });
+
+  it('routes summary requests to active provider', async () => {
+    const deepseekChatService = {
+      generateFromMessages: jest.fn(),
+      summarizeConversation: jest.fn().mockResolvedValue('summary'),
+    } as unknown as DeepseekChatService;
+    const service = new AssistantLlmProviderService(
+      {
+        read: jest.fn().mockResolvedValue({ provider: 'deepseek' }),
+      } as unknown as AssistantWorkerConfigService,
+      deepseekChatService,
+      {
+        generateFromMessages: jest.fn(),
+        summarizeConversation: jest.fn(),
+      } as unknown as GrokResponsesService,
+      {
+        generateFromMessages: jest.fn(),
+        summarizeConversation: jest.fn(),
+      } as unknown as OllamaChatService,
+    );
+
+    await expect(
+      service.summarizeConversation([{ content: 'msg', role: 'user' }], 'previous'),
+    ).resolves.toEqual('summary');
   });
 });

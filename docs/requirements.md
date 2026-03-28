@@ -65,7 +65,7 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - Redis transport is required between API intake and worker execution.
 - Redis is the canonical queue transport.
 - One shared Swagger UI is preferred over multiple Swagger UI services.
-- `assistant-worker` reads `SYSTEM.js`, `SOUL.js`, `IDENTITY.js`, and `skills/` from `runtime/assistant-worker/`.
+- `assistant-worker` reads `SYSTEM.js` and `skills/` from `runtime/assistant-worker/`.
 - conversation state lives in MySQL under `assistant-worker` ownership.
 - durable memory lives behind `assistant-memory`.
 - `gateway-web` conversation history is canonical in `assistant-memory`; local runtime is used for gateway config only.

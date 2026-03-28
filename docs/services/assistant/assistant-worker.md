@@ -19,7 +19,7 @@ This document describes the canonical `assistant-worker` architecture.
 
 - Read accepted jobs from Redis
 - Read bootstrap runtime context from the runtime directory
-- Load `SYSTEM.js`, `SOUL.js`, `IDENTITY.js`, local skill definitions, and prompt templates
+- Load `SYSTEM.js` and local skill definitions
 - Build execution context from bootstrap data, conversation state, and retrieved memory
 - Run the LangChain.js-based assistant loop
 - Call the configured LLM provider through one shared provider interface
@@ -43,7 +43,6 @@ flowchart LR
 
 `assistant-worker` starts from the same runtime directory as the rest of `assistant`.
 It treats this directory as the source of bootstrap identity, behavior rules, and static skill definitions.
-The worker prompt template is stored in the repository, not in the runtime directory.
 
 Expected layout:
 
@@ -51,8 +50,6 @@ Expected layout:
 runtime/
   assistant-worker/
     SYSTEM.js
-    SOUL.js
-    IDENTITY.js
     skills/
     config/
       worker.json
@@ -64,8 +61,6 @@ runtime/
 ### Runtime Files
 
 - `SYSTEM.js`: operating rules and execution constraints
-- `SOUL.js`: tone, behavior, and boundaries
-- `IDENTITY.js`: assistant identity and role
 - `skills/`: local skill definitions
 - `config/worker.json`: worker runtime settings
 - `data/`: runtime state and working data
@@ -107,8 +102,6 @@ For each run, `assistant-worker` builds context from:
 
 1. bootstrap instructions
    - `SYSTEM.js`
-   - `SOUL.js`
-   - `IDENTITY.js`
 2. conversation context
    - rolling summary from MySQL
    - recent turns from MySQL
@@ -169,7 +162,7 @@ sequenceDiagram
 
 1. Read the next accepted job from Redis.
 2. Read the current bootstrap context from the runtime directory.
-3. Load and normalize assistant rules, identity, the repository prompt template, and worker config.
+3. Load and normalize assistant rules and worker config.
 4. Read conversation summary and recent turns from MySQL.
 5. Call `assistant-memory` to retrieve relevant durable memory.
 6. Build the LangChain.js execution context.

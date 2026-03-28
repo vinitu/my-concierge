@@ -13,8 +13,17 @@ export interface AssistantLlmGenerateInput {
   retrieved_memory: MemoryEntry[];
 }
 
+export interface AssistantLlmMessage {
+  content: string;
+  role: 'assistant' | 'system' | 'user';
+}
+
 export interface AssistantLlmProvider {
-  generateText(prompt: string): Promise<string>;
+  generateFromMessages(messages: AssistantLlmMessage[]): Promise<string>;
+  summarizeConversation(
+    messages: AssistantLlmMessage[],
+    previousContext: string,
+  ): Promise<string>;
 }
 
 export const ASSISTANT_LLM_PROVIDER = Symbol('ASSISTANT_LLM_PROVIDER');

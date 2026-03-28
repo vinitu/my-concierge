@@ -10,6 +10,7 @@ import { ConversationRegistryService } from './session-registry.service';
 
 interface CallbackBody {
   message: string;
+  error?: boolean;
 }
 
 interface ThinkingBody {
@@ -30,7 +31,7 @@ export class CallbackController {
     @Body() body: CallbackBody,
   ): Promise<{ delivered: boolean; response: string }> {
     const message = body.message?.trim() ?? '';
-    return this.handleResponseDelivery(conversationId, message);
+    return this.handleResponseDelivery(conversationId, message, body.error === true);
   }
 
   @Post('thinking/:conversationId')
@@ -59,10 +60,13 @@ export class CallbackController {
   private async handleResponseDelivery(
     conversationId: string,
     message: string,
+    error: boolean,
   ): Promise<{ delivered: boolean; response: string }> {
     const delivered =
       message.length > 0 &&
-      this.conversationRegistryService.sendAssistantMessage(conversationId, message);
+      (error
+        ? this.conversationRegistryService.sendAssistantError(conversationId, message)
+        : this.conversationRegistryService.sendAssistantMessage(conversationId, message));
 
     this.metricsService.recordCallback(delivered);
 

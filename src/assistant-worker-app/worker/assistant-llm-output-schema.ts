@@ -1,8 +1,8 @@
-import { StructuredOutputParser } from '@langchain/core/output_parsers';
 import { z } from 'zod/v3';
 
 export interface AssistantLlmGenerateResult {
   context: string;
+  fallback_reason?: string;
   memory_writes?: Array<Record<string, unknown>>;
   message: string;
   tool_observations?: Array<Record<string, unknown>>;
@@ -17,20 +17,20 @@ export interface AssistantLlmPlanResult {
 }
 
 const toolNameSchema = z.enum([
-  'conversation_search',
-  'memory_search_federated',
-  'memory_search_preference',
-  'memory_search_fact',
-  'memory_search_routine',
-  'memory_search_project',
-  'memory_search_episode',
-  'memory_search_rule',
-  'memory_write_preference',
-  'memory_write_fact',
-  'memory_write_routine',
-  'memory_write_project',
-  'memory_write_episode',
-  'memory_write_rule',
+  'mem_conversation_search',
+  'mem_search',
+  'mem_preference_search',
+  'mem_fact_search',
+  'mem_routine_search',
+  'mem_project_search',
+  'mem_episode_search',
+  'mem_rule_search',
+  'mem_preference_write',
+  'mem_fact_write',
+  'mem_routine_write',
+  'mem_project_write',
+  'mem_episode_write',
+  'mem_rule_write',
   'skill_execute',
   'time_current',
   'web_search',
@@ -46,6 +46,7 @@ const assistantResultInputSchema = z
     answer: z.string().optional(),
     content: z.string().optional(),
     context: z.string().optional().default(''),
+    fallback_reason: z.string().optional(),
     memory_writes: objectArraySchema,
     message: z.string().optional(),
     reply: z.string().optional(),
@@ -76,6 +77,7 @@ const assistantResultInputSchema = z
   })
   .transform((value): AssistantLlmGenerateResult => ({
     context: value.context?.trim() ?? '',
+    fallback_reason: value.fallback_reason?.trim() || undefined,
     memory_writes: value.memory_writes ?? [],
     message: [
       value.message,
@@ -88,48 +90,116 @@ const assistantResultInputSchema = z
     tool_observations: value.tool_observations ?? [],
   }));
 
-const toolCallSchema = z.object({
-  arguments: z.record(z.string(), z.unknown()),
-  name: toolNameSchema,
-});
-
-const planWrapperSchema = z
+const planningUnifiedSchema = z
   .object({
-    final: assistantResultInputSchema.optional(),
-    tool_call: toolCallSchema.nullish(),
+    context: z.string().optional().default(''),
+    fallback_reason: z.string().optional(),
+    memory_writes: objectArraySchema,
+    message: z.string().optional(),
+    tool_arguments: z.record(z.string(), z.unknown()).optional().default({}),
+    tool_name: toolNameSchema.optional(),
+    tool_observations: objectArraySchema,
+    type: z.enum(['final', 'tool_call', 'error']),
   })
   .passthrough()
   .superRefine((value, ctx) => {
-    const hasFinal = typeof value.final !== 'undefined';
-    const hasTool = typeof value.tool_call === 'object' && value.tool_call !== null;
+    if (value.type === 'tool_call') {
+      if (!value.tool_name) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'tool_name is required when type=tool_call.',
+          path: ['tool_name'],
+        });
+      }
+      return;
+    }
 
-    if (hasFinal === hasTool) {
+    if (typeof value.message !== 'string' || value.message.trim().length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Planning output must contain exactly one of final or tool_call.',
-        path: ['final'],
+        message: 'message is required when type=final|error.',
+        path: ['message'],
       });
     }
   })
-  .transform(
-    (value): AssistantLlmPlanResult => ({
-      final: value.final,
-      tool_call: value.tool_call ?? null,
-    }),
-  );
+  .transform((value): AssistantLlmPlanResult => {
+    if (value.type === 'tool_call') {
+      return {
+        final: undefined,
+        tool_call: {
+          arguments: value.tool_arguments ?? {},
+          name: value.tool_name!,
+        },
+      };
+    }
 
-const planningStructuredSchema = z.union([
-  planWrapperSchema,
-  assistantResultInputSchema.transform(
-    (final): AssistantLlmPlanResult => ({
-      final,
+    return {
+      final: {
+        context: value.context?.trim() ?? '',
+        fallback_reason: value.fallback_reason?.trim() || undefined,
+        memory_writes: value.memory_writes ?? [],
+        message: value.message!.trim(),
+        tool_observations: value.tool_observations ?? [],
+      },
       tool_call: null,
-    }),
-  ),
-]);
+    };
+  });
 
-export const assistantPlanningOutputParser =
-  StructuredOutputParser.fromZodSchema(planningStructuredSchema);
+interface OutputParser<T> {
+  getFormatInstructions(): string;
+  parse(text: string): Promise<T>;
+}
 
-export const assistantSynthesisOutputParser =
-  StructuredOutputParser.fromZodSchema(assistantResultInputSchema);
+function createOutputParser<T>(
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+  formatInstructions: string,
+): OutputParser<T> {
+  return {
+    getFormatInstructions(): string {
+      return formatInstructions;
+    },
+    async parse(text: string): Promise<T> {
+      const candidate = text.trim();
+
+      let value: unknown;
+      try {
+        value = JSON.parse(candidate);
+      } catch (error) {
+        const parseMessage = error instanceof Error ? error.message : 'Unknown JSON parse error';
+        throw new Error(`Failed to parse JSON text: ${parseMessage}. Text: "${candidate}"`);
+      }
+
+      try {
+        return await schema.parseAsync(value);
+      } catch (error) {
+        const validationMessage =
+          error instanceof Error ? error.message : JSON.stringify(error);
+        throw new Error(`Structured output validation failed: ${validationMessage}. Text: "${candidate}"`);
+      }
+    },
+  };
+}
+
+const planningFormatInstructions = [
+  'Return JSON only.',
+  'Required shape:',
+  '{"type":"final|tool_call|error","message":"...","tool_name":"optional","tool_arguments":{},"context":"...","memory_writes":[],"tool_observations":[]}',
+  'If type=tool_call, provide tool_name + tool_arguments and message may be empty.',
+  'If type=final or type=error, message must be non-empty.',
+].join('\n');
+
+const synthesisFormatInstructions = [
+  'Return JSON only.',
+  'Required shape:',
+  '{"message":"...","context":"...","memory_writes":[],"tool_observations":[]}',
+].join('\n');
+
+export const assistantPlanningOutputParser = createOutputParser(
+  planningUnifiedSchema,
+  planningFormatInstructions,
+);
+
+export const assistantSynthesisOutputParser = createOutputParser(
+  assistantResultInputSchema,
+  synthesisFormatInstructions,
+);

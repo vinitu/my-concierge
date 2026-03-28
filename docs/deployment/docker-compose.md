@@ -36,7 +36,6 @@ Describe the default local runtime.
 - `gateway-telegram` mounts `./runtime/gateway-telegram` into the container as `/app/runtime`
 - `gateway-email` mounts `./runtime/gateway-email` into the container as `/app/runtime`
 - `dashboard` polls every service over HTTP and refreshes the browser tiles every `DASHBOARD_REFRESH_SECONDS`
-- `assistant-worker` reads its prompt template from `/app/prompts/user-prompt.md`
 - runtime files are provided only through the Docker Compose bind volume and are not copied into the image
 - Docker Compose reads local values from `.env`
 - the schema must be prepared with `npm run db:migrate` before `assistant-worker` and `assistant-memory` can use MySQL successfully

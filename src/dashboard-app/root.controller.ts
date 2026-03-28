@@ -191,24 +191,25 @@ export class DashboardRootController {
       const ASSISTANT_WORKER_TOOL_NAMES = [
         'time_current',
         'web_search',
-        'memory_search_federated',
-        'memory_search_preference',
-        'memory_search_fact',
-        'memory_search_routine',
-        'memory_search_project',
-        'memory_search_episode',
-        'memory_search_rule',
-        'memory_write_preference',
-        'memory_write_fact',
-        'memory_write_routine',
-        'memory_write_project',
-        'memory_write_episode',
-        'memory_write_rule',
-        'conversation_search',
+        'mem_search',
+        'mem_preference_search',
+        'mem_fact_search',
+        'mem_routine_search',
+        'mem_project_search',
+        'mem_episode_search',
+        'mem_rule_search',
+        'mem_preference_write',
+        'mem_fact_write',
+        'mem_routine_write',
+        'mem_project_write',
+        'mem_episode_write',
+        'mem_rule_write',
+        'mem_conversation_search',
         'skill_execute',
       ];
       const ASSISTANT_MEMORY_SECTIONS = [
         { id: 'profile', label: 'Profile' },
+        { id: 'conversations', label: 'Conversations' },
         { id: 'preferences', label: 'Preferences' },
         { id: 'facts', label: 'Facts' },
         { id: 'routines', label: 'Routines' },
@@ -807,6 +808,103 @@ export class DashboardRootController {
           } catch {
             content.innerHTML = '<div class="status-line">Failed to load profile</div>';
           }
+          return;
+        }
+
+        if (section === 'conversations') {
+          content.innerHTML = '<div class="status-line">Loading conversations...</div>';
+          try {
+            const listResponse = await fetch(buildServiceUrl(service, '/v1/conversations'));
+            if (!listResponse.ok) {
+              content.innerHTML = '<div class="status-line">Failed to load conversations</div>';
+              return;
+            }
+
+            const payload = await listResponse.json();
+            const conversations = Array.isArray(payload.threads)
+              ? payload.threads
+              : Array.isArray(payload.conversations)
+                ? payload.conversations
+                : [];
+
+            if (conversations.length === 0) {
+              content.innerHTML = '<div class="item">No conversations found.</div>';
+              return;
+            }
+
+            const firstConversation = conversations[0] || null;
+            let firstConversationState = null;
+            const firstConversationId =
+              firstConversation?.thread_id || firstConversation?.conversationId || '';
+            if (typeof firstConversationId === 'string' && firstConversationId.length > 0) {
+              const readResponse = await fetch(buildServiceUrl(service, '/v1/conversations/read'), {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                  chat: firstConversation?.chat || 'direct',
+                  contact: firstConversation?.contact || 'default-user',
+                  conversation_id: firstConversationId,
+                  direction: firstConversation?.direction || 'api',
+                }),
+              });
+              if (readResponse.ok) {
+                firstConversationState = await readResponse.json();
+              }
+            }
+
+            content.innerHTML =
+              '<div class="row">' +
+                '<div class="list" id="conversation-list">' +
+                  conversations.map((conversation) => {
+                    const conversationId = conversation.thread_id || conversation.conversationId || '';
+                    const updatedAt = conversation.updated_at || conversation.updatedAt || '';
+                    const chat = conversation.chat || 'direct';
+                    const contact = conversation.contact || 'default-user';
+                    const direction = conversation.direction || 'api';
+                    return '<button class="item" style="text-align:left;cursor:pointer" data-conversation-id="' + escapeHtml(conversationId) + '" data-chat="' + escapeHtml(chat) + '" data-contact="' + escapeHtml(contact) + '" data-direction="' + escapeHtml(direction) + '">' +
+                      '<strong>' + escapeHtml(conversationId) + '</strong><br />' +
+                      '<span class="meta">' + escapeHtml(direction + '/' + chat + '/' + contact) + ' · updated=' + escapeHtml(updatedAt) + '</span>' +
+                    '</button>';
+                  }).join('') +
+                '</div>' +
+                '<div><pre id="conversation-detail">' + escapeHtml(JSON.stringify(firstConversationState || conversations[0], null, 2)) + '</pre></div>' +
+              '</div>';
+
+            content.querySelectorAll('button[data-conversation-id]').forEach((button) => {
+              button.addEventListener('click', async () => {
+                const conversationId = button.dataset.conversationId;
+                const detail = content.querySelector('#conversation-detail');
+                detail.textContent = 'Loading...';
+
+                try {
+                  const chat = button.dataset.chat || 'direct';
+                  const contact = button.dataset.contact || 'default-user';
+                  const direction = button.dataset.direction || 'api';
+                  const readResponse = await fetch(buildServiceUrl(service, '/v1/conversations/read'), {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                      chat,
+                      contact,
+                      conversation_id: conversationId,
+                      direction,
+                    }),
+                  });
+                  if (!readResponse.ok) {
+                    detail.textContent = 'Failed to load conversation';
+                    return;
+                  }
+                  const conversationState = await readResponse.json();
+                  detail.textContent = JSON.stringify(conversationState, null, 2);
+                } catch {
+                  detail.textContent = 'Failed to load conversation';
+                }
+              });
+            });
+          } catch {
+            content.innerHTML = '<div class="status-line">Failed to load conversations</div>';
+          }
+
           return;
         }
 

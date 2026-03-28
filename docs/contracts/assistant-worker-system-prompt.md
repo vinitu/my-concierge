@@ -4,18 +4,12 @@
 
 Describe what `assistant-worker` sends into the LangChain.js runtime and which structured output the worker expects back from the assistant execution loop.
 
-The repository prompt template lives in:
-
-- [prompts/user-prompt.md](../../prompts/user-prompt.md)
-
 ## Context Layers
 
 For each queued request, `assistant-worker` builds one execution input from four layers:
 
 1. bootstrap context
    - `SYSTEM.js`
-   - `SOUL.js`
-   - `IDENTITY.js`
 2. conversation context
    - rolling summary from MySQL
    - recent conversation turns from MySQL

@@ -30,6 +30,7 @@ import type {
   AssistantConversationMessage,
   AssistantConversationState,
 } from './assistant-worker-conversation.service';
+import type { AssistantLlmGenerateInput } from './assistant-llm-provider';
 
 @Injectable()
 export class AssistantWorkerProcessorService
@@ -111,33 +112,30 @@ export class AssistantWorkerProcessorService
   }
 
   private async handleMessage(item: ProcessingQueueMessage): Promise<void> {
-    const workerConfig = await this.assistantWorkerConfigService.read();
     const runId = randomUUID();
     const startedAt = Date.now();
     let sequence = 0;
-    this.logger.log(
-      `Starting run runId=${runId} requestId=${item.request_id} conversationId=${item.conversation_id} provider=${workerConfig.provider} model=${workerConfig.model}`,
-    );
-    await this.publishRunEvent(item, runId, ++sequence, 'run.started', {});
-    const providerStatus = await this.assistantLlmProviderStatusService.getStatus();
-    this.logger.log(
-      `Provider preflight runId=${runId} status=${providerStatus.status} provider=${providerStatus.provider} reachable=${String(providerStatus.reachable)}`,
-    );
-
-    if (providerStatus.status !== 'ready') {
-      await this.publishRunEvent(item, runId, ++sequence, 'run.failed', {
-        code: 'PROVIDER_ERROR',
-        message: `assistant-worker is not ready: ${providerStatus.message}. Open the assistant-worker web panel and fix the AI settings.`,
-      });
-      this.logger.warn(
-        `Run failed preflight runId=${runId} requestId=${item.request_id}: ${providerStatus.message}`,
-      );
-      throw item;
-    }
-
+    let workerConfig: AssistantWorkerConfig | null = null;
     let stopThinking: (() => void) | null = null;
 
     try {
+      workerConfig = await this.assistantWorkerConfigService.read();
+      this.logger.log(
+        `Starting run runId=${runId} requestId=${item.request_id} conversationId=${item.conversation_id} provider=${workerConfig.provider} model=${workerConfig.model}`,
+      );
+      await this.publishRunEvent(item, runId, ++sequence, 'run.started', {});
+      const providerStatus = await this.assistantLlmProviderStatusService.getStatus();
+      this.logger.log(
+        `Provider preflight runId=${runId} status=${providerStatus.status} provider=${providerStatus.provider} reachable=${String(providerStatus.reachable)}`,
+      );
+
+      if (providerStatus.status !== 'ready') {
+        throw new AssistantRuntimeError(
+          'PROVIDER_ERROR',
+          `assistant-worker is not ready: ${providerStatus.message}. Open the assistant-worker web panel and fix the AI settings.`,
+        );
+      }
+
       this.logger.log(
         `Reading conversation state runId=${runId} conversationId=${item.conversation_id}`,
       );
@@ -169,14 +167,28 @@ export class AssistantWorkerProcessorService
       );
 
       stopThinking = this.startThinkingLoop(item, workerConfig, runId, () => ++sequence);
-      const result = await this.withRunTimeout(
+      const enabledTools = this.effectiveEnabledTools(workerConfig);
+      const runtimeResult = await this.withRunTimeout(
         this.assistantLangchainRuntimeService.run({
           conversation: effectiveConversation,
           message: item,
           retrieved_memory: memorySearch.entries,
-        }, workerConfig.enabled_tools),
+        }, enabledTools),
         workerConfig.run_timeout_seconds,
       );
+      const summaryContext = await this.safeSummarizeConversation(
+        {
+          conversation: effectiveConversation,
+          message: item,
+          retrieved_memory: memorySearch.entries,
+        },
+        runtimeResult.message,
+        runId,
+      );
+      const result = {
+        ...runtimeResult,
+        context: summaryContext,
+      };
 
       stopThinking();
       stopThinking = null;
@@ -185,6 +197,7 @@ export class AssistantWorkerProcessorService
         this.buildMemoryCandidates(item, effectiveConversation.context, result.context),
       );
       await this.publishRunEvent(item, runId, ++sequence, 'run.completed', {
+        fallback_reason: result.fallback_reason ?? null,
         message: result.message,
       });
       this.logger.log(
@@ -193,11 +206,17 @@ export class AssistantWorkerProcessorService
     } catch (error) {
       stopThinking?.();
       const errorCode = this.classifyErrorCode(error);
-      const userFacingMessage = this.userFacingFailureMessage(error, workerConfig.provider);
-      await this.publishRunEvent(item, runId, ++sequence, 'run.failed', {
-        code: errorCode,
-        message: userFacingMessage,
-      });
+      const userFacingMessage = this.userFacingFailureMessage(
+        error,
+        workerConfig?.provider,
+      );
+      await this.publishFailureBestEffort(
+        item,
+        runId,
+        ++sequence,
+        errorCode,
+        userFacingMessage,
+      );
       this.logger.error(
         `Run failed runId=${runId} requestId=${item.request_id} code=${errorCode} durationMs=${String(
           Date.now() - startedAt,
@@ -208,6 +227,132 @@ export class AssistantWorkerProcessorService
       );
       throw item;
     }
+  }
+
+  private async publishFailureBestEffort(
+    item: ProcessingQueueMessage,
+    runId: string,
+    sequence: number,
+    code: string,
+    message: string,
+  ): Promise<void> {
+    try {
+      await this.publishRunEvent(item, runId, sequence, 'run.failed', {
+        code,
+        message,
+      });
+      return;
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish run.failed event runId=${runId} requestId=${item.request_id}: ${this.unwrapErrorMessage(
+          error,
+        )}`,
+      );
+    }
+
+    await this.sendFailureCallbackDirectly(item, message);
+  }
+
+  private async sendFailureCallbackDirectly(
+    item: ProcessingQueueMessage,
+    message: string,
+  ): Promise<void> {
+    const baseUrl = item.callback.base_url?.trim();
+
+    if (!baseUrl) {
+      this.logger.warn(
+        `Skipping direct failure callback because callback base URL is empty requestId=${item.request_id} conversationId=${item.conversation_id}`,
+      );
+      return;
+    }
+
+    const callbackUrl = `${baseUrl.replace(/\/$/, '')}/response/${encodeURIComponent(
+      item.conversation_id,
+    )}`;
+
+    try {
+      const response = await fetch(callbackUrl, {
+        body: JSON.stringify({
+          error: true,
+          message,
+        }),
+        headers: {
+          'content-type': 'application/json',
+        },
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        this.logger.error(
+          `Direct failure callback returned ${String(response.status)} requestId=${item.request_id} conversationId=${item.conversation_id}: ${body}`,
+        );
+        return;
+      }
+
+      this.logger.log(
+        `Delivered failure callback directly requestId=${item.request_id} conversationId=${item.conversation_id}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Direct failure callback failed requestId=${item.request_id} conversationId=${item.conversation_id}: ${this.unwrapErrorMessage(
+          error,
+        )}`,
+      );
+    }
+  }
+
+  private async safeSummarizeConversation(
+    input: AssistantLlmGenerateInput,
+    assistantMessage: string,
+    runId: string,
+  ): Promise<string> {
+    try {
+      const summary = await this.assistantLangchainRuntimeService.summarizeConversation(
+        input,
+        assistantMessage,
+      );
+
+      if (!this.isUsableSummary(summary)) {
+        return input.conversation.context;
+      }
+
+      return summary.trim();
+    } catch (error) {
+      this.logger.warn(
+        `Summary generation failed runId=${runId} conversationId=${input.message.conversation_id}: ${this.unwrapErrorMessage(
+          error,
+        )}`,
+      );
+      return input.conversation.context;
+    }
+  }
+
+  private isUsableSummary(summary: string): boolean {
+    const normalized = summary.trim();
+
+    if (!normalized) {
+      return false;
+    }
+
+    if (normalized.length < 12) {
+      return false;
+    }
+
+    return /[\p{L}\p{N}]/u.test(normalized);
+  }
+
+  private effectiveEnabledTools(
+    config: AssistantWorkerConfig,
+  ): AssistantWorkerConfig['enabled_tools'] {
+    if (!config.small_model_safe_mode) {
+      return config.enabled_tools;
+    }
+
+    this.logger.log(
+      `Small-model safe mode enabled: disabling runtime tool calls for provider=${config.provider} model=${config.model}`,
+    );
+    return [];
   }
 
   private async buildEffectiveConversation(
@@ -447,7 +592,10 @@ export class AssistantWorkerProcessorService
       return error.code;
     }
 
-    if (error instanceof Error && error.message.includes('MySQL')) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('MySQL') || error.message.includes('assistant-memory returned'))
+    ) {
       return 'PERSISTENCE_ERROR';
     }
 
@@ -456,7 +604,7 @@ export class AssistantWorkerProcessorService
 
   private userFacingFailureMessage(
     error: unknown,
-    provider: AssistantWorkerConfig['provider'],
+    provider?: AssistantWorkerConfig['provider'],
   ): string {
     const message = this.unwrapErrorMessage(error).toLowerCase();
 
@@ -465,7 +613,7 @@ export class AssistantWorkerProcessorService
         return 'assistant-worker web search is enabled, but the Brave API key is missing. Open the Tools section in the assistant-worker web panel and save the Brave settings.';
       }
       return `assistant-worker is not configured: ${this.providerLabel(
-        provider,
+        provider ?? 'deepseek',
       )} API key is missing. Open the assistant-worker web panel and save the AI settings.`;
     }
 
@@ -474,7 +622,7 @@ export class AssistantWorkerProcessorService
         return 'assistant-worker web search timed out while calling Brave. Increase the Brave timeout or try again later.';
       }
       return `assistant-worker timed out while waiting for ${this.providerLabel(
-        provider,
+        provider ?? 'deepseek',
       )}. Reduce the model timeout or switch the provider in the assistant-worker web panel.`;
     }
 
@@ -483,7 +631,7 @@ export class AssistantWorkerProcessorService
         return 'assistant-worker could not authenticate with Brave web search. Check the Brave API key in the Tools section.';
       }
       return `assistant-worker could not authenticate with ${this.providerLabel(
-        provider,
+        provider ?? 'deepseek',
       )}. Check the AI settings in the assistant-worker web panel.`;
     }
 
@@ -508,12 +656,20 @@ export class AssistantWorkerProcessorService
       return 'assistant-worker MySQL conversation storage is not ready. Run `npm run db:migrate` and restart the stack.';
     }
 
+    if (message.includes('assistant-memory schema is outdated')) {
+      return 'assistant-memory uses an old conversation schema. Run `npm run db:migrate` and restart the stack.';
+    }
+
+    if (message.includes('assistant-memory returned')) {
+      return 'assistant-worker could not save conversation state in assistant-memory. Check assistant-memory logs and run `npm run db:migrate`.';
+    }
+
     if (message.includes('mysql')) {
       return 'assistant-worker could not save conversation state because MySQL is unavailable.';
     }
 
     return `assistant-worker failed while processing the message. Check the ${this.providerLabel(
-      provider,
+      provider ?? 'deepseek',
     )} configuration in the assistant-worker web panel.`;
   }
 

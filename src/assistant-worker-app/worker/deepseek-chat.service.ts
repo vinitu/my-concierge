@@ -2,7 +2,10 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import type { AssistantLlmProvider } from './assistant-llm-provider';
+import type {
+  AssistantLlmMessage,
+  AssistantLlmProvider,
+} from './assistant-llm-provider';
 import { AssistantWorkerConfigService } from './assistant-worker-config.service';
 
 interface DeepseekChatCompletionResponse {
@@ -37,7 +40,31 @@ export class DeepseekChatService implements AssistantLlmProvider {
     };
   }
 
-  async generateText(prompt: string): Promise<string> {
+  async generateFromMessages(messages: AssistantLlmMessage[]): Promise<string> {
+    return this.sendChatCompletion(messages);
+  }
+
+  async summarizeConversation(
+    messages: AssistantLlmMessage[],
+    previousContext: string,
+  ): Promise<string> {
+    const summaryInstructions = [
+      'Summarize the conversation for compact future context.',
+      'Return plain text only (no markdown, no JSON).',
+      'Keep it concise and reusable (1-3 sentences).',
+      `Previous summary: ${previousContext.trim() || '(empty)'}`,
+      'Preserve active topic, decisions, preferences, constraints, and unresolved questions.',
+      'Drop filler and repetitive phrasing.',
+    ].join('\n');
+    const summaryMessages: AssistantLlmMessage[] = [
+      { content: summaryInstructions, role: 'system' },
+      ...messages,
+    ];
+    const summary = await this.sendChatCompletion(summaryMessages);
+    return this.normalizeSummary(summary, previousContext);
+  }
+
+  private async sendChatCompletion(messages: AssistantLlmMessage[]): Promise<string> {
     const providerConfig = await this.currentConfig();
     const apiKey = providerConfig.apiKey;
 
@@ -49,12 +76,7 @@ export class DeepseekChatService implements AssistantLlmProvider {
     const model = providerConfig.model;
     const timeoutMs = providerConfig.timeoutMs;
     const requestBody = {
-      messages: [
-        {
-          content: prompt,
-          role: 'system',
-        },
-      ],
+      messages,
       model,
       stream: false,
     };
@@ -90,6 +112,21 @@ export class DeepseekChatService implements AssistantLlmProvider {
     }
 
     throw new Error('DeepSeek API response did not contain assistant text');
+  }
+
+  private normalizeSummary(summary: string, previousContext: string): string {
+    const normalized = this.stripMarkdownFence(summary).trim();
+
+    if (!normalized) {
+      return previousContext.trim();
+    }
+
+    return normalized.length > 1200 ? `${normalized.slice(0, 1200)}…` : normalized;
+  }
+
+  private stripMarkdownFence(value: string): string {
+    const match = value.trim().match(/^```(?:text|md|markdown)?\s*([\s\S]*?)\s*```$/i);
+    return match ? match[1] : value;
   }
 
   private preview(value: unknown): string {

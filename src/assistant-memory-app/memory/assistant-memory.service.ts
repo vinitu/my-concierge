@@ -260,16 +260,10 @@ export class AssistantMemoryService {
       const summary = nextContext || currentState.context;
       await connection.query(
         `
-          INSERT INTO conversation_threads (
+          INSERT IGNORE INTO conversation_threads (
             id, direction, chat, contact, status, created_at, updated_at, last_message_at
           )
           VALUES (?, ?, ?, ?, 'active', ?, ?, ?)
-          ON DUPLICATE KEY UPDATE
-            direction = VALUES(direction),
-            chat = VALUES(chat),
-            contact = VALUES(contact),
-            updated_at = VALUES(updated_at),
-            last_message_at = VALUES(last_message_at)
         `,
         [
           message.conversation_id,
@@ -281,6 +275,38 @@ export class AssistantMemoryService {
           now,
         ],
       );
+      const [threadUpdateResult] = await connection.query<QueryResult>(
+        `
+          UPDATE conversation_threads
+          SET
+            direction = ?,
+            chat = ?,
+            contact = ?,
+            updated_at = ?,
+            last_message_at = ?
+          WHERE id = ?
+        `,
+        [
+          message.direction,
+          message.chat,
+          message.contact,
+          now,
+          now,
+          message.conversation_id,
+        ],
+      );
+      const affectedRows =
+        typeof threadUpdateResult === 'object' &&
+        threadUpdateResult !== null &&
+        'affectedRows' in threadUpdateResult &&
+        typeof threadUpdateResult.affectedRows === 'number'
+          ? threadUpdateResult.affectedRows
+          : 0;
+      if (affectedRows === 0) {
+        throw new ConflictException(
+          'assistant-memory schema is outdated: conversation_threads still enforces uniq_conversation_route. Run npm run db:migrate to use conversation_id as canonical thread id.',
+        );
+      }
       const [sequenceRows] = await connection.query<
         Array<RowDataPacket & { max_sequence: number | null }>
       >(

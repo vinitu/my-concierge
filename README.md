@@ -148,8 +148,6 @@ In Docker Compose, each service mounts only its own runtime directory:
 Expected runtime files and folders:
 
 - `runtime/assistant-worker/SYSTEM.js`
-- `runtime/assistant-worker/SOUL.js`
-- `runtime/assistant-worker/IDENTITY.js`
 - `runtime/assistant-worker/skills/`
 - `runtime/assistant-worker/config/`
 - `runtime/gateway-web/conversations/`
@@ -158,7 +156,6 @@ Expected runtime files and folders:
 
 The runtime directory is not baked into the Docker image.
 The repository already includes a starter runtime directory in [runtime](./runtime) with placeholder instruction files.
-The repository-owned worker prompt template lives in [prompts/user-prompt.md](./prompts/user-prompt.md).
 
 ### assistant-api
 

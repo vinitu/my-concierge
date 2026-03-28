@@ -53,8 +53,6 @@ my-concierge/
   runtime/
     assistant-worker/
       SYSTEM.js
-      SOUL.js
-      IDENTITY.js
       skills/
       config/
       data/
@@ -65,9 +63,6 @@ my-concierge/
       data/
       logs/
       cache/
-
-  prompts/
-    user-prompt.md
 ```
 
 ## Why The Current Layout Is Small

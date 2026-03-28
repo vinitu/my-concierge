@@ -42,6 +42,8 @@ interface UpdateWorkerConfigBody {
   ollama_timeout_ms?: number | string;
   provider?: AssistantWorkerProvider | string;
   run_timeout_seconds?: number | string;
+  small_model_safe_mode?: boolean | string | number;
+  structured_mode?: boolean | string | number;
   thinking_interval_seconds?: number | string;
   xai_api_key?: string;
   xai_base_url?: string;
@@ -357,7 +359,7 @@ export class AssistantWorkerRootController {
                         )}</select>
                       </div>
                       <div class="col-md-4">
-                        <label class="form-label" for="memory-window">Remember messages</label>
+                        <label class="form-label" for="memory-window">Memory window (messages sent to main LLM)</label>
                         <input
                           class="form-control"
                           id="memory-window"
@@ -391,6 +393,26 @@ export class AssistantWorkerRootController {
                           max="600"
                           value="${String(config.run_timeout_seconds)}"
                         />
+                      </div>
+                      <div class="col-md-6">
+                        <div class="form-check form-switch mt-2">
+                          <input class="form-check-input" type="checkbox" role="switch" id="structured-mode" name="structured_mode"${
+                            config.structured_mode ? ' checked' : ''
+                          } />
+                          <label class="form-check-label" for="structured-mode">
+                            Structured mode (strict JSON schema for planning/synthesis)
+                          </label>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="form-check form-switch mt-2">
+                          <input class="form-check-input" type="checkbox" role="switch" id="small-model-safe-mode" name="small_model_safe_mode"${
+                            config.small_model_safe_mode ? ' checked' : ''
+                          } />
+                          <label class="form-check-label" for="small-model-safe-mode">
+                            Small-model safe mode (disable runtime tool calls)
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -512,6 +534,8 @@ export class AssistantWorkerRootController {
             <div>Selected model: <span id="selected-model-value">${this.escapeHtml(config.model)}</span></div>
             <div>Memory window: <span id="memory-window-value">${String(config.memory_window)}</span></div>
             <div>Thinking interval: <span id="thinking-interval-value">${String(config.thinking_interval_seconds)}</span>s</div>
+            <div>Structured mode: <span id="structured-mode-value">${config.structured_mode ? 'on' : 'off'}</span></div>
+            <div>Small-model safe mode: <span id="small-model-safe-mode-value">${config.small_model_safe_mode ? 'on' : 'off'}</span></div>
             <div>Enabled tools: <span id="enabled-tools-value">${this.escapeHtml(config.enabled_tools.join(', '))}</span></div>
             <div>Provider id: <span id="provider-id">${this.escapeHtml(providerStatus.provider)}</span></div>
             <div>Configured model: <span id="provider-model">${this.escapeHtml(providerStatus.model)}</span></div>
@@ -575,6 +599,8 @@ export class AssistantWorkerRootController {
         const memoryWindow = document.getElementById('memory-window').value;
         const thinkingIntervalSeconds = document.getElementById('thinking-interval-seconds').value;
         const runTimeoutSeconds = document.getElementById('run-timeout-seconds').value;
+        const structuredMode = document.getElementById('structured-mode').checked;
+        const smallModelSafeMode = document.getElementById('small-model-safe-mode').checked;
         const enabledTools = Array.from(document.querySelectorAll('input[name="enabled_tools"]:checked'))
           .map((field) => field.value);
         const braveApiKey = document.getElementById('brave-api-key').value;
@@ -607,6 +633,8 @@ export class AssistantWorkerRootController {
             ollama_timeout_ms: ollamaTimeoutMs,
             provider,
             run_timeout_seconds: runTimeoutSeconds,
+            small_model_safe_mode: smallModelSafeMode,
+            structured_mode: structuredMode,
             thinking_interval_seconds: thinkingIntervalSeconds,
             xai_api_key: xaiApiKey,
             xai_base_url: xaiBaseUrl,
@@ -620,7 +648,7 @@ export class AssistantWorkerRootController {
         }
 
         const payload = await response.json();
-        status.textContent = 'Saved provider: ' + payload.provider + ', model: ' + payload.model + ', memory window: ' + payload.memory_window + ', thinking interval: ' + payload.thinking_interval_seconds + 's, run timeout: ' + payload.run_timeout_seconds + 's, enabled tools: ' + payload.enabled_tools.join(', ');
+        status.textContent = 'Saved provider: ' + payload.provider + ', model: ' + payload.model + ', memory window: ' + payload.memory_window + ', thinking interval: ' + payload.thinking_interval_seconds + 's, run timeout: ' + payload.run_timeout_seconds + 's, structured: ' + (payload.structured_mode ? 'on' : 'off') + ', safe mode: ' + (payload.small_model_safe_mode ? 'on' : 'off') + ', enabled tools: ' + payload.enabled_tools.join(', ');
         document.getElementById('provider-value').textContent = payload.provider;
         document.getElementById('selected-model-value').textContent = payload.model;
         document.getElementById('provider').value = payload.provider;
@@ -629,6 +657,10 @@ export class AssistantWorkerRootController {
         document.getElementById('memory-window').value = String(payload.memory_window);
         document.getElementById('thinking-interval-value').textContent = String(payload.thinking_interval_seconds);
         document.getElementById('thinking-interval-seconds').value = String(payload.thinking_interval_seconds);
+        document.getElementById('structured-mode-value').textContent = payload.structured_mode ? 'on' : 'off';
+        document.getElementById('small-model-safe-mode-value').textContent = payload.small_model_safe_mode ? 'on' : 'off';
+        document.getElementById('structured-mode').checked = Boolean(payload.structured_mode);
+        document.getElementById('small-model-safe-mode').checked = Boolean(payload.small_model_safe_mode);
         document.getElementById('enabled-tools-value').textContent = payload.enabled_tools.join(', ');
         document.querySelectorAll('input[name="enabled_tools"]').forEach((field) => {
           field.checked = payload.enabled_tools.includes(field.value);
@@ -757,6 +789,8 @@ export class AssistantWorkerRootController {
           : typeof body.run_timeout_seconds === 'string'
             ? Number.parseInt(body.run_timeout_seconds, 10)
             : 30,
+      small_model_safe_mode: this.normalizeBoolean(body.small_model_safe_mode, false),
+      structured_mode: this.normalizeBoolean(body.structured_mode, true),
       thinking_interval_seconds:
         typeof body.thinking_interval_seconds === 'number'
           ? body.thinking_interval_seconds
@@ -782,6 +816,28 @@ export class AssistantWorkerRootController {
     }
 
     return 'xai';
+  }
+
+  private normalizeBoolean(value: unknown, fallback: boolean): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'on'].includes(normalized)) {
+        return true;
+      }
+      if (['false', '0', 'no', 'off'].includes(normalized)) {
+        return false;
+      }
+    }
+
+    return fallback;
   }
 
   private normalizeEnabledTools(value: unknown): AssistantToolName[] {

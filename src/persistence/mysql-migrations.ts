@@ -98,6 +98,16 @@ export const MYSQL_MIGRATIONS: MysqlMigration[] = [
       `,
     ],
   },
+  {
+    name: 'drop_conversation_route_uniqueness',
+    version: 2,
+    statements: [
+      `
+        DROP INDEX uniq_conversation_route
+        ON conversation_threads
+      `,
+    ],
+  },
 ];
 
 export const REQUIRED_SCHEMA_TABLES = [

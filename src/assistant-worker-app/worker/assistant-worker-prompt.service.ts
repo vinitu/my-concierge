@@ -73,23 +73,18 @@ export class AssistantWorkerPromptService {
     runtimeContext: AssistantWorkerRuntimeContext,
     enabledTools?: AssistantToolName[],
   ): string {
+    const systemInstructions = this.parseInstructions(runtimeContext.agents);
+
     return JSON.stringify(
       {
-        behavior: runtimeContext.soul ? JSON.parse(runtimeContext.soul) : [],
         available_tools: this.toolCatalogService.listTools(enabledTools),
         conversation_context: this.buildConversationContextSection(input),
-        current_user_message: {
-          chat: input.message.chat,
-          contact: input.message.contact,
-          direction: input.message.direction,
-          message: input.message.message,
-        },
-        identity: runtimeContext.identity ? JSON.parse(runtimeContext.identity) : [],
         retrieved_memory: input.retrieved_memory,
-        recent_messages: input.conversation.messages,
-        system_instructions: runtimeContext.agents ? JSON.parse(runtimeContext.agents) : [],
+        system_instructions: systemInstructions,
         task: [
           'Answer as the assistant inside the dialogue.',
+          'The full dialogue history is provided as chat messages outside this JSON payload.',
+          'The current user turn is provided as the latest user chat message outside this JSON payload.',
           'Preserve continuity with the conversation history, retrieved memory, and context.',
           'Use runtime instructions, retrieved memory, and conversation context when relevant.',
           'Update the compact conversation context for future turns.',
@@ -109,6 +104,34 @@ export class AssistantWorkerPromptService {
     );
   }
 
+  private parseInstructions(raw: string | null): string[] {
+    if (!raw) {
+      return [];
+    }
+
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((entry): entry is string => typeof entry === 'string');
+      }
+      if (typeof parsed === 'string' && parsed.trim()) {
+        return [parsed.trim()];
+      }
+    } catch {
+      return trimmed
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+    }
+
+    return [];
+  }
+
   buildPlanningPrompt(
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantWorkerRuntimeContext,
@@ -117,8 +140,9 @@ export class AssistantWorkerPromptService {
     return [
       'You are the planning phase of the assistant runtime.',
       'Follow the structured output schema exactly.',
-      'If no tool is needed, populate final with the assistant reply.',
-      'If one tool is needed, populate tool_call and leave final absent.',
+      'If no tool is needed, return type=final with message/context.',
+      'If one tool is needed, return type=tool_call with tool_name/tool_arguments.',
+      'Use type=error only when request cannot be processed safely.',
       'Do not output any explanatory text outside the JSON object.',
       '',
       assistantPlanningOutputParser.getFormatInstructions(),

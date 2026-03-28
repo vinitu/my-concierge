@@ -38,7 +38,9 @@ describe('DeepseekChatService', () => {
       } as unknown as AssistantWorkerConfigService,
     );
 
-    await expect(service.generateText('prompt')).resolves.toEqual(
+    await expect(
+      service.generateFromMessages([{ content: 'prompt', role: 'system' }]),
+    ).resolves.toEqual(
       '{"message":"Everything looks normal.","context":"The active topic is current house status."}',
     );
 
@@ -82,7 +84,9 @@ describe('DeepseekChatService', () => {
       } as unknown as AssistantWorkerConfigService,
     );
 
-    await expect(service.generateText('prompt')).rejects.toThrow(
+    await expect(
+      service.generateFromMessages([{ content: 'prompt', role: 'system' }]),
+    ).rejects.toThrow(
       'DeepSeek API key is not configured in assistant-worker web settings',
     );
   });

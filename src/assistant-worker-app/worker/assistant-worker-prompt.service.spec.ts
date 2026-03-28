@@ -254,16 +254,8 @@ describe('AssistantWorkerPromptService', () => {
     ).toBe(
       JSON.stringify(
         {
-          behavior: ['Stay calm'],
           available_tools: fullToolCatalog(),
           conversation_context: 'Current topic is dinner.',
-          current_user_message: {
-            chat: 'direct',
-            contact: 'alex',
-            direction: 'api',
-            message: 'hi',
-          },
-          identity: ['Name: MyConcierge'],
           retrieved_memory: [
             {
               archivedAt: null,
@@ -280,16 +272,11 @@ describe('AssistantWorkerPromptService', () => {
               updatedAt: '2026-03-27T09:00:00.000Z',
             },
           ],
-          recent_messages: [
-            {
-              content: 'hello',
-              created_at: '2026-03-22T10:00:00.000Z',
-              role: 'user',
-            },
-          ],
           system_instructions: ['instruction 1'],
           task: [
             'Answer as the assistant inside the dialogue.',
+            'The full dialogue history is provided as chat messages outside this JSON payload.',
+            'The current user turn is provided as the latest user chat message outside this JSON payload.',
             'Preserve continuity with the conversation history, retrieved memory, and context.',
             'Use runtime instructions, retrieved memory, and conversation context when relevant.',
             'Update the compact conversation context for future turns.',
@@ -308,6 +295,45 @@ describe('AssistantWorkerPromptService', () => {
         2,
       ),
     );
+  });
+
+  it('parses plain-text SYSTEM.js instructions into system_instructions array', () => {
+    const runtimeContext: AssistantWorkerRuntimeContext = {
+      agents: 'Line one\nLine two\nLine three',
+      datadir: '/runtime',
+      identity: null,
+      memory: [],
+      soul: null,
+    };
+    const service = createService();
+    const request = JSON.parse(
+      service.buildRequestSection(
+        {
+          conversation: {
+            chat: 'direct',
+            contact: 'alex',
+            context: '',
+            direction: 'api',
+            messages: [],
+            updated_at: null,
+          },
+          message: {
+            accepted_at: new Date().toISOString(),
+            callback: { base_url: 'http://example.test' },
+            chat: 'direct',
+            conversation_id: 'alex',
+            contact: 'alex',
+            direction: 'api',
+            message: 'hi',
+            request_id: 'req-plain-system',
+          },
+          retrieved_memory: [],
+        },
+        runtimeContext,
+      ),
+    ) as { system_instructions: string[] };
+
+    expect(request.system_instructions).toEqual(['Line one', 'Line two', 'Line three']);
   });
 
   it('filters available tools when assistant-worker settings disable some of them', () => {
@@ -343,7 +369,7 @@ describe('AssistantWorkerPromptService', () => {
           retrieved_memory: [],
         },
         runtimeContext,
-        ['time_current', 'memory_search_federated'],
+        ['time_current', 'mem_search'],
       ),
     ) as { available_tools: Array<{ name: string }> };
 
@@ -356,7 +382,7 @@ describe('AssistantWorkerPromptService', () => {
       {
         description:
           'Search durable memory across all kinds (federated fallback when kind is unknown).',
-        name: 'memory_search_federated',
+        name: 'mem_search',
         use_when:
           'Use first when you need memory retrieval but the target kind is not yet clear.',
       },

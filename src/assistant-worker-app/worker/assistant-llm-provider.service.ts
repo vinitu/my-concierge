@@ -4,6 +4,7 @@ import {
   type AssistantWorkerConfig,
 } from './assistant-worker-config.service';
 import type {
+  AssistantLlmMessage,
   AssistantLlmProvider,
 } from './assistant-llm-provider';
 import { DeepseekChatService } from './deepseek-chat.service';
@@ -19,9 +20,17 @@ export class AssistantLlmProviderService implements AssistantLlmProvider {
     private readonly ollamaChatService: OllamaChatService,
   ) {}
 
-  async generateText(prompt: string): Promise<string> {
+  async generateFromMessages(messages: AssistantLlmMessage[]): Promise<string> {
     const config = await this.assistantWorkerConfigService.read();
-    return this.selectProvider(config).generateText(prompt);
+    return this.selectProvider(config).generateFromMessages(messages);
+  }
+
+  async summarizeConversation(
+    messages: AssistantLlmMessage[],
+    previousContext: string,
+  ): Promise<string> {
+    const config = await this.assistantWorkerConfigService.read();
+    return this.selectProvider(config).summarizeConversation(messages, previousContext);
   }
 
   private selectProvider(config: AssistantWorkerConfig): AssistantLlmProvider {

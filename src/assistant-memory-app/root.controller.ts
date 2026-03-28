@@ -106,6 +106,17 @@ export class AssistantMemoryRootController {
             <p class="mb-0"><code>preferences</code>, <code>facts</code>, <code>routines</code>, <code>projects</code>, <code>episodes</code>, <code>rules</code></p>
           </div>
         </div>
+        <div class="col-lg-12">
+          <div class="card-shell">
+            <h2>Conversations</h2>
+            <ul class="mb-0 ps-3">
+              <li><code>GET /v1/conversations</code></li>
+              <li><code>POST /v1/conversations/read</code></li>
+              <li><code>POST /v1/conversations/append</code></li>
+              <li><code>POST /v1/conversations/search</code></li>
+            </ul>
+          </div>
+        </div>
       </section>
     </main>
   </body>

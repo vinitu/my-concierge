@@ -41,6 +41,7 @@ describe('AssistantWorkerProcessorService', () => {
         memory_writes: [],
         tool_observations: [],
       }),
+      summarizeConversation: jest.fn().mockResolvedValue('Summary confirmed.'),
     } as unknown as AssistantLangchainRuntimeService;
     const conversationService = {
       appendExchange: jest.fn().mockResolvedValue(undefined),
@@ -216,6 +217,7 @@ describe('AssistantWorkerProcessorService', () => {
         memory_writes: [],
         tool_observations: [],
       }),
+      summarizeConversation: jest.fn().mockResolvedValue('Greeting completed.'),
     } as unknown as AssistantLangchainRuntimeService;
     const configService = new ConfigService({
       FILE_QUEUE_DIR: queueDir,
@@ -341,6 +343,9 @@ describe('AssistantWorkerProcessorService', () => {
           memory_writes: [],
           tool_observations: [],
         }),
+        summarizeConversation: jest
+          .fn()
+          .mockResolvedValue('The user wants concise Russian greetings and quick status updates.'),
       } as unknown as AssistantLangchainRuntimeService,
       {
         getStatus: jest.fn().mockResolvedValue({
@@ -392,6 +397,108 @@ describe('AssistantWorkerProcessorService', () => {
     ]);
   });
 
+  it('keeps previous context when summary output is trivial punctuation', async () => {
+    const queueDir = await mkdtemp(join(tmpdir(), 'assistant-worker-queue-'));
+    await writeFile(
+      join(queueDir, '001.json'),
+      JSON.stringify({
+        accepted_at: new Date().toISOString(),
+        callback: {
+          base_url: 'http://example.test',
+        },
+        chat: 'direct',
+        conversation_id: 'alex',
+        contact: 'alex',
+        direction: 'api',
+        message: 'привет',
+        request_id: 'req-summary-trivial',
+      }),
+      'utf8',
+    );
+
+    const runEventPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    } as unknown as RunEventPublisher;
+    const conversationService = {
+      appendExchange: jest.fn().mockResolvedValue(undefined),
+      read: jest.fn().mockResolvedValue({
+        chat: 'direct',
+        contact: 'alex',
+        context: 'Existing useful summary.',
+        direction: 'api',
+        messages: [],
+        updated_at: null,
+      }),
+    } as unknown as AssistantWorkerConversationService;
+
+    const service = new AssistantWorkerProcessorService(
+      {
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: '',
+          deepseek_base_url: 'https://api.deepseek.com',
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: 'grok-4',
+          ollama_base_url: 'http://host.docker.internal:11434',
+          ollama_timeout_ms: 360000,
+          provider: 'xai',
+          run_timeout_seconds: 30,
+          thinking_interval_seconds: 2,
+          xai_api_key: '',
+          xai_base_url: 'https://api.x.ai/v1',
+          xai_timeout_ms: 360000,
+        }),
+      } as never,
+      {
+        run: jest.fn().mockResolvedValue({
+          context: '',
+          message: 'Привет!',
+          memory_writes: [],
+          tool_observations: [],
+        }),
+        summarizeConversation: jest.fn().mockResolvedValue('!'),
+      } as unknown as AssistantLangchainRuntimeService,
+      {
+        getStatus: jest.fn().mockResolvedValue({
+          apiKeyConfigured: true,
+          message: 'xAI API is reachable',
+          model: 'grok-4',
+          provider: 'xai',
+          reachable: true,
+          status: 'ready',
+        }),
+      } as never,
+      {
+        safeSearch: jest.fn().mockResolvedValue({ count: 0, entries: [] }),
+        safeWrite: jest.fn().mockResolvedValue(undefined),
+      } as unknown as AssistantMemoryClientService,
+      conversationService,
+      new ConfigService({
+        FILE_QUEUE_DIR: queueDir,
+        WORKER_POLL_INTERVAL_MS: '1000',
+      }),
+      new AssistantWorkerMetricsService(),
+      new FileQueueConsumerService(
+        new ConfigService({
+          FILE_QUEUE_DIR: queueDir,
+        }),
+      ),
+      runEventPublisher,
+    );
+
+    await service.processOnce();
+
+    expect(conversationService.appendExchange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversation_id: 'alex',
+      }),
+      expect.objectContaining({
+        context: 'Existing useful summary.',
+      }),
+      expect.any(String),
+    );
+  });
+
   it('publishes a descriptive run.failed event when provider settings are missing', async () => {
     const queueDir = await mkdtemp(join(tmpdir(), 'assistant-worker-queue-'));
     await writeFile(
@@ -436,10 +543,11 @@ describe('AssistantWorkerProcessorService', () => {
         run: jest.fn().mockRejectedValue(
           new AssistantRuntimeError(
             'PROVIDER_ERROR',
-            'LangChain runtime failed',
+            'Assistant runtime failed',
             new Error('xAI API key is not configured in assistant-worker web settings'),
           ),
         ),
+        summarizeConversation: jest.fn().mockResolvedValue(''),
       } as unknown as AssistantLangchainRuntimeService,
       {
         getStatus: jest.fn().mockResolvedValue({
@@ -517,6 +625,7 @@ describe('AssistantWorkerProcessorService', () => {
     } as unknown as RunEventPublisher;
     const langchainRuntime = {
       run: jest.fn(),
+      summarizeConversation: jest.fn(),
     } as unknown as AssistantLangchainRuntimeService;
     const service = new AssistantWorkerProcessorService(
       {
@@ -612,7 +721,7 @@ describe('AssistantWorkerProcessorService', () => {
           deepseek_api_key: 'key',
           deepseek_base_url: 'https://api.deepseek.com',
           deepseek_timeout_ms: 30000,
-          enabled_tools: ['memory_search_federated'],
+          enabled_tools: ['mem_search'],
           memory_window: 3,
           model: 'deepseek-chat',
           ollama_base_url: 'http://host.docker.internal:11434',
@@ -632,6 +741,7 @@ describe('AssistantWorkerProcessorService', () => {
             'Tool is disabled in assistant-worker settings: time_current',
           ),
         ),
+        summarizeConversation: jest.fn().mockResolvedValue(''),
       } as unknown as AssistantLangchainRuntimeService,
       {
         getStatus: jest.fn().mockResolvedValue({
@@ -680,6 +790,78 @@ describe('AssistantWorkerProcessorService', () => {
           code: 'TOOL_ERROR',
           message:
             'assistant-worker tried to use a disabled tool: time_current. Enable it in the Tools section or keep only the tools you want the model to use.',
+        }),
+      }),
+    );
+  });
+
+  it('notifies user with run.failed even when worker config read fails early', async () => {
+    const queueDir = await mkdtemp(join(tmpdir(), 'assistant-worker-queue-'));
+    await writeFile(
+      join(queueDir, '001.json'),
+      JSON.stringify({
+        accepted_at: new Date().toISOString(),
+        callback: {
+          base_url: 'http://example.test',
+        },
+        chat: 'direct',
+        conversation_id: 'alex',
+        contact: 'alex',
+        direction: 'api',
+        message: 'hello',
+        request_id: 'req-early-fail',
+      }),
+      'utf8',
+    );
+
+    const runEventPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    } as unknown as RunEventPublisher;
+
+    const service = new AssistantWorkerProcessorService(
+      {
+        read: jest
+          .fn()
+          .mockRejectedValue(new Error('Failed to load assistant-worker config')),
+      } as never,
+      {
+        run: jest.fn(),
+        summarizeConversation: jest.fn(),
+      } as unknown as AssistantLangchainRuntimeService,
+      {
+        getStatus: jest.fn(),
+      } as never,
+      {
+        safeSearch: jest.fn(),
+        safeWrite: jest.fn(),
+      } as unknown as AssistantMemoryClientService,
+      {
+        appendExchange: jest.fn(),
+        read: jest.fn(),
+      } as unknown as AssistantWorkerConversationService,
+      new ConfigService({
+        FILE_QUEUE_DIR: queueDir,
+        WORKER_POLL_INTERVAL_MS: '1000',
+      }),
+      new AssistantWorkerMetricsService(),
+      new FileQueueConsumerService(
+        new ConfigService({
+          FILE_QUEUE_DIR: queueDir,
+        }),
+      ),
+      runEventPublisher,
+    );
+
+    await service.processOnce();
+
+    expect(runEventPublisher.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'run.failed',
+        payload: expect.objectContaining({
+          code: 'RUN_FAILED',
+          message: expect.stringContaining(
+            'assistant-worker failed while processing the message',
+          ),
         }),
       }),
     );

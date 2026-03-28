@@ -28,7 +28,10 @@ export class CallbackDeliveryService {
 
     return this.send(
       this.callbackUrl(event.callback.base_url, 'response', event.conversationId),
-      { message },
+      {
+        error: event.eventType === 'run.failed',
+        message,
+      },
     );
   }
 

@@ -4,14 +4,13 @@ import {
 } from './assistant-llm-output-schema';
 
 describe('assistant-llm-output-schema', () => {
-  it('parses planning final output that uses response field', async () => {
+  it('parses planning output in unified type contract', async () => {
     await expect(
       assistantPlanningOutputParser.parse(
         JSON.stringify({
-          final: {
-            context: 'User said "привет" in Russian.',
-            response: 'Привет!',
-          },
+          context: 'User said "привет" in Russian.',
+          message: 'Привет!',
+          type: 'final',
         }),
       ),
     ).resolves.toEqual({

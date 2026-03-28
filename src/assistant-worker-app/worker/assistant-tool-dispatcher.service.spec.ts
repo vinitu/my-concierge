@@ -4,7 +4,7 @@ import { AssistantWorkerConversationService } from './assistant-worker-conversat
 import { BraveSearchService } from './brave-search.service';
 
 describe('AssistantToolDispatcherService', () => {
-  it('routes memory_search_federated through assistant-memory', async () => {
+  it('routes mem_search through assistant-memory', async () => {
     const service = new AssistantToolDispatcherService(
       {
         searchFederated: jest.fn().mockResolvedValue({
@@ -24,7 +24,7 @@ describe('AssistantToolDispatcherService', () => {
       service.execute(
         {
           arguments: { query: 'dinner' },
-          name: 'memory_search_federated',
+          name: 'mem_search',
         },
         'thread_1',
       ),
@@ -34,7 +34,7 @@ describe('AssistantToolDispatcherService', () => {
         count: 1,
         entries: [{ id: 'mem_1' }],
       },
-      tool_name: 'memory_search_federated',
+      tool_name: 'mem_search',
     });
   });
 
@@ -58,7 +58,7 @@ describe('AssistantToolDispatcherService', () => {
       service.execute(
         {
           arguments: { query: 'birth date' },
-          name: 'memory_search_fact',
+          name: 'mem_fact_search',
         },
         'thread_1',
       ),
@@ -68,11 +68,11 @@ describe('AssistantToolDispatcherService', () => {
         count: 1,
         entries: [{ id: 'mem_fact_1' }],
       },
-      tool_name: 'memory_search_fact',
+      tool_name: 'mem_fact_search',
     });
   });
 
-  it('routes conversation_search through canonical conversation state', async () => {
+  it('routes mem_conversation_search through canonical conversation state', async () => {
     const service = new AssistantToolDispatcherService(
       {
         search: jest.fn(),
@@ -93,7 +93,7 @@ describe('AssistantToolDispatcherService', () => {
       service.execute(
         {
           arguments: { limit: 5 },
-          name: 'conversation_search',
+          name: 'mem_conversation_search',
         },
         'thread_1',
       ),
@@ -104,7 +104,7 @@ describe('AssistantToolDispatcherService', () => {
         summary: 'Dinner planning is active.',
         thread_id: 'thread_1',
       },
-      tool_name: 'conversation_search',
+      tool_name: 'mem_conversation_search',
     });
   });
 
@@ -162,7 +162,7 @@ describe('AssistantToolDispatcherService', () => {
           name: 'time_current',
         },
         'thread_1',
-        ['memory_search_federated'],
+        ['mem_search'],
       ),
     ).rejects.toThrow('Tool is disabled in assistant-worker settings: time_current');
   });

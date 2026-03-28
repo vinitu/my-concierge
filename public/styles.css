@@ -201,6 +201,17 @@
   border: 1px solid var(--chat-line);
 }
 
+.message-error {
+  align-self: center;
+  max-width: 100%;
+  border-radius: 16px;
+  background: #fff1f2;
+  color: #991b1b;
+  font-size: 0.9rem;
+  border: 1px solid #fecdd3;
+  box-shadow: 0 8px 18px rgba(185, 28, 28, 0.08);
+}
+
 .chat-form-panel {
   padding: 16px;
   position: sticky;

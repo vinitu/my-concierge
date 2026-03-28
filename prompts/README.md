@@ -1,5 +1,2 @@
-Store repository-owned prompt templates for `assistant-worker` in this directory.
-
-Files:
-
-- `user-prompt.md`: system prompt template for normal LLM replies and conversation-context updates
+Prompt templates were removed.
+`assistant-worker` now builds prompts directly from runtime context and code-defined schemas.

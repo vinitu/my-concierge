@@ -31,7 +31,6 @@
   },
   "homepage": "https://github.com/vinitu/my-concierge#readme",
   "dependencies": {
-    "@langchain/core": "^1.1.36",
     "@nestjs/common": "^11.1.17",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.17",
@@ -39,7 +38,6 @@
     "@nestjs/platform-socket.io": "^11.1.17",
     "@nestjs/websockets": "^11.1.17",
     "imapflow": "^1.2.18",
-    "langchain": "^1.2.37",
     "mailparser": "^3.9.6",
     "mysql2": "^3.14.4",
     "nodemailer": "^8.0.4",

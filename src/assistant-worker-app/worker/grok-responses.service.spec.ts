@@ -43,7 +43,9 @@ describe('GrokResponsesService', () => {
       } as unknown as AssistantWorkerConfigService,
     );
 
-    await expect(service.generateText('Turn on the kitchen lights')).resolves.toEqual(
+    await expect(
+      service.generateFromMessages([{ content: 'Turn on the kitchen lights', role: 'system' }]),
+    ).resolves.toEqual(
       '{"message":"Kitchen lights are on.","context":"The kitchen lights are currently on."}',
     );
 
@@ -97,7 +99,9 @@ describe('GrokResponsesService', () => {
       } as unknown as AssistantWorkerConfigService,
     );
 
-    await expect(service.generateText('prompt')).rejects.toThrow(
+    await expect(
+      service.generateFromMessages([{ content: 'prompt', role: 'system' }]),
+    ).rejects.toThrow(
       'xAI API key is not configured in assistant-worker web settings',
     );
   });
@@ -139,6 +143,8 @@ describe('GrokResponsesService', () => {
       } as unknown as AssistantWorkerConfigService,
     );
 
-    await expect(service.generateText('prompt')).resolves.toEqual('Kitchen lights are on.');
+    await expect(
+      service.generateFromMessages([{ content: 'prompt', role: 'system' }]),
+    ).resolves.toEqual('Kitchen lights are on.');
   });
 });

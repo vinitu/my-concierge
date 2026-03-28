@@ -60,6 +60,17 @@ function appendMessage(role, text) {
   return article;
 }
 
+function isFailureMessage(text) {
+  const normalized = String(text ?? '').toLowerCase();
+  return (
+    normalized.includes('assistant-worker failed while processing the message') ||
+    normalized.includes('run failed') ||
+    normalized.includes('tool is disabled') ||
+    normalized.includes('provider_error') ||
+    normalized.includes('persistence_error')
+  );
+}
+
 function clearThinking() {
   if (thinkingTimer !== null) {
     window.clearTimeout(thinkingTimer);
@@ -141,6 +152,10 @@ function connectSocket() {
 
   socket.on('assistant.message', (payload) => {
     clearThinking();
+    if (isFailureMessage(payload?.message)) {
+      appendMessage('error', payload.message);
+      return;
+    }
     appendMessage('assistant', payload.message);
   });
 
@@ -150,7 +165,7 @@ function connectSocket() {
 
   socket.on('assistant.error', (payload) => {
     clearThinking();
-    appendMessage('system', payload.message);
+    appendMessage('error', payload.message);
   });
 }
 

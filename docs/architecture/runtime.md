@@ -25,8 +25,6 @@ Expected layout:
 runtime/
   assistant-worker/
     SYSTEM.js
-    SOUL.js
-    IDENTITY.js
     skills/
     config/
       worker.json
@@ -44,14 +42,8 @@ runtime/
 ## Runtime Files
 
 - `runtime/assistant-worker/SYSTEM.js`: operating rules
-- `runtime/assistant-worker/SOUL.js`: tone and boundaries
-- `runtime/assistant-worker/IDENTITY.js`: who the assistant is
 - `runtime/assistant-worker/skills/`: skill definitions
 - `runtime/gateway-web/config/gateway-web.json`: gateway-web runtime config
-
-Repository-owned files:
-
-- `prompts/user-prompt.md`: the prompt template used by `assistant-worker`
 
 ## Memory
 
@@ -80,8 +72,6 @@ Current direction:
 For each request, `assistant-worker` builds the provider input from:
 
 - `SYSTEM.js`
-- `SOUL.js`
-- `IDENTITY.js`
 - conversation summary from canonical storage
 - recent conversation turns from canonical storage
 - retrieved memory from `assistant-memory`
@@ -91,18 +81,17 @@ For each request, `assistant-worker` builds the provider input from:
 
 1. Read the configured runtime directory paths.
 2. Validate required runtime files and folders.
-3. Load `runtime/assistant-worker/IDENTITY.js`, `runtime/assistant-worker/SOUL.js`, and `runtime/assistant-worker/SYSTEM.js`.
-4. Load the repository prompt template from `prompts/user-prompt.md`.
-5. Keep `runtime/assistant-worker/skills/` available for local skill definitions.
-6. Connect `assistant-worker` to MySQL for conversation state.
-7. Connect `assistant-worker` to `assistant-memory` for durable memory operations.
-8. Connect `assistant-api` and `assistant-worker` to Redis for jobs and run events.
-9. Keep `runtime/gateway-web/config/gateway-web.json` available for gateway-web runtime config.
-10. Build one shared runtime context model.
-11. Start `assistant-api`.
-12. Start `assistant-worker`.
-13. Start `assistant-memory`.
-14. Start `gateway-web`.
+3. Load `runtime/assistant-worker/SYSTEM.js`.
+4. Keep `runtime/assistant-worker/skills/` available for local skill definitions.
+5. Connect `assistant-worker` to MySQL for conversation state.
+6. Connect `assistant-worker` to `assistant-memory` for durable memory operations.
+7. Connect `assistant-api` and `assistant-worker` to Redis for jobs and run events.
+8. Keep `runtime/gateway-web/config/gateway-web.json` available for gateway-web runtime config.
+9. Build one shared runtime context model.
+10. Start `assistant-api`.
+11. Start `assistant-worker`.
+12. Start `assistant-memory`.
+13. Start `gateway-web`.
 
 ## Container Port Rule
 

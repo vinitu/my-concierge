@@ -1,11 +1,3 @@
-import { ConfigService } from '@nestjs/config';
-import {
-  mkdtemp,
-  mkdir,
-  writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { AssistantToolCatalogService } from './assistant-tool-catalog.service';
 import { AssistantWorkerPromptService } from './assistant-worker-prompt.service';
 import { AssistantWorkerPromptTemplateService } from './assistant-worker-prompt-template.service';
@@ -15,39 +7,23 @@ describe('AssistantWorkerPromptTemplateService', () => {
   const runtimeContext: AssistantWorkerRuntimeContext = {
     agents: '["agent rules"]',
     datadir: '/runtime',
-    identity: '["assistant identity"]',
+    identity: null,
     memory: [
       {
         content: 'remember this',
         path: 'memory/profile.md',
       },
     ],
-    soul: `[
-  "Stay calm in the dialogue.",
-  "Preserve a natural conversational tone.",
-  "Be direct and practical.",
-  "Keep responses concise by default.",
-  "Be helpful without unnecessary explanation."
-]`,
+    soul: null,
   };
 
-  it('renders assistant system prompt from repository template', async () => {
-    const promptsdir = await mkdtemp(join(tmpdir(), 'assistant-worker-prompts-'));
-    await mkdir(promptsdir, { recursive: true });
-    await writeFile(
-      join(promptsdir, 'user-prompt.md'),
-      'HEADER\n{{request}}\nFOOTER\n',
-      'utf8',
-    );
+  it('renders planning prompt with request payload and structured format instructions', async () => {
     const service = new AssistantWorkerPromptTemplateService(
-      new ConfigService({
-        ASSISTANT_PROMPTS_DIR: promptsdir,
-      }),
       new AssistantWorkerPromptService(new AssistantToolCatalogService()),
     );
 
     await expect(
-      service.renderAssistantSystemPrompt(
+      service.renderPlanningPrompt(
         {
           conversation: {
             chat: 'direct',
@@ -61,6 +37,32 @@ describe('AssistantWorkerPromptTemplateService', () => {
                 role: 'user',
               },
             ],
+            updated_at: null,
+          },
+          message: {
+            accepted_at: new Date().toISOString(),
+            callback: { base_url: 'http://example.test' },
+            chat: 'direct',
+            conversation_id: 'alex',
+            contact: 'alex',
+            direction: 'api',
+            message: 'current message',
+            request_id: 'req-1',
+          },
+          retrieved_memory: [],
+        },
+        runtimeContext,
+      ),
+    ).resolves.toContain('"system_instructions": [');
+    await expect(
+      service.renderPlanningPrompt(
+        {
+          conversation: {
+            chat: 'direct',
+            contact: 'alex',
+            context: 'Current conversation context',
+            direction: 'api',
+            messages: [],
             updated_at: null,
           },
           message: {
@@ -78,74 +80,8 @@ describe('AssistantWorkerPromptTemplateService', () => {
         runtimeContext,
       ),
     ).resolves.toContain(
-      '"system_instructions": [',
+      'You are the planning phase of the assistant runtime.',
     );
-    await expect(
-      service.renderAssistantSystemPrompt(
-        {
-          conversation: {
-            chat: 'direct',
-            contact: 'alex',
-            context: 'Current conversation context',
-            direction: 'api',
-            messages: [
-              {
-                content: 'hello',
-                created_at: '2026-03-22T10:00:00.000Z',
-                role: 'user',
-              },
-            ],
-            updated_at: null,
-          },
-          message: {
-            accepted_at: new Date().toISOString(),
-            callback: { base_url: 'http://example.test' },
-            chat: 'direct',
-            conversation_id: 'alex',
-            contact: 'alex',
-            direction: 'api',
-            message: 'current message',
-            request_id: 'req-1',
-          },
-          retrieved_memory: [],
-        },
-        runtimeContext,
-      ),
-    ).resolves.toContain(
-      '"identity": [',
-    );
-    await expect(
-      service.renderAssistantSystemPrompt(
-        {
-          conversation: {
-            chat: 'direct',
-            contact: 'alex',
-            context: 'Current conversation context',
-            direction: 'api',
-            messages: [
-              {
-                content: 'hello',
-                created_at: '2026-03-22T10:00:00.000Z',
-                role: 'user',
-              },
-            ],
-            updated_at: null,
-          },
-          message: {
-            accepted_at: new Date().toISOString(),
-            callback: { base_url: 'http://example.test' },
-            chat: 'direct',
-            conversation_id: 'alex',
-            contact: 'alex',
-            direction: 'api',
-            message: 'current message',
-            request_id: 'req-1',
-          },
-          retrieved_memory: [],
-        },
-        runtimeContext,
-      ),
-    ).resolves.toContain('"message": "current message"');
   });
 
 });

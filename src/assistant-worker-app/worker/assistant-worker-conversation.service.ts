@@ -88,7 +88,7 @@ export class AssistantWorkerConversationService {
     limit: number,
   ): Promise<AssistantConversationSearchResult> {
     if (this.storeDriver() === 'file') {
-      throw new Error('conversation_search is not available in file mode');
+      throw new Error('mem_conversation_search is not available in file mode');
     }
 
     const response = await this.fetchMemoryEndpoint('/v1/conversations/search', {

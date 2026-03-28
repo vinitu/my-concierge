@@ -15,8 +15,6 @@ describe('AssistantWorkerRuntimeContextService', () => {
 
     await mkdir(memoryDir, { recursive: true });
     await writeFile(join(datadir, 'SYSTEM.js'), '["agent rules"]', 'utf8');
-    await writeFile(join(datadir, 'SOUL.js'), '["Stay calm in the dialogue."]', 'utf8');
-    await writeFile(join(datadir, 'IDENTITY.js'), '["assistant identity"]', 'utf8');
     await writeFile(join(memoryDir, 'todo.md'), 'remember this', 'utf8');
 
     const service = new AssistantWorkerRuntimeContextService(
@@ -28,14 +26,34 @@ describe('AssistantWorkerRuntimeContextService', () => {
     await expect(service.load()).resolves.toEqual({
       agents: '["agent rules"]',
       datadir,
-      identity: '["assistant identity"]',
+      identity: null,
       memory: [
         {
           content: 'remember this',
           path: 'memory/notes/todo.md',
         },
       ],
-      soul: '["Stay calm in the dialogue."]',
+      soul: null,
+    });
+  });
+
+  it('merges legacy SOUL.js and IDENTITY.js when SYSTEM.js is missing', async () => {
+    const datadir = await mkdtemp(join(tmpdir(), 'assistant-runtime-legacy-'));
+    await writeFile(join(datadir, 'SOUL.js'), '["Stay calm in the dialogue."]', 'utf8');
+    await writeFile(join(datadir, 'IDENTITY.js'), '["Name: Sonya"]', 'utf8');
+
+    const service = new AssistantWorkerRuntimeContextService(
+      new ConfigService({
+        ASSISTANT_DATADIR: datadir,
+      }),
+    );
+
+    await expect(service.load()).resolves.toEqual({
+      agents: JSON.stringify(['Name: Sonya', 'Stay calm in the dialogue.'], null, 2),
+      datadir,
+      identity: null,
+      memory: [],
+      soul: null,
     });
   });
 

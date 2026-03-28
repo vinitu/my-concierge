@@ -29,13 +29,50 @@ export class AssistantWorkerRuntimeContextService {
       join(process.cwd(), 'runtime', 'assistant-worker'),
     );
 
+    const system = await this.readOptionalFile(join(datadir, 'SYSTEM.js'));
+    const legacySoul = await this.readOptionalFile(join(datadir, 'SOUL.js'));
+    const legacyIdentity = await this.readOptionalFile(join(datadir, 'IDENTITY.js'));
+
     return {
-      agents: await this.readOptionalFile(join(datadir, 'SYSTEM.js')),
+      agents: system ?? this.mergeLegacySystemFiles(legacySoul, legacyIdentity),
       datadir,
-      identity: await this.readOptionalFile(join(datadir, 'IDENTITY.js')),
+      identity: null,
       memory: await this.readMemoryDirectory(datadir),
-      soul: await this.readOptionalFile(join(datadir, 'SOUL.js')),
+      soul: null,
     };
+  }
+
+  private mergeLegacySystemFiles(
+    soul: string | null,
+    identity: string | null,
+  ): string | null {
+    const merged = [
+      ...this.parseInstructionArray(identity),
+      ...this.parseInstructionArray(soul),
+    ];
+
+    if (merged.length === 0) {
+      return null;
+    }
+
+    return JSON.stringify(merged, null, 2);
+  }
+
+  private parseInstructionArray(value: string | null): string[] {
+    if (!value) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((entry): entry is string => typeof entry === 'string');
+      }
+    } catch {
+      return value.trim().length > 0 ? [value.trim()] : [];
+    }
+
+    return [];
   }
 
   private async readMemoryDirectory(datadir: string): Promise<RuntimeMemoryEntry[]> {

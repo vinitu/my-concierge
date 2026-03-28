@@ -29,6 +29,7 @@ describe('assistant-worker (e2e)', () => {
       memory_writes: [],
       tool_observations: [],
     }),
+    summarizeConversation: jest.fn().mockResolvedValue('Greeting completed.'),
   };
   const providerStatus = {
     getStatus: jest.fn(),
@@ -122,7 +123,7 @@ describe('assistant-worker (e2e)', () => {
     expect(response.text).toContain('name="run_timeout_seconds"');
     expect(response.text).toContain('name="enabled_tools"');
     expect(response.text).toContain('value="web_search" checked');
-    expect(response.text).toContain('value="memory_search_federated" checked');
+    expect(response.text).toContain('value="mem_search" checked');
     expect(response.text).toContain('name="brave_api_key"');
     expect(response.text).toContain('name="brave_base_url"');
     expect(response.text).toContain('name="brave_timeout_ms"');
@@ -149,20 +150,20 @@ describe('assistant-worker (e2e)', () => {
       enabled_tools: [
         'time_current',
         'web_search',
-        'memory_search_federated',
-        'memory_search_preference',
-        'memory_search_fact',
-        'memory_search_routine',
-        'memory_search_project',
-        'memory_search_episode',
-        'memory_search_rule',
-        'memory_write_preference',
-        'memory_write_fact',
-        'memory_write_routine',
-        'memory_write_project',
-        'memory_write_episode',
-        'memory_write_rule',
-        'conversation_search',
+        'mem_search',
+        'mem_preference_search',
+        'mem_fact_search',
+        'mem_routine_search',
+        'mem_project_search',
+        'mem_episode_search',
+        'mem_rule_search',
+        'mem_preference_write',
+        'mem_fact_write',
+        'mem_routine_write',
+        'mem_project_write',
+        'mem_episode_write',
+        'mem_rule_write',
+        'mem_conversation_search',
         'skill_execute',
       ],
       model: 'grok-4',
@@ -184,7 +185,7 @@ describe('assistant-worker (e2e)', () => {
       deepseek_api_key: 'deepseek-key',
       deepseek_base_url: 'https://deepseek.example.test',
       deepseek_timeout_ms: 240000,
-      enabled_tools: ['time_current', 'memory_search_federated'],
+      enabled_tools: ['time_current', 'mem_search'],
       model: 'deepseek-chat',
       memory_window: 5,
       ollama_base_url: 'http://ollama.example.test:11434',
@@ -205,7 +206,7 @@ describe('assistant-worker (e2e)', () => {
       deepseek_api_key: 'deepseek-key',
       deepseek_base_url: 'https://deepseek.example.test',
       deepseek_timeout_ms: 240000,
-      enabled_tools: ['time_current', 'memory_search_federated'],
+      enabled_tools: ['time_current', 'mem_search'],
       model: 'deepseek-chat',
       memory_window: 5,
       ollama_base_url: 'http://ollama.example.test:11434',
@@ -306,7 +307,10 @@ describe('assistant-worker (e2e)', () => {
 
     expect(completedEvents).toHaveLength(1);
     expect(thinkingEvents).toHaveLength(0);
-    expect(completedEvents[0]?.payload).toEqual({ message: 'hello from grok' });
+    expect(completedEvents[0]?.payload).toEqual({
+      fallback_reason: null,
+      message: 'hello from grok',
+    });
     const conversationPath = join(datadir, 'conversations', 'api', 'direct', 'alex.json');
     let storedConversation = '';
 

@@ -78,7 +78,7 @@ export class DashboardServiceRegistryService {
         key: 'assistant-worker',
         kind: 'application',
         name: 'assistant-worker',
-        notes: 'LangChain runtime, conversation state, tools',
+        notes: 'Runtime execution, conversation state, tools',
         upstream_url: this.url(
           'DASHBOARD_ASSISTANT_WORKER_UPSTREAM_URL',
           'http://assistant-worker:3000',

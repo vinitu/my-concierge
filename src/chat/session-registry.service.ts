@@ -55,6 +55,17 @@ export class ConversationRegistryService {
     client.emit('assistant.thinking', { seconds });
     return true;
   }
+
+  sendAssistantError(conversationId: string, message: string): boolean {
+    const client = this.conversations.get(conversationId);
+
+    if (!client) {
+      return false;
+    }
+
+    client.emit('assistant.error', { message });
+    return true;
+  }
 }
 
 // Backward-compatible alias for existing imports during migration.

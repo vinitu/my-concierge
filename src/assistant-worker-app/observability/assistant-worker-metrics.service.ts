@@ -40,10 +40,35 @@ export class AssistantWorkerMetricsService {
     labelNames: ['endpoint', 'service'] as const,
     registers: [this.registry],
   });
-  private readonly langchainRunCounter = new Counter({
-    name: 'langchain_runs_total',
-    help: 'Total number of LangChain runtime phase executions',
+  private readonly runtimePhaseCounter = new Counter({
+    name: 'assistant_runtime_phases_total',
+    help: 'Total number of assistant runtime phase executions',
     labelNames: ['phase', 'service', 'status'] as const,
+    registers: [this.registry],
+  });
+  private readonly llmMainRequestCounter = new Counter({
+    name: 'llm_main_request_total',
+    help: 'Total number of main LLM requests',
+    labelNames: ['phase', 'service', 'status'] as const,
+    registers: [this.registry],
+  });
+  private readonly llmSummaryRequestCounter = new Counter({
+    name: 'llm_summary_request_total',
+    help: 'Total number of summary LLM requests',
+    labelNames: ['service', 'status'] as const,
+    registers: [this.registry],
+  });
+  private readonly runtimeFallbackCounter = new Counter({
+    name: 'runtime_fallback_total',
+    help: 'Total number of deterministic runtime fallbacks',
+    labelNames: ['reason', 'service'] as const,
+    registers: [this.registry],
+  });
+  private readonly llmDurationHistogram = new Histogram({
+    name: 'llm_phase_duration_ms',
+    help: 'LLM request duration in milliseconds',
+    labelNames: ['phase', 'service', 'status'] as const,
+    buckets: [50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000],
     registers: [this.registry],
   });
   private readonly toolInvocationCounter = new Counter({
@@ -86,11 +111,59 @@ export class AssistantWorkerMetricsService {
     });
   }
 
-  recordLangchainRun(phase: string, success: boolean): void {
-    this.langchainRunCounter.inc({
+  recordRuntimePhase(phase: string, success: boolean): void {
+    this.runtimePhaseCounter.inc({
       phase,
       service: 'assistant-worker',
       status: success ? 'success' : 'error',
+    });
+  }
+
+  recordLlmMainRequest(success: boolean, phase: 'planning' | 'synthesis'): void {
+    this.llmMainRequestCounter.inc({
+      phase,
+      service: 'assistant-worker',
+      status: success ? 'success' : 'error',
+    });
+  }
+
+  recordLlmSummaryRequest(success: boolean): void {
+    this.llmSummaryRequestCounter.inc({
+      service: 'assistant-worker',
+      status: success ? 'success' : 'error',
+    });
+  }
+
+  recordLlmMainDurationMs(
+    durationMs: number,
+    phase: 'planning' | 'synthesis',
+    success = true,
+  ): void {
+    this.llmDurationHistogram.observe(
+      {
+        phase,
+        service: 'assistant-worker',
+        status: success ? 'success' : 'error',
+      },
+      durationMs,
+    );
+  }
+
+  recordLlmSummaryDurationMs(durationMs: number, success = true): void {
+    this.llmDurationHistogram.observe(
+      {
+        phase: 'summary',
+        service: 'assistant-worker',
+        status: success ? 'success' : 'error',
+      },
+      durationMs,
+    );
+  }
+
+  recordRuntimeFallback(reason: string): void {
+    this.runtimeFallbackCounter.inc({
+      reason,
+      service: 'assistant-worker',
     });
   }
 
