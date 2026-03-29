@@ -2100,18 +2100,21 @@ export class AssistantMemoryService {
       ].join(' '),
     );
 
-    const conversationId = details?.conversationThreadId?.trim();
-    if (!conversationId || this.storeDriver() === 'file') {
+    if (this.storeDriver() === 'file') {
       return;
     }
+    const conversationId =
+      details?.conversationThreadId?.trim() ||
+      `memory_${details?.userId?.trim() || 'default-user'}`;
 
     const eventType = `memory.${kind}.${action}` as const;
+    const eventMessage = this.memoryEventMessage(kind, action);
     void this.assistantMemoryRunEventPublisherService
       .publish(eventType, conversationId, {
         direction: details?.direction ?? 'web',
         id: memoryId,
         kind,
-        message: eventType,
+        message: eventMessage,
         source_request_id: details?.sourceRequestId ?? null,
         scope: details?.scope ?? null,
         user_id: details?.userId ?? 'default-user',
@@ -2123,5 +2126,19 @@ export class AssistantMemoryService {
           }`,
         );
       });
+  }
+
+  private memoryEventMessage(kind: MemoryKind, action: MemoryEventAction): string {
+    const kindLabel = kind.charAt(0).toUpperCase() + kind.slice(1);
+    if (action === 'added') {
+      return `${kindLabel} added to memory`;
+    }
+    if (action === 'updated') {
+      return `${kindLabel} updated in memory`;
+    }
+    if (action === 'deleted') {
+      return `${kindLabel} deleted from memory`;
+    }
+    return `${kindLabel} read from memory`;
   }
 }

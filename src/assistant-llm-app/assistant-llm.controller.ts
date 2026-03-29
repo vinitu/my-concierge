@@ -5,6 +5,7 @@ import type {
   AssistantLlmConversationRespondResponse,
   AssistantLlmMemoryByKindRequest,
   AssistantLlmMemoryFactResponse,
+  AssistantLlmMemoryProfileResponse,
   AssistantLlmProvider,
   AssistantLlmProviderStatus,
   AssistantLlmSummarizeRequest,
@@ -137,6 +138,21 @@ export class AssistantLlmController {
         ),
       ),
     };
+  }
+
+  @Post("v1/memory/profile")
+  async extractProfile(
+    @Body() body: AssistantLlmMemoryByKindRequest,
+  ): Promise<AssistantLlmMemoryProfileResponse> {
+    const patch = await this.assistantLlmService.extractProfile(
+      typeof body.conversation_id === "string" &&
+        body.conversation_id.trim().length > 0
+        ? body.conversation_id
+        : "conversation_unknown",
+      body.messages,
+    );
+
+    return { patch };
   }
 
   private normalizeProvider(

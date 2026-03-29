@@ -74,3 +74,13 @@ export interface AssistantLlmMemoryByKindRequest {
 export interface AssistantLlmMemoryFactResponse {
   items: string[];
 }
+
+export interface AssistantLlmMemoryProfileResponse {
+  patch: {
+    constraints?: Record<string, unknown>;
+    home?: Record<string, unknown>;
+    language?: string | null;
+    preferences?: Record<string, unknown>;
+    timezone?: string | null;
+  };
+}

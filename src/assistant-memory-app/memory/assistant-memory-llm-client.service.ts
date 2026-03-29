@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type {
   AssistantLlmMemoryFactResponse,
+  AssistantLlmMemoryProfileResponse,
   AssistantLlmMessage,
 } from "../../contracts/assistant-llm";
 
@@ -54,6 +55,53 @@ export class AssistantMemoryLlmClientService {
       )}`,
     );
     return extracted;
+  }
+
+  async extractProfile(
+    conversationId: string,
+    messages: AssistantLlmMessage[],
+  ): Promise<{
+    constraints?: Record<string, unknown>;
+    home?: Record<string, unknown>;
+    language?: string | null;
+    preferences?: Record<string, unknown>;
+    timezone?: string | null;
+  }> {
+    const endpoint = "/v1/memory/profile";
+    this.logger.debug(
+      `assistant-llm request endpoint=${endpoint} conversation_id=${conversationId} messages=${messages.length}`,
+    );
+
+    const response = await fetch(`${this.baseUrl()}${endpoint}`, {
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        messages,
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+      signal: AbortSignal.timeout(this.timeoutMs()),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `assistant-llm returned ${String(response.status)} for ${endpoint}: ${body}`,
+      );
+    }
+
+    const payload = (await response.json()) as AssistantLlmMemoryProfileResponse;
+    const patch =
+      typeof payload.patch === "object" &&
+      payload.patch !== null &&
+      !Array.isArray(payload.patch)
+        ? payload.patch
+        : {};
+    this.logger.debug(
+      `assistant-llm response endpoint=${endpoint} conversation_id=${conversationId} fields=${Object.keys(
+        patch,
+      ).join(",") || "none"} payload=${JSON.stringify(payload)}`,
+    );
+    return patch;
   }
 
   private baseUrl(): string {

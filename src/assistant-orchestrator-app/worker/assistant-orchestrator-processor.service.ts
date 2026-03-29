@@ -154,8 +154,17 @@ export class AssistantOrchestratorProcessorService
       this.logger.log(
         `Starting memory search requestId=${requestId} conversationId=${item.conversation_id}`,
       );
-      const memorySearch = await this.assistantMemoryClientService.safeSearch(
+      const factQuery = this.latestUserMessageForFactSearch(
+        effectiveConversation.messages,
         item.message,
+      );
+      this.logger.log(
+        `Fact search query selected requestId=${requestId} conversationId=${item.conversation_id} queryLen=${String(
+          factQuery.length,
+        )}`,
+      );
+      const memorySearch = await this.assistantMemoryClientService.safeSearch(
+        factQuery,
         item.conversation_id,
       );
       this.logger.log(
@@ -398,6 +407,23 @@ export class AssistantOrchestratorProcessorService
     }
 
     return deduped;
+  }
+
+  private latestUserMessageForFactSearch(
+    messages: AssistantConversationMessage[],
+    fallback: string,
+  ): string {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (message.role !== 'user') {
+        continue;
+      }
+      const content = message.content.trim();
+      if (content.length > 0) {
+        return content;
+      }
+    }
+    return fallback.trim();
   }
 
   private buildMemoryCandidates(

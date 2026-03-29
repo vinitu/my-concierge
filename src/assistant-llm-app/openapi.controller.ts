@@ -44,6 +44,11 @@ export class AssistantLlmOpenApiController {
             summary: "Extract fact candidates from conversation messages",
           },
         },
+        "/v1/memory/profile": {
+          post: {
+            summary: "Extract profile patch from conversation messages",
+          },
+        },
       },
     };
   }

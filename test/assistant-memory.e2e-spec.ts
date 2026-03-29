@@ -30,6 +30,13 @@ class DeterministicEnrichmentService {
       return;
     }
 
+    await this.assistantMemoryService.updateProfile({
+      preferences: {
+        preferred_name: match,
+      },
+      source: 'assistant-memory-enrichment',
+    });
+
     await this.assistantMemoryService.writeByKind(
       'fact',
       `test-enrichment:${job.request_id}:fact`,
@@ -263,6 +270,10 @@ describe('assistant-memory fact extraction from conversation (e2e)', () => {
           entry.content.includes('Дмитрий'),
       ),
     ).toBe(true);
+
+    const profileResponse = await request(app.getHttpServer()).get('/v1/profile');
+    expect(profileResponse.status).toBe(200);
+    expect(profileResponse.body.preferences?.preferred_name).toBe('Дмитрий');
   });
 
   it('extracts fact from conversation append even without request_id', async () => {

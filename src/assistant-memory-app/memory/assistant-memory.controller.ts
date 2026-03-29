@@ -260,6 +260,7 @@ export class AssistantMemoryController {
       chat: body.chat,
       conversation_id: body.conversation_id,
       direction: body.direction,
+      message_text: body.message,
       request_id: requestId,
       user_id: body.user_id || 'default-user',
     });

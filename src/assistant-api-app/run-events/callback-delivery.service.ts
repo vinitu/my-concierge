@@ -17,18 +17,14 @@ export class CallbackDeliveryService {
     }
 
     if (event.eventType.startsWith("memory.")) {
-      const memoryEvent = this.normalizeMemoryEventForCallback(event);
-      if (!memoryEvent) {
-        return true;
-      }
       return this.send(
         this.callbackUrl(baseUrl, "event", event.conversationId),
         {
           conversation_id: event.conversationId,
           direction: event.direction,
-          message: memoryEvent.message,
+          message: this.messageForMemoryEvent(event),
           payload: event.payload,
-          type: memoryEvent.type,
+          type: event.eventType,
           user_id: event.userId,
         },
       );
@@ -89,23 +85,17 @@ export class CallbackDeliveryService {
     return `${trimTrailingSlash(baseUrl)}/${kind}/${encodeURIComponent(conversationId)}`;
   }
 
-  private normalizeMemoryEventForCallback(
-    event: RunEvent,
-  ): { message: string; type: string } | null {
-    if (event.eventType.startsWith("memory.extract.")) {
-      return null;
-    }
-
-    if (!event.eventType.endsWith(".added")) {
-      return null;
+  private messageForMemoryEvent(event: RunEvent): string {
+    const payloadMessage =
+      typeof event.payload?.message === "string" ? event.payload.message.trim() : "";
+    if (payloadMessage.length > 0) {
+      return payloadMessage;
     }
 
     const parts = event.eventType.split(".");
     const kind = parts.length >= 3 ? parts[1] : "memory";
-    return {
-      message: `Remembered new ${kind}.`,
-      type: event.eventType,
-    };
+    const action = parts.length >= 3 ? parts[2] : "event";
+    return `Memory ${kind} ${action}.`;
   }
 
   private baseUrlForDirection(direction: string): string {

@@ -124,6 +124,23 @@ export class AssistantMemoryClientService {
     }
   }
 
+  async safeFactSearch(
+    query: string,
+    conversationThreadId: string,
+  ): Promise<MemorySearchResponse> {
+    try {
+      return await this.searchByKind('fact', query, conversationThreadId);
+    } catch (error) {
+      this.logger.warn(
+        `assistant-memory fact search failed for ${conversationThreadId}: ${this.errorMessage(error)}`,
+      );
+      return {
+        count: 0,
+        entries: [],
+      };
+    }
+  }
+
   async safeWrite(entries: MemoryWriteCandidate[]): Promise<void> {
     try {
       await this.write(entries);

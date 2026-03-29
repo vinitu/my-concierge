@@ -208,12 +208,11 @@ export class DashboardRootController {
         { group: 'Response', value: 'response.message', description: 'Assistant response message' },
         { group: 'Response', value: 'response.error', description: 'Assistant error response' },
         { group: 'Response', value: 'response.thinking', description: 'Thinking progress update' },
-        { group: 'Extract', value: 'memory.extract.started', description: 'Started memory extraction' },
-        { group: 'Extract', value: 'memory.extract.failed', description: 'Failed memory extraction' },
         { group: 'Fact', value: 'memory.fact.added', description: 'Added fact to memory' },
         { group: 'Fact', value: 'memory.fact.updated', description: 'Updated fact in memory' },
         { group: 'Fact', value: 'memory.fact.deleted', description: 'Deleted fact from memory' },
         { group: 'Fact', value: 'memory.fact.readed', description: 'Read fact from memory' },
+        { group: 'Fact', value: 'memory.fact.failed', description: 'Failed fact memory operation' },
       ];
       const ASSISTANT_MEMORY_SECTIONS = [
         { id: 'settings', label: 'Settings' },
@@ -1045,19 +1044,50 @@ export class DashboardRootController {
               '<form id="assistant-memory-settings-form" class="card border-0 shadow-sm">' +
                 '<div class="card-body">' +
                   '<h5 class="card-title mb-2">Conversation Enrichment</h5>' +
-                  '<p class="text-secondary mb-3">Only fact extraction is enabled. Other extract types were removed.</p>' +
+                  '<p class="text-secondary mb-3">Select which extract jobs run after each appended conversation message.</p>' +
                   '<div class="row g-2">' +
                     '<div class="col-md-6">' +
                       '<div class="form-check">' +
                         '<input class="form-check-input memory-extract" type="checkbox" id="memory-extract-fact" value="fact"' +
                           (enabledExtracts.includes('fact') ? ' checked' : '') +
-                          ' disabled />' +
+                          ' />' +
                         '<label class="form-check-label fw-semibold" for="memory-extract-fact">fact</label>' +
                       '</div>' +
                     '</div>' +
+                    '<div class="col-md-6">' +
+                      '<div class="form-check">' +
+                        '<input class="form-check-input memory-extract" type="checkbox" id="memory-extract-profile" value="profile"' +
+                          (enabledExtracts.includes('profile') ? ' checked' : '') +
+                          ' />' +
+                        '<label class="form-check-label fw-semibold" for="memory-extract-profile">profile</label>' +
+                      '</div>' +
+                    '</div>' +
+                  '</div>' +
+                  '<div class="mt-3 d-flex gap-2 align-items-center">' +
+                    '<button type="submit" class="btn btn-dark">Save memory settings</button>' +
+                    '<div id="assistant-memory-settings-status" class="text-secondary"></div>' +
                   '</div>' +
                 '</div>' +
               '</form>';
+
+            document
+              .getElementById('assistant-memory-settings-form')
+              .addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const status = document.getElementById('assistant-memory-settings-status');
+                status.textContent = 'Saving...';
+                const selectedExtracts = Array.from(
+                  content.querySelectorAll('.memory-extract:checked'),
+                ).map((checkbox) => checkbox.value);
+                try {
+                  await saveServiceConfig(service, {
+                    enabled_extracts: selectedExtracts,
+                  });
+                  status.textContent = 'Saved';
+                } catch {
+                  status.textContent = 'Failed to save';
+                }
+              });
           } catch {
             content.innerHTML = '<div class="status-line">Failed to load memory settings</div>';
           }

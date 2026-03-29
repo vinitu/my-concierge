@@ -21,6 +21,7 @@ interface EnrichmentJob {
   conversation_id: string;
   direction: string;
   extract: AssistantMemoryExtractKind;
+  message_text?: string;
   request_id: string;
   user_id: string;
 }
@@ -119,11 +120,9 @@ export class AssistantMemoryEnrichmentService
       }
 
       try {
-        await this.publishExtractEvent("started", job);
         await this.processJob(job);
-        await this.publishExtractEvent("completed", job);
       } catch (error) {
-        await this.publishExtractEvent("failed", job, {
+        await this.publishExtractFailedEvent(job, {
           error: error instanceof Error ? error.message : String(error),
         });
         this.logger.warn(
@@ -152,14 +151,35 @@ export class AssistantMemoryEnrichmentService
     this.logger.debug(
       `Enrichment history loaded request_id=${job.request_id} conversation_id=${job.conversation_id} extract=${job.extract} messages=${history.messages.length}`,
     );
-    const messages = history.messages.map((message) =>
-      this.mapConversationMessage(message),
+    const messages = history.messages
+      .filter((message) => message.role === "user")
+      .map((message) => this.mapConversationMessage(message))
+      .slice(-1);
+    this.logger.debug(
+      `Enrichment user-only window request_id=${job.request_id} conversation_id=${job.conversation_id} extract=${job.extract} messages=${messages.length}`,
     );
-    const facts = await this.extractFacts(
-      job.conversation_id,
-      messages,
-    );
-    await this.applyFacts(job, facts);
+    if (job.extract === "fact") {
+      const llmFacts = await this.extractFacts(job.conversation_id, messages);
+      const facts = llmFacts.length > 0 ? [llmFacts[llmFacts.length - 1]] : [];
+      this.logger.debug(
+        `Enrichment selected facts request_id=${job.request_id} conversation_id=${job.conversation_id} llm=${llmFacts.length} selected=${facts.length}`,
+      );
+      await this.applyFacts(job, facts);
+    } else if (job.extract === "profile") {
+      const latestUserMessage = messages[messages.length - 1]?.content ?? "";
+      const candidateText =
+        typeof job.message_text === "string" && job.message_text.trim().length > 0
+          ? job.message_text
+          : latestUserMessage;
+      if (!this.matchesProfileFilter(candidateText)) {
+        this.logger.debug(
+          `Enrichment profile skipped by filter request_id=${job.request_id} conversation_id=${job.conversation_id} extract=profile`,
+        );
+        return;
+      }
+      const profilePatch = await this.extractProfile(job.conversation_id, messages);
+      await this.applyProfile(job, profilePatch);
+    }
     this.logger.debug(
       `Enrichment job completed request_id=${job.request_id} conversation_id=${job.conversation_id} extract=${job.extract}`,
     );
@@ -225,6 +245,99 @@ export class AssistantMemoryEnrichmentService
     );
   }
 
+  private async extractProfile(
+    conversationId: string,
+    messages: AssistantLlmMessage[],
+  ): Promise<{
+    constraints?: Record<string, unknown>;
+    home?: Record<string, unknown>;
+    language?: string | null;
+    preferences?: Record<string, unknown>;
+    timezone?: string | null;
+  }> {
+    const patch = await this.assistantMemoryLlmClientService.extractProfile(
+      conversationId,
+      messages,
+    );
+    this.logger.debug(
+      `Enrichment extract payload conversation_id=${conversationId} extract=profile payload=${this.preview(
+        patch,
+      )}`,
+    );
+    this.logger.debug(
+      `Enrichment extract response conversation_id=${conversationId} extract=profile fields=${Object.keys(
+        patch,
+      ).join(",") || "none"}`,
+    );
+    return patch;
+  }
+
+  private async applyProfile(
+    job: EnrichmentJob,
+    patch: {
+      constraints?: Record<string, unknown>;
+      home?: Record<string, unknown>;
+      language?: string | null;
+      preferences?: Record<string, unknown>;
+      timezone?: string | null;
+    },
+  ): Promise<void> {
+    if (this.isEmptyProfilePatch(patch)) {
+      this.logger.debug(
+        `Enrichment profile skipped request_id=${job.request_id} conversation_id=${job.conversation_id} extract=profile candidates=0`,
+      );
+      return;
+    }
+
+    const result = await this.assistantMemoryService.updateProfile({
+      ...patch,
+      source: "assistant-memory-enrichment",
+    });
+    this.logger.debug(
+      `Enrichment profile applied request_id=${job.request_id} conversation_id=${job.conversation_id} extract=profile updated_at=${result.updatedAt}`,
+    );
+  }
+
+  private isEmptyProfilePatch(patch: {
+    constraints?: Record<string, unknown>;
+    home?: Record<string, unknown>;
+    language?: string | null;
+    preferences?: Record<string, unknown>;
+    timezone?: string | null;
+  }): boolean {
+    const hasLanguage = "language" in patch;
+    const hasTimezone = "timezone" in patch;
+    const hasHome = patch.home !== undefined;
+    const hasPreferences = patch.preferences !== undefined;
+    const hasConstraints = patch.constraints !== undefined;
+    return !hasLanguage && !hasTimezone && !hasHome && !hasPreferences && !hasConstraints;
+  }
+
+  private matchesProfileFilter(message: string): boolean {
+    const text = message.trim().toLowerCase();
+    if (!text) {
+      return false;
+    }
+
+    const patterns = [
+      /\bmy name is\b/i,
+      /\bменя зовут\b/i,
+      /\bi am \d{1,3}\b/i,
+      /\bмне \d{1,3}\b/i,
+      /\bi live in\b/i,
+      /\bя живу\b/i,
+      /\btimezone\b/i,
+      /\bчасов(ой|ая)\s*пояс\b/i,
+      /\blanguage\b/i,
+      /\bговори\b/i,
+      /\bотвечай\b/i,
+      /\bпредпочитаю\b/i,
+      /\bпредпочитаем\b/i,
+    ];
+
+    return patterns.some((pattern) => pattern.test(text));
+  }
+
   private async getClient(): Promise<RedisClientType> {
     if (!this.client) {
       this.client = createClient({
@@ -259,8 +372,7 @@ export class AssistantMemoryEnrichmentService
       : serialized;
   }
 
-  private async publishExtractEvent(
-    stage: "completed" | "failed" | "started",
+  private async publishExtractFailedEvent(
     job: EnrichmentJob,
     extraPayload?: Record<string, unknown>,
   ): Promise<void> {
@@ -273,10 +385,14 @@ export class AssistantMemoryEnrichmentService
       return;
     }
 
-    const eventType = `memory.extract.${stage}` as const;
+    const eventType = `memory.${job.extract}.failed` as const;
+    const errorMessage =
+      typeof extraPayload?.error === "string" && extraPayload.error.trim().length > 0
+        ? extraPayload.error.trim()
+        : "Unknown error";
     const payload: Record<string, unknown> = {
       extract: job.extract,
-      message: eventType,
+      message: `Failed to save ${job.extract} to memory: ${errorMessage}`,
       request_id: job.request_id,
       ...extraPayload,
     };

@@ -32,40 +32,31 @@ describe("CallbackDeliveryService", () => {
     };
   }
 
-  it("suppresses memory extract events", async () => {
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    const delivered = await service().deliver(
-      baseEvent("memory.extract.completed"),
-    );
-
-    expect(delivered).toBe(true);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("suppresses non-added memory events", async () => {
-    const fetchMock = jest.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    const delivered = await service().deliver(baseEvent("memory.fact.updated"));
-
-    expect(delivered).toBe(true);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("delivers only memory.*.added with friendly message", async () => {
+  it("delivers memory extract events", async () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const delivered = await service().deliver(baseEvent("memory.fact.added"));
+    const delivered = await service().deliver(baseEvent("memory.extract.completed"));
 
     expect(delivered).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://gateway-web:3000/event/conv_1");
     expect(typeof request.body).toBe("string");
-    expect(request.body).toContain('"message":"Remembered new fact."');
-    expect(request.body).toContain('"type":"memory.fact.added"');
+    expect(request.body).toContain('"type":"memory.extract.completed"');
+  });
+
+  it("delivers memory updated events", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const delivered = await service().deliver(baseEvent("memory.fact.updated"));
+
+    expect(delivered).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://gateway-web:3000/event/conv_1");
+    expect(typeof request.body).toBe("string");
+    expect(request.body).toContain('"type":"memory.fact.updated"');
   });
 });

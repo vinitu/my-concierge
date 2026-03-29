@@ -36,11 +36,7 @@ const MEMORY_EVENT_ACTIONS = [
   'updated',
   'deleted',
   'readed',
-] as const;
-
-const MEMORY_EXTRACT_EVENTS = [
-  'memory.extract.started',
-  'memory.extract.failed',
+  'failed',
 ] as const;
 
 const MEMORY_KINDED_EVENTS = MEMORY_EVENT_KINDS.flatMap((kind) =>
@@ -48,7 +44,6 @@ const MEMORY_KINDED_EVENTS = MEMORY_EVENT_KINDS.flatMap((kind) =>
 );
 
 export const GATEWAY_WEB_EVENT_TYPES = [
-  ...MEMORY_EXTRACT_EVENTS,
   ...MEMORY_KINDED_EVENTS,
 ] as const;
 

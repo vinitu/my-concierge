@@ -55,4 +55,37 @@ describe("AssistantMemoryLlmClientService", () => {
       "assistant-llm returned 500 for /v1/memory/facts: {\"message\":\"Internal server error\"}",
     );
   });
+
+  it("calls assistant-llm profile endpoint and returns profile patch", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: async () => ({
+        patch: {
+          language: "ru",
+          preferences: { reply_language: "ru" },
+        },
+      }),
+      ok: true,
+    }) as unknown as typeof fetch;
+
+    const service = new AssistantMemoryLlmClientService(
+      new ConfigService({
+        ASSISTANT_LLM_URL: "http://assistant-llm:3000",
+      }),
+    );
+
+    const result = await service.extractProfile("conv-2", [
+      { content: "отвечай по-русски", role: "user" },
+    ]);
+
+    expect(result).toEqual({
+      language: "ru",
+      preferences: { reply_language: "ru" },
+    });
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://assistant-llm:3000/v1/memory/profile",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+  });
 });

@@ -88,15 +88,25 @@ export class AssistantLlmService {
     conversationId: string,
     messages: AssistantLlmMessage[],
   ): Promise<string[]> {
+    const latestUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === "user");
+    if (!latestUserMessage) {
+      this.logger.debug(
+        `extract-facts conversation_id=${conversationId} items=0 reason=no_user_message`,
+      );
+      return [];
+    }
+
     const prompt = this.buildFactsExtractPrompt(conversationId);
     try {
       const response = await this.generateMain([
         { content: prompt, role: "system" },
-        ...messages,
+        latestUserMessage,
       ]);
       const extracted = this.parseFactsFromResponse(response);
       this.logger.debug(
-        `extract-facts conversation_id=${conversationId} items=${extracted.length}`,
+        `extract-facts conversation_id=${conversationId} items=${extracted.length} source=latest_user_only`,
       );
       return extracted;
     } catch (error) {
@@ -106,6 +116,47 @@ export class AssistantLlmService {
         }`,
       );
       return [];
+    }
+  }
+
+  async extractProfile(
+    conversationId: string,
+    messages: AssistantLlmMessage[],
+  ): Promise<{
+    constraints?: Record<string, unknown>;
+    home?: Record<string, unknown>;
+    language?: string | null;
+    preferences?: Record<string, unknown>;
+    timezone?: string | null;
+  }> {
+    const latestUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === "user");
+    if (!latestUserMessage) {
+      this.logger.debug(
+        `extract-profile conversation_id=${conversationId} patch=empty reason=no_user_message`,
+      );
+      return {};
+    }
+
+    const prompt = this.buildProfileExtractPrompt(conversationId);
+    try {
+      const response = await this.generateMain([
+        { content: prompt, role: "system" },
+        latestUserMessage,
+      ]);
+      const patch = this.parseProfilePatchFromResponse(response);
+      this.logger.debug(
+        `extract-profile conversation_id=${conversationId} fields=${Object.keys(patch).join(",") || "none"} source=latest_user_only`,
+      );
+      return patch;
+    } catch (error) {
+      this.logger.warn(
+        `extract-profile fallback conversation_id=${conversationId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return {};
     }
   }
 
@@ -153,24 +204,139 @@ export class AssistantLlmService {
 
   private buildFactsExtractPrompt(conversationId: string): string {
     return [
-      "Extract durable facts from conversation.",
+      "Extract only the latest stable user fact from the latest user message in the conversation.",
       "Return JSON only with exact shape:",
       '{"items":["User ..."]}',
       "Rules:",
-      "- Keep only stable facts.",
-      "- Use third person for each item (for example: User lives in Warsaw.).",
+      "- Return at most one item in items.",
+      "- Keep only facts about the user.",
+      "- Use third person for the item (for example: User lives in Warsaw.).",
+      "- Ignore assistant messages and older user messages.",
       "- Do not include temporary or speculative details.",
+      "- If no stable user fact is present in the latest user message, return {\"items\":[]}.",
+      `conversation_id=${conversationId}`,
+    ].join("\n");
+  }
+
+  private buildProfileExtractPrompt(conversationId: string): string {
+    return [
+      "Extract only profile updates from the latest user message in the conversation.",
+      "Return JSON only with exact shape:",
+      '{"patch":{"language":null,"timezone":null,"home":{},"preferences":{},"constraints":{}}}',
+      "Rules:",
+      "- Use only keys that are explicitly present in the latest user message.",
+      "- Keep patch empty if there is no explicit profile update.",
+      "- Ignore assistant messages and older user messages.",
+      "- language must be a string or null.",
+      "- timezone must be a string or null.",
+      "- home, preferences, constraints must be JSON objects when present.",
+      "- If no profile update is present, return {\"patch\":{}}.",
       `conversation_id=${conversationId}`,
     ].join("\n");
   }
 
   private parseFactsFromResponse(responseText: string): string[] {
     const parsed = this.parseJsonCandidate(responseText);
-    const fromObject = this.parseFactsFromObject(parsed);
-    if (fromObject.length > 0) {
-      return fromObject;
+    if (this.hasExplicitFactItems(parsed)) {
+      return this.parseFactsFromObject(parsed);
     }
-    return this.extractFactsFromRawText(responseText);
+    const fromRaw = this.extractFactsFromRawText(responseText);
+    if (fromRaw.length > 0) {
+      return fromRaw;
+    }
+
+    const trimmed = responseText.trim();
+    if (trimmed.length > 0) {
+      throw new Error("Invalid facts extraction response: expected JSON with items");
+    }
+    return [];
+  }
+
+  private parseProfilePatchFromResponse(responseText: string): {
+    constraints?: Record<string, unknown>;
+    home?: Record<string, unknown>;
+    language?: string | null;
+    preferences?: Record<string, unknown>;
+    timezone?: string | null;
+  } {
+    const parsed = this.parseJsonCandidate(responseText);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      const trimmed = responseText.trim();
+      if (!trimmed) {
+        return {};
+      }
+      throw new Error(
+        "Invalid profile extraction response: expected JSON object with patch",
+      );
+    }
+
+    const payload = parsed as Record<string, unknown>;
+    const patchRaw =
+      typeof payload.patch === "object" && payload.patch !== null && !Array.isArray(payload.patch)
+        ? (payload.patch as Record<string, unknown>)
+        : payload;
+
+    const normalized: {
+      constraints?: Record<string, unknown>;
+      home?: Record<string, unknown>;
+      language?: string | null;
+      preferences?: Record<string, unknown>;
+      timezone?: string | null;
+    } = {};
+
+    if ("language" in patchRaw) {
+      normalized.language =
+        typeof patchRaw.language === "string" ? patchRaw.language : null;
+    }
+    if ("timezone" in patchRaw) {
+      normalized.timezone =
+        typeof patchRaw.timezone === "string" ? patchRaw.timezone : null;
+    }
+    if (
+      "home" in patchRaw &&
+      typeof patchRaw.home === "object" &&
+      patchRaw.home !== null &&
+      !Array.isArray(patchRaw.home)
+    ) {
+      normalized.home = patchRaw.home as Record<string, unknown>;
+    }
+    if (
+      "preferences" in patchRaw &&
+      typeof patchRaw.preferences === "object" &&
+      patchRaw.preferences !== null &&
+      !Array.isArray(patchRaw.preferences)
+    ) {
+      normalized.preferences = patchRaw.preferences as Record<string, unknown>;
+    }
+    if (
+      "constraints" in patchRaw &&
+      typeof patchRaw.constraints === "object" &&
+      patchRaw.constraints !== null &&
+      !Array.isArray(patchRaw.constraints)
+    ) {
+      normalized.constraints = patchRaw.constraints as Record<string, unknown>;
+    }
+
+    return normalized;
+  }
+
+  private hasExplicitFactItems(value: unknown): boolean {
+    if (Array.isArray(value)) {
+      return true;
+    }
+    if (typeof value !== "object" || value === null) {
+      return false;
+    }
+
+    const payload = value as Record<string, unknown>;
+    if (Array.isArray(payload.items) || Array.isArray(payload.facts)) {
+      return true;
+    }
+    const typedWrites =
+      typeof payload.typed_writes === "object" && payload.typed_writes !== null
+        ? (payload.typed_writes as Record<string, unknown>)
+        : null;
+    return Boolean(typedWrites && Array.isArray(typedWrites.fact));
   }
 
   private parseJsonCandidate(text: string): unknown {

@@ -13,7 +13,13 @@ interface OllamaChatResponse {
   error?: string;
   message?: {
     content?: string;
+    thinking?: string;
   };
+}
+
+interface OllamaGenerateResponse {
+  error?: string;
+  response?: string;
 }
 
 interface OllamaToolDefinition {
@@ -87,6 +93,16 @@ export class OllamaChatService implements AssistantLlmProviderPort {
       allowEmptyAssistantText?: boolean;
     },
   ): Promise<string> {
+    return this.sendChatInternal(requestBody, baseUrl, timeoutMs, options, true);
+  }
+
+  private async sendChatInternal(
+    requestBody: Record<string, unknown>,
+    baseUrl: string,
+    timeoutMs: number,
+    options: { allowEmptyAssistantText?: boolean } | undefined,
+    canRetryWithoutThink: boolean,
+  ): Promise<string> {
     this.logger.debug(`Ollama reply request: ${this.preview(requestBody)}`);
     const response = await fetch(`${baseUrl}/api/chat`, {
       body: JSON.stringify(requestBody),
@@ -111,6 +127,34 @@ export class OllamaChatService implements AssistantLlmProviderPort {
 
     if (body.error) {
       throw new Error(`Ollama API error: ${body.error}`);
+    }
+
+    if (canRetryWithoutThink && requestBody.think === false) {
+      this.logger.warn(
+        'Ollama API response did not contain assistant text with think=false; retrying without think parameter',
+      );
+      const retryBody = { ...requestBody };
+      delete retryBody.think;
+      return this.sendChatInternal(
+        retryBody,
+        baseUrl,
+        timeoutMs,
+        options,
+        false,
+      );
+    }
+
+    const generateFallback = await this.tryGenerateFallback(
+      requestBody,
+      baseUrl,
+      timeoutMs,
+    );
+    if (generateFallback) {
+      this.logger.warn(
+        'Ollama /api/chat returned empty assistant text; used /api/generate fallback',
+      );
+      this.logExtractedOutput(generateFallback);
+      return generateFallback;
     }
 
     if (options?.allowEmptyAssistantText) {
@@ -186,5 +230,54 @@ export class OllamaChatService implements AssistantLlmProviderPort {
       });
     }
     return tools;
+  }
+
+  private async tryGenerateFallback(
+    requestBody: Record<string, unknown>,
+    baseUrl: string,
+    timeoutMs: number,
+  ): Promise<string | null> {
+    const model = typeof requestBody.model === 'string' ? requestBody.model : '';
+    const messages = Array.isArray(requestBody.messages)
+      ? (requestBody.messages as Array<Record<string, unknown>>)
+      : [];
+    if (!model || messages.length === 0) {
+      return null;
+    }
+
+    const prompt = messages
+      .map((message) => {
+        const role = typeof message.role === 'string' ? message.role : 'user';
+        const content = typeof message.content === 'string' ? message.content : '';
+        return `${role.toUpperCase()}:\n${content}`;
+      })
+      .join('\n\n');
+
+    const generateRequest = {
+      model,
+      prompt,
+      stream: false,
+    };
+    this.logger.debug(`Ollama generate fallback request: ${this.preview(generateRequest)}`);
+    const response = await fetch(`${baseUrl}/api/generate`, {
+      body: JSON.stringify(generateRequest),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) {
+      const errorBody = await response.text();
+      this.logger.warn(`Ollama generate fallback failed with ${response.status}: ${errorBody}`);
+      return null;
+    }
+
+    const body = (await response.json()) as OllamaGenerateResponse;
+    this.logger.debug(`Ollama generate fallback response: ${this.preview(body)}`);
+    if (body.error) {
+      this.logger.warn(`Ollama generate fallback returned error: ${body.error}`);
+      return null;
+    }
+    const content = body.response?.trim();
+    return content && content.length > 0 ? content : null;
   }
 }

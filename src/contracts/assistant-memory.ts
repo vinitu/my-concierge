@@ -6,7 +6,7 @@ export type MemoryKind =
   | "routine"
   | "rule";
 
-export type AssistantMemoryExtractKind = "fact";
+export type AssistantMemoryExtractKind = "fact" | "profile";
 
 export interface AssistantProfile {
   constraints: Record<string, unknown>;

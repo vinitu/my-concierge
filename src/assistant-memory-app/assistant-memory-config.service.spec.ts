@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { AssistantMemoryConfigService } from "./assistant-memory-config.service";
 
 describe("AssistantMemoryConfigService", () => {
-  it("creates default config with fact extraction enabled", async () => {
+  it("creates default config with fact and profile extraction enabled", async () => {
     const runtimeDir = await mkdtemp(
       join(tmpdir(), "assistant-memory-config-"),
     );
@@ -16,7 +16,7 @@ describe("AssistantMemoryConfigService", () => {
     );
 
     const config = await service.read();
-    expect(config.enabled_extracts).toEqual(["fact"]);
+    expect(config.enabled_extracts).toEqual(["fact", "profile"]);
 
     const file = await readFile(
       join(runtimeDir, "config", "assistant-memory.json"),
@@ -36,7 +36,24 @@ describe("AssistantMemoryConfigService", () => {
     );
 
     const updated = await service.write({
-      enabled_extracts: ["fact", "fact"],
+      enabled_extracts: ["fact", "profile", "fact"],
+    });
+
+    expect(updated.enabled_extracts).toEqual(["fact", "profile"]);
+  });
+
+  it("allows disabling profile extract via config", async () => {
+    const runtimeDir = await mkdtemp(
+      join(tmpdir(), "assistant-memory-config-"),
+    );
+    const service = new AssistantMemoryConfigService(
+      new ConfigService({
+        ASSISTANT_MEMORY_RUNTIME_DIR: runtimeDir,
+      }),
+    );
+
+    const updated = await service.write({
+      enabled_extracts: ["fact"],
     });
 
     expect(updated.enabled_extracts).toEqual(["fact"]);

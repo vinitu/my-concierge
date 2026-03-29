@@ -8,7 +8,7 @@ import type {
   UpdateAssistantMemoryConfigBody,
 } from "../contracts/assistant-memory";
 
-const ALL_EXTRACTS: AssistantMemoryExtractKind[] = ["fact"];
+const ALL_EXTRACTS: AssistantMemoryExtractKind[] = ["fact", "profile"];
 
 @Injectable()
 export class AssistantMemoryConfigService {
@@ -70,7 +70,6 @@ export class AssistantMemoryConfigService {
     if (unique.length === 0) {
       return this.defaultConfig().enabled_extracts;
     }
-
     return ALL_EXTRACTS.filter((item) => unique.includes(item));
   }
 
@@ -94,7 +93,6 @@ export class AssistantMemoryConfigService {
         "assistant-memory config validation failed: enabled_extracts must contain at least one supported extract",
       );
     }
-
     return ALL_EXTRACTS.filter((item) => unique.includes(item));
   }
 
