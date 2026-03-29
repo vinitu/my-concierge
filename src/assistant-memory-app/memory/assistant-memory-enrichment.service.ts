@@ -293,6 +293,7 @@ export class AssistantMemoryEnrichmentService
       ...patch,
       source: "assistant-memory-enrichment",
     });
+    await this.publishExtractUpdatedEvent(job);
     this.logger.debug(
       `Enrichment profile applied request_id=${job.request_id} conversation_id=${job.conversation_id} extract=profile updated_at=${result.updatedAt}`,
     );
@@ -395,6 +396,41 @@ export class AssistantMemoryEnrichmentService
       message: `Failed to save ${job.extract} to memory: ${errorMessage}`,
       request_id: job.request_id,
       ...extraPayload,
+    };
+
+    try {
+      await this.assistantMemoryRunEventPublisherService.publish(
+        eventType,
+        job.conversation_id,
+        payload,
+        job.request_id,
+        job.direction,
+        job.user_id,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to publish enrichment event event=${eventType} request_id=${job.request_id} conversation_id=${job.conversation_id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async publishExtractUpdatedEvent(job: EnrichmentJob): Promise<void> {
+    if (
+      this.configService.get<string>(
+        "ASSISTANT_MEMORY_STORE_DRIVER",
+        "mysql",
+      ) === "file"
+    ) {
+      return;
+    }
+
+    const eventType = `memory.${job.extract}.updated` as const;
+    const payload: Record<string, unknown> = {
+      extract: job.extract,
+      message: `Updated ${job.extract} in memory`,
+      request_id: job.request_id,
     };
 
     try {

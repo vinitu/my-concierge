@@ -29,6 +29,7 @@ export const GATEWAY_WEB_INCOMING_MESSAGE_TYPES = [
 
 const MEMORY_EVENT_KINDS = [
   'fact',
+  'profile',
 ] as const;
 
 const MEMORY_EVENT_ACTIONS = [
