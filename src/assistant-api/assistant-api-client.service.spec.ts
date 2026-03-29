@@ -17,7 +17,6 @@ describe('AssistantApiClientService', () => {
 
     const configService = new ConfigService({
       ASSISTANT_API_URL: 'http://assistant-api:3000',
-      CALLBACK_BASE_URL: 'http://gateway-web:3000',
     });
     const gatewayWebConfigService = new GatewayWebConfigService(configService);
     const metricsService = { recordAssistantApiRequest: jest.fn() } as unknown as MetricsService;
@@ -30,14 +29,11 @@ describe('AssistantApiClientService', () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://assistant-api:3000/conversation/api/direct/default-user',
+      'http://assistant-api:3000/conversation/web/direct/default-user',
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          callback: {
-            base_url: 'http://gateway-web:3000',
-          },
           conversation_id: 'socket-1',
           message: 'hello',
         }),
@@ -52,7 +48,6 @@ describe('AssistantApiClientService', () => {
 
     const configService = new ConfigService({
       ASSISTANT_API_URL: 'http://assistant-api:3000',
-      CALLBACK_BASE_URL: 'http://gateway-web:3000',
     });
     const gatewayWebConfigService = new GatewayWebConfigService(configService);
     const metricsService = { recordAssistantApiRequest: jest.fn() } as unknown as MetricsService;

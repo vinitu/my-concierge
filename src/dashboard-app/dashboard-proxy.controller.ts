@@ -30,18 +30,32 @@ export class DashboardProxyController {
     await this.proxy('assistant-api', this.normalizePath(path), request, response);
   }
 
-  @All('assistant-worker')
-  async proxyAssistantWorkerRoot(@Req() request: Request, @Res() response: Response): Promise<void> {
-    await this.proxy('assistant-worker', '', request, response);
+  @All('assistant-orchestrator')
+  async proxyAssistantOrchestratorRoot(@Req() request: Request, @Res() response: Response): Promise<void> {
+    await this.proxy('assistant-orchestrator', '', request, response);
   }
 
-  @All('assistant-worker/*path')
-  async proxyAssistantWorkerPath(
+  @All('assistant-orchestrator/*path')
+  async proxyAssistantOrchestratorPath(
     @Param('path') path: string | string[],
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    await this.proxy('assistant-worker', this.normalizePath(path), request, response);
+    await this.proxy('assistant-orchestrator', this.normalizePath(path), request, response);
+  }
+
+  @All('assistant-llm')
+  async proxyAssistantLlmRoot(@Req() request: Request, @Res() response: Response): Promise<void> {
+    await this.proxy('assistant-llm', '', request, response);
+  }
+
+  @All('assistant-llm/*path')
+  async proxyAssistantLlmPath(
+    @Param('path') path: string | string[],
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<void> {
+    await this.proxy('assistant-llm', this.normalizePath(path), request, response);
   }
 
   @All('assistant-memory')

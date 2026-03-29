@@ -24,16 +24,16 @@ describe('dashboard (e2e)', () => {
       entities: [],
     },
     {
-      key: 'assistant-worker',
+      key: 'assistant-orchestrator',
       kind: 'application',
-      name: 'assistant-worker',
+      name: 'assistant-orchestrator',
       notes: 'Worker runtime',
-      upstream_url: 'http://assistant-worker:3000',
-      prefix: '/assistant-worker',
+      upstream_url: 'http://assistant-orchestrator:3000',
+      prefix: '/assistant-orchestrator',
       panel_url: 'http://localhost:3001',
-      status_url: 'http://assistant-worker:3000/status',
+      status_url: 'http://assistant-orchestrator:3000/status',
       config_path: '/config',
-      entities: [{ id: 'provider-status', label: 'Provider status', path: '/provider-status' }],
+      entities: [{ id: 'skills', label: 'Skills', path: '/skills' }],
     },
     {
       key: 'redis',
@@ -71,20 +71,20 @@ describe('dashboard (e2e)', () => {
         entities: [],
       },
       {
-        key: 'assistant-worker',
+        key: 'assistant-orchestrator',
         kind: 'application',
-        name: 'assistant-worker',
+        name: 'assistant-orchestrator',
         notes: 'Worker runtime',
-        upstream_url: 'http://assistant-worker:3000',
-        prefix: '/assistant-worker',
+        upstream_url: 'http://assistant-orchestrator:3000',
+        prefix: '/assistant-orchestrator',
         panel_url: 'http://localhost:3001',
         ready: false,
         response_time_ms: null,
         service_status: 'unreachable',
-        status_url: 'http://assistant-worker:3000/status',
+        status_url: 'http://assistant-orchestrator:3000/status',
         uptime_seconds: null,
         config_path: '/config',
-        entities: [{ id: 'provider-status', label: 'Provider status', path: '/provider-status' }],
+        entities: [{ id: 'skills', label: 'Skills', path: '/skills' }],
       },
       {
         key: 'redis',
@@ -150,7 +150,7 @@ describe('dashboard (e2e)', () => {
     expect(response.status).toBe(200);
     expect(response.body.refresh_seconds).toBe(5);
     expect(response.body.services).toHaveLength(3);
-    expect(response.body.services[1].key).toBe('assistant-worker');
+    expect(response.body.services[1].key).toBe('assistant-orchestrator');
   });
 
   it('returns dashboard status', async () => {

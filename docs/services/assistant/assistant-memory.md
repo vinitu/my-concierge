@@ -28,13 +28,13 @@ This document describes the canonical `assistant-memory` service.
 
 ```mermaid
 flowchart LR
-    Worker["assistant-worker"] <--> Memory["assistant-memory"]
+    Worker["assistant-orchestrator"] <--> Memory["assistant-memory"]
     Memory --> MySQL["mysql"]
 ```
 
 Rules:
 
-- `assistant-worker` calls `assistant-memory` for memory reads and writes
+- `assistant-orchestrator` calls `assistant-memory` for memory reads and writes
 - `assistant-memory` owns the memory tables in MySQL
 - `assistant-memory` does not talk to gateways
 - `assistant-memory` does not consume Redis jobs directly
@@ -142,7 +142,7 @@ Examples:
 
 - `On 2026-03-27, callbacks were assigned only to assistant-api`
 - `Decided one email chain maps to one conversation_id`
-- `Chose LangChain.js as the only assistant-worker runtime`
+- `Chose assistant-llm as shared generation runtime`
 
 ### `rule`
 
@@ -270,7 +270,7 @@ Request body:
   "home": {},
   "preferences": {},
   "constraints": {},
-  "source": "assistant-worker"
+  "source": "assistant-orchestrator"
 }
 ```
 
@@ -350,7 +350,7 @@ Example typed write:
       "confidence": 0.92,
       "conversationThreadId": "thread_123",
       "scope": "conversation",
-      "source": "assistant-worker",
+      "source": "assistant-orchestrator",
       "tags": ["style"]
     }
   ]
@@ -379,7 +379,7 @@ Error responses use:
 
 ## Tool Mapping
 
-Inside `assistant-worker`, the main tool-to-service mapping is:
+Inside `assistant-orchestrator`, the main tool-to-service mapping is:
 
 - `memory_search` -> `POST /v1/search`
 - `memory_write` -> typed write endpoints grouped by memory kind
@@ -413,7 +413,7 @@ Reject or archive when:
 
 ## Must Not Do
 
-- Run LangChain.js agent loops
+- Run asynchronous memory enrichment via `assistant-llm` extraction endpoint
 - Own conversation state
 - Send callbacks to gateways
 - Consume public inbound requests from channels

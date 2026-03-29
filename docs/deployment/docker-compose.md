@@ -8,7 +8,8 @@ Describe the default local runtime.
 
 - `mysql`
 - `assistant-api`
-- `assistant-worker`
+- `assistant-orchestrator`
+- `assistant-llm`
 - `assistant-memory`
 - `dashboard`
 - `gateway-web`
@@ -22,23 +23,26 @@ Describe the default local runtime.
 - `gateway-telegram` is built from the repository root
 - `gateway-email` is built from the repository root
 - `assistant-api` is built from the repository root
-- `assistant-worker` is built from the repository root
+- `assistant-orchestrator` is built from the repository root
+- `assistant-llm` is built from the repository root
 - `assistant-memory` is built from the repository root
 - `dashboard` is built from the repository root
 - `queue` uses Redis in the local example
 - `assistant-api` uses `QUEUE_ADAPTER=redis`
-- `assistant-worker` uses `QUEUE_ADAPTER=redis`
-- `assistant-worker` uses `ASSISTANT_MEMORY_URL=http://assistant-memory:3000`
-- `assistant-worker` and `assistant-memory` use MySQL connection settings that point to the `mysql` container
-- `assistant-worker` can use DeepSeek, xAI, or local Ollama
-- `assistant-worker` mounts `./runtime/assistant-worker` into the container as `/app/runtime`
+- `assistant-orchestrator` uses `QUEUE_ADAPTER=redis`
+- `assistant-orchestrator` uses `ASSISTANT_MEMORY_URL=http://assistant-memory:3000`
+- `assistant-orchestrator` uses `ASSISTANT_LLM_URL=http://assistant-llm:3000`
+- `assistant-orchestrator` and `assistant-memory` use MySQL connection settings that point to the `mysql` container
+- `assistant-llm` can use DeepSeek, xAI, or local Ollama
+- `assistant-orchestrator` mounts `./runtime/assistant-orchestrator` into the container as `/app/runtime`
+- `assistant-llm` mounts `./runtime/assistant-llm` into the container as `/app/runtime`
 - `gateway-web` mounts `./runtime/gateway-web` into the container as `/app/runtime`
 - `gateway-telegram` mounts `./runtime/gateway-telegram` into the container as `/app/runtime`
 - `gateway-email` mounts `./runtime/gateway-email` into the container as `/app/runtime`
 - `dashboard` polls every service over HTTP and refreshes the browser tiles every `DASHBOARD_REFRESH_SECONDS`
 - runtime files are provided only through the Docker Compose bind volume and are not copied into the image
 - Docker Compose reads local values from `.env`
-- the schema must be prepared with `npm run db:migrate` before `assistant-worker` and `assistant-memory` can use MySQL successfully
+- the schema must be prepared with `npm run db:migrate` before `assistant-orchestrator` and `assistant-memory` can use MySQL successfully
 - `make build` builds the local runtime images
 - `make up` starts the local example stack
 - `make down` stops it
@@ -107,7 +111,8 @@ Default `GATEWAY_TELEGRAM_RUNTIME_DIR` and `GATEWAY_EMAIL_RUNTIME_DIR` in the lo
 Runtime volume in the local Docker Compose setup:
 
 ```text
-./runtime/assistant-worker:/app/runtime
+./runtime/assistant-orchestrator:/app/runtime
+./runtime/assistant-llm:/app/runtime
 ./runtime/gateway-web:/app/runtime
 ./runtime/gateway-telegram:/app/runtime
 ./runtime/gateway-email:/app/runtime
@@ -119,7 +124,7 @@ Default `OLLAMA_BASE_URL` in the local Docker Compose setup:
 http://host.docker.internal:11434
 ```
 
-This lets the `assistant-worker` container reach the Ollama process running on the host machine in Docker Desktop.
+This lets the `assistant-llm` container reach the Ollama process running on the host machine in Docker Desktop.
 Default `OLLAMA_MODEL` is `gemma3:1b`.
 
 ## Port Model
@@ -131,17 +136,18 @@ Default `OLLAMA_MODEL` is `gemma3:1b`.
 - `gateway-telegram` is exposed on host port `8081`.
 - `gateway-email` is exposed on host port `8082`.
 - `assistant-api` is exposed on host port `3000`.
-- `assistant-worker` is exposed on host port `3001`.
+- `assistant-orchestrator` is exposed on host port `3001`.
+- `assistant-llm` is exposed on host port `3003`.
 - `assistant-memory` is exposed on host port `3002`.
 - `assistant-scheduler` is not part of the current local Compose stack.
 
 ## Current Flow
 
 ```text
-browser -> gateway-web -> assistant-api -> redis -> assistant-worker -> redis -> assistant-api -> callback
+browser -> gateway-web -> assistant-api -> redis -> assistant-orchestrator -> redis -> assistant-api -> callback
 ```
 
 ## Current Runtime Coverage
 
-- `assistant-api`, `assistant-worker`, `assistant-memory`, `queue`, `dashboard`, `gateway-web`, `gateway-telegram`, `gateway-email`, and `swagger` are implemented in this repository.
+- `assistant-api`, `assistant-orchestrator`, `assistant-llm`, `assistant-memory`, `queue`, `dashboard`, `gateway-web`, `gateway-telegram`, `gateway-email`, and `swagger` are implemented in this repository.
 - `assistant-scheduler` is a documented service and can be added to the local stack when implemented.

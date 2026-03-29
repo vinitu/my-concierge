@@ -8,9 +8,9 @@ Describe the endpoints of all application services in one place.
 
 - All runtime components expose `GET /status`.
 - All runtime components expose `GET /metrics`.
-- `assistant-api`, `assistant-worker`, `assistant-memory`, `dashboard`, `gateway-web`, `gateway-email`, and `gateway-telegram` also expose `GET /openapi.json`.
+- `assistant-api`, `assistant-orchestrator`, `assistant-llm`, `assistant-memory`, `dashboard`, `gateway-web`, `gateway-email`, and `gateway-telegram` also expose `GET /openapi.json`.
 - `GET /status` should include `service`, `status`, `ready`, and `uptime_seconds`.
-- `assistant-worker` does not expose public conversation endpoints.
+- `assistant-orchestrator` does not expose public conversation endpoints.
 
 ## `assistant-api`
 
@@ -31,22 +31,53 @@ Describe the endpoints of all application services in one place.
 - `assistant-api` does not run assistant business logic.
 - `assistant-api` owns external callback delivery.
 
-## `assistant-worker`
+## `assistant-orchestrator`
 
 ### Endpoints
 
 - `GET /status`
-  Purpose: report `assistant-worker` readiness
+  Purpose: report `assistant-orchestrator` readiness
 - `GET /metrics`
   Purpose: return Prometheus worker metrics
 - `GET /openapi.json`
-  Purpose: return the `assistant-worker` OpenAPI schema
+  Purpose: return the `assistant-orchestrator` OpenAPI schema
 
 ### Notes
 
-- `assistant-worker` reads jobs from the queue.
-- `assistant-worker` publishes run events back to the queue.
-- `assistant-worker` does not call gateway callback endpoints directly.
+- `assistant-orchestrator` reads jobs from the queue.
+- `assistant-orchestrator` publishes run events back to the queue.
+- `assistant-orchestrator` does not call gateway callback endpoints directly.
+- `assistant-orchestrator` delegates LLM generation to `assistant-llm`.
+
+## `assistant-llm`
+
+### Endpoints
+
+- `GET /status`
+  Purpose: report `assistant-llm` readiness
+- `GET /metrics`
+  Purpose: return Prometheus LLM metrics
+- `GET /openapi.json`
+  Purpose: return the `assistant-llm` OpenAPI schema
+- `GET /config`
+  Purpose: read LLM provider/model settings
+- `PUT /config`
+  Purpose: update LLM provider/model settings
+- `GET /provider-status`
+  Purpose: verify provider reachability and key configuration
+- `GET /models`
+  Purpose: list available models by provider
+- `POST /v1/generate/main`
+  Purpose: run main generation from `messages[]`
+- `POST /v1/generate/summarize`
+  Purpose: run summary generation
+- `POST /v1/generate/extract-memory`
+  Purpose: extract profile patch and typed memory candidates
+
+### Notes
+
+- `assistant-llm` is internal-only.
+- `assistant-orchestrator` and `assistant-memory` enrichment call `assistant-llm`.
 
 ## `assistant-memory`
 
@@ -120,7 +151,7 @@ Describe the endpoints of all application services in one place.
 ### Notes
 
 - `assistant-memory` is an internal service.
-- `assistant-worker` calls `assistant-memory` for durable memory operations.
+- `assistant-orchestrator` calls `assistant-memory` for durable memory operations.
 
 ## `gateway-telegram`
 
@@ -258,12 +289,13 @@ Describe the endpoints of all application services in one place.
 ### Endpoints
 
 - `GET /`
-  Purpose: show one shared Swagger UI for `assistant-api`, `assistant-worker`, `assistant-memory`, `dashboard`, `gateway-web`, `gateway-telegram`, and `gateway-email`
+  Purpose: show one shared Swagger UI for `assistant-api`, `assistant-orchestrator`, `assistant-llm`, `assistant-memory`, `dashboard`, `gateway-web`, `gateway-telegram`, and `gateway-email`
 
 ### Notes
 
 - `swagger` reads schemas from `http://localhost:3000/openapi.json`.
 - `swagger` reads schemas from `http://localhost:3001/openapi.json`.
+- `swagger` reads schemas from `http://localhost:3003/openapi.json`.
 - `swagger` reads schemas from `http://assistant-memory:3000/openapi.json`.
 - `swagger` reads schemas from `http://localhost:8080/openapi.json`.
 - `swagger` reads schemas from `http://localhost:8079/openapi.json`.
@@ -298,5 +330,5 @@ Describe the endpoints of all application services in one place.
 
 ### Notes
 
-- `queue` is an internal transport component between `assistant-api` and `assistant-worker` in both directions.
+- `queue` is an internal transport component between `assistant-api` and `assistant-orchestrator` in both directions.
 - Queue depth must still appear in `assistant-api -> GET /metrics`.

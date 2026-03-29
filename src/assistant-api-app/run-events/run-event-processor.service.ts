@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import { CallbackDeliveryService } from './callback-delivery.service';
 
 @Injectable()
 export class RunEventProcessorService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(RunEventProcessorService.name);
   private timer: NodeJS.Timeout | null = null;
   private processing = false;
 
@@ -56,6 +58,10 @@ export class RunEventProcessorService implements OnModuleInit, OnModuleDestroy {
       if (!event) {
         return;
       }
+
+      this.logger.log(
+        `Run event received eventType=${event.eventType} direction=${event.direction} userId=${event.userId} requestId=${event.requestId} conversationId=${event.conversationId}`,
+      );
 
       const delivered = await this.callbackDeliveryService.deliver(event);
       this.metricsService.recordCallbackDelivery(delivered);

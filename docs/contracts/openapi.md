@@ -7,7 +7,8 @@ Describe where OpenAPI schemas come from.
 ## Endpoints
 
 - `assistant-api -> GET /openapi.json`
-- `assistant-worker -> GET /openapi.json`
+- `assistant-orchestrator -> GET /openapi.json`
+- `assistant-llm -> GET /openapi.json`
 - `assistant-memory -> GET /openapi.json`
 - `dashboard -> GET /openapi.json`
 - `gateway-web -> GET /openapi.json`

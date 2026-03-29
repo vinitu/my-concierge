@@ -1,43 +1,53 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get } from "@nestjs/common";
 
 @Controller()
 export class AssistantMemoryOpenApiController {
-  @Get('openapi.json')
+  @Get("openapi.json")
   getOpenApi(): Record<string, unknown> {
-    const typedPaths = ['preferences', 'facts', 'routines', 'projects', 'episodes', 'rules']
+    const typedPaths = [
+      "preferences",
+      "facts",
+      "routines",
+      "projects",
+      "episodes",
+      "rules",
+    ]
       .flatMap((resource) => [
-        [`/v1/${resource}/search`, 'Search active memory entries of one kind'],
-        [`/v1/${resource}/write`, 'Persist memory entries of one kind'],
-        [`/v1/${resource}/{memoryId}`, 'Get one memory entry of one kind'],
-        [`/v1/${resource}/{memoryId}/archive`, 'Archive one memory entry of one kind'],
+        [`/v1/${resource}/search`, "Search active memory entries of one kind"],
+        [`/v1/${resource}/write`, "Persist memory entries of one kind"],
+        [`/v1/${resource}/{memoryId}`, "Get one memory entry of one kind"],
+        [
+          `/v1/${resource}/{memoryId}/archive`,
+          "Archive one memory entry of one kind",
+        ],
       ])
       .reduce<Record<string, unknown>>((accumulator, [path, summary]) => {
-        if (path.endsWith('/search')) {
+        if (path.endsWith("/search")) {
           accumulator[path] = {
             post: {
-              responses: { '200': { description: 'Ranked search result' } },
+              responses: { "200": { description: "Ranked search result" } },
               summary,
             },
           };
           return accumulator;
         }
 
-        if (path.endsWith('/write')) {
+        if (path.endsWith("/write")) {
           accumulator[path] = {
             post: {
-              responses: { '200': { description: 'Persisted write result' } },
+              responses: { "200": { description: "Persisted write result" } },
               summary,
             },
           };
           return accumulator;
         }
 
-        if (path.endsWith('/archive')) {
+        if (path.endsWith("/archive")) {
           accumulator[path] = {
             post: {
               responses: {
-                '200': { description: 'Memory archived' },
-                '404': { description: 'Memory entry not found' },
+                "200": { description: "Memory archived" },
+                "404": { description: "Memory entry not found" },
               },
               summary,
             },
@@ -48,8 +58,8 @@ export class AssistantMemoryOpenApiController {
         accumulator[path] = {
           get: {
             responses: {
-              '200': { description: 'Single memory entry' },
-              '404': { description: 'Memory entry not found' },
+              "200": { description: "Single memory entry" },
+              "404": { description: "Memory entry not found" },
             },
             summary,
           },
@@ -60,86 +70,103 @@ export class AssistantMemoryOpenApiController {
     return {
       info: {
         description:
-          'Durable memory service for assistant profile, federated retrieval, typed memory writes, and operational endpoints.',
-        title: 'assistant-memory',
-        version: '1.0.0',
+          "Durable memory service for assistant profile, federated retrieval, typed memory writes, and operational endpoints.",
+        title: "assistant-memory",
+        version: "1.0.0",
       },
-      openapi: '3.0.0',
+      openapi: "3.0.0",
       paths: {
-        '/': {
+        "/": {
           get: {
-            responses: { '200': { description: 'Service entrypoint summary' } },
-            summary: 'Get assistant-memory root endpoint',
+            responses: { "200": { description: "Service entrypoint summary" } },
+            summary: "Get assistant-memory root endpoint",
           },
         },
-        '/status': {
+        "/status": {
           get: {
-            responses: { '200': { description: 'Service is ready' } },
-            summary: 'Get memory service status',
+            responses: { "200": { description: "Service is ready" } },
+            summary: "Get memory service status",
           },
         },
-        '/metrics': {
+        "/metrics": {
           get: {
-            responses: { '200': { description: 'Prometheus metrics output' } },
-            summary: 'Get Prometheus metrics',
+            responses: { "200": { description: "Prometheus metrics output" } },
+            summary: "Get Prometheus metrics",
           },
         },
-        '/openapi.json': {
+        "/openapi.json": {
           get: {
-            responses: { '200': { description: 'OpenAPI schema document' } },
-            summary: 'Get assistant-memory OpenAPI schema',
+            responses: { "200": { description: "OpenAPI schema document" } },
+            summary: "Get assistant-memory OpenAPI schema",
           },
         },
-        '/v1/profile': {
+        "/config": {
           get: {
-            responses: { '200': { description: 'Current canonical profile' } },
-            summary: 'Get canonical assistant profile',
+            responses: {
+              "200": { description: "assistant-memory runtime config" },
+            },
+            summary: "Read assistant-memory config",
           },
           put: {
-            responses: { '200': { description: 'Profile updated' } },
-            summary: 'Update canonical assistant profile',
+            responses: {
+              "200": { description: "assistant-memory runtime config updated" },
+            },
+            summary: "Update assistant-memory config",
           },
         },
-        '/v1/search': {
-          post: {
-            responses: { '200': { description: 'Federated ranked search result' } },
-            summary: 'Search across all memory kinds',
-          },
-        },
-        '/v1/compact': {
-          post: {
-            responses: { '200': { description: 'Memory compacted' } },
-            summary: 'Compact duplicate memory entries',
-          },
-        },
-        '/v1/reindex': {
-          post: {
-            responses: { '200': { description: 'Memory reindex completed' } },
-            summary: 'Rebuild memory retrieval metadata',
-          },
-        },
-        '/v1/conversations': {
+        "/v1/profile": {
           get: {
-            responses: { '200': { description: 'Conversation thread list' } },
-            summary: 'List canonical conversation threads',
+            responses: { "200": { description: "Current canonical profile" } },
+            summary: "Get canonical assistant profile",
+          },
+          put: {
+            responses: { "200": { description: "Profile updated" } },
+            summary: "Update canonical assistant profile",
           },
         },
-        '/v1/conversations/read': {
+        "/v1/search": {
           post: {
-            responses: { '200': { description: 'Conversation state' } },
-            summary: 'Read one canonical conversation state',
+            responses: {
+              "200": { description: "Federated ranked search result" },
+            },
+            summary: "Search across all memory kinds",
           },
         },
-        '/v1/conversations/append': {
+        "/v1/compact": {
           post: {
-            responses: { '200': { description: 'Updated conversation state' } },
-            summary: 'Append one user/assistant exchange to canonical conversation state',
+            responses: { "200": { description: "Memory compacted" } },
+            summary: "Compact duplicate memory entries",
           },
         },
-        '/v1/conversations/search': {
+        "/v1/reindex": {
           post: {
-            responses: { '200': { description: 'Conversation search result' } },
-            summary: 'Search one conversation thread window and summary',
+            responses: { "200": { description: "Memory reindex completed" } },
+            summary: "Rebuild memory retrieval metadata",
+          },
+        },
+        "/v1/conversations": {
+          get: {
+            responses: { "200": { description: "Conversation thread list" } },
+            summary: "List canonical conversation threads",
+          },
+        },
+        "/v1/conversations/read": {
+          post: {
+            responses: { "200": { description: "Conversation state" } },
+            summary: "Read one canonical conversation state",
+          },
+        },
+        "/v1/conversations/append": {
+          post: {
+            responses: { "200": { description: "Updated conversation state" } },
+            summary:
+              "Append one user/assistant exchange to canonical conversation state",
+          },
+        },
+        "/v1/conversations/search": {
+          post: {
+            responses: { "200": { description: "Conversation search result" } },
+            summary: "Search one conversation thread window and summary",
           },
         },
         ...typedPaths,

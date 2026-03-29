@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MysqlService } from '../../persistence/mysql.service';
 import { AssistantMemoryMetricsService } from '../observability/assistant-memory-metrics.service';
+import { AssistantMemoryRunEventPublisherService } from '../run-events/assistant-memory-run-event-publisher.service';
 import { AssistantMemoryService } from './assistant-memory.service';
 
 describe('AssistantMemoryService', () => {
@@ -18,6 +19,9 @@ describe('AssistantMemoryService', () => {
       }),
       new AssistantMemoryMetricsService(),
       {} as MysqlService,
+      {
+        publish: jest.fn(),
+      } as unknown as AssistantMemoryRunEventPublisherService,
     );
   }
 
@@ -30,7 +34,7 @@ describe('AssistantMemoryService', () => {
           confidence: 0.91,
           content: 'On 2026-03-27, we decided to use concise replies.',
           scope: 'conversation',
-          source: 'assistant-worker',
+          source: 'assistant-orchestrator',
         },
       ]),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -45,7 +49,7 @@ describe('AssistantMemoryService', () => {
           confidence: 0.91,
           content: 'User said "привет" in Russian.',
           scope: 'conversation',
-          source: 'assistant-worker',
+          source: 'assistant-orchestrator',
         },
       ]),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -59,7 +63,7 @@ describe('AssistantMemoryService', () => {
         confidence: 0.82,
         content: 'Uses a Synology NAS at home.',
         scope: 'global',
-        source: 'assistant-worker',
+        source: 'assistant-orchestrator',
         tags: ['home'],
       },
     ]);
@@ -68,7 +72,7 @@ describe('AssistantMemoryService', () => {
         confidence: 0.95,
         content: 'Uses a Synology NAS at home.',
         scope: 'global',
-        source: 'assistant-worker',
+        source: 'assistant-orchestrator',
         tags: ['infra'],
       },
     ]);
@@ -88,7 +92,7 @@ describe('AssistantMemoryService', () => {
         confidence: 0.91,
         content: 'Prefers concise replies.',
         scope: 'conversation',
-        source: 'assistant-worker',
+        source: 'assistant-orchestrator',
       },
     ]);
     await service.writeByKind('rule', 'idempotency-5', [
@@ -96,7 +100,7 @@ describe('AssistantMemoryService', () => {
         confidence: 0.98,
         content: 'Only assistant-api may deliver external callbacks.',
         scope: 'architecture',
-        source: 'assistant-worker',
+        source: 'assistant-orchestrator',
       },
     ]);
 

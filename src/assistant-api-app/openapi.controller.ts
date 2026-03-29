@@ -23,7 +23,7 @@ export class AssistantApiOpenApiController {
             },
           },
         },
-        '/conversation/{direction}/{chat}/{contact}': {
+        '/conversation/{direction}/{chat}/{userId}': {
           post: {
             summary: 'Accept a conversation event',
             parameters: [
@@ -31,7 +31,7 @@ export class AssistantApiOpenApiController {
                 name: 'direction',
                 in: 'path',
                 required: true,
-                schema: { type: 'string', enum: ['api', 'telegram', 'email'] },
+                schema: { type: 'string', enum: ['web', 'email', 'telegram', 'api'] },
               },
               {
                 name: 'chat',
@@ -40,7 +40,7 @@ export class AssistantApiOpenApiController {
                 schema: { type: 'string' },
               },
               {
-                name: 'contact',
+                name: 'userId',
                 in: 'path',
                 required: true,
                 schema: { type: 'string' },
@@ -52,15 +52,8 @@ export class AssistantApiOpenApiController {
                 'application/json': {
                   schema: {
                     type: 'object',
-                    required: ['message', 'callback', 'conversation_id'],
+                    required: ['message', 'conversation_id'],
                     properties: {
-                      callback: {
-                        type: 'object',
-                        required: ['base_url'],
-                        properties: {
-                          base_url: { type: 'string', format: 'uri' },
-                        },
-                      },
                       conversation_id: { type: 'string' },
                       message: { type: 'string' },
                     },

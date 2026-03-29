@@ -8,7 +8,10 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { GatewayWebConfigService } from './gateway-web-config.service';
+import {
+  GatewayWebConfigService,
+  GATEWAY_WEB_ALLOWED_INCOMING_MESSAGE_TYPES,
+} from './gateway-web-config.service';
 
 describe('GatewayWebConfigService', () => {
   it('creates and reads default config', async () => {
@@ -17,7 +20,6 @@ describe('GatewayWebConfigService', () => {
       new ConfigService({
         ASSISTANT_API_URL: 'http://assistant-api:3000',
         ASSISTANT_MEMORY_URL: 'http://assistant-memory:3000',
-        CALLBACK_BASE_URL: 'http://gateway-web:3000',
         GATEWAY_WEB_RUNTIME_DIR: runtimeDirectory,
         GATEWAY_WEB_USER_ID: 'default-user',
       }),
@@ -26,7 +28,7 @@ describe('GatewayWebConfigService', () => {
     await expect(service.read()).resolves.toEqual({
       assistant_api_url: 'http://assistant-api:3000',
       assistant_memory_url: 'http://assistant-memory:3000',
-      callback_base_url: 'http://gateway-web:3000',
+      allowed_incoming_message_types: [...GATEWAY_WEB_ALLOWED_INCOMING_MESSAGE_TYPES],
       user_id: 'default-user',
     });
   });
@@ -41,7 +43,22 @@ describe('GatewayWebConfigService', () => {
 
     await expect(
       service.write({
-        assistant_api_url: 'not-a-url',
+        allowed_incoming_message_types: 'not-array' as unknown as never[],
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('rejects unknown allowed incoming message types', async () => {
+    const runtimeDirectory = await mkdtemp(join(tmpdir(), 'gateway-web-config-'));
+    const service = new GatewayWebConfigService(
+      new ConfigService({
+        GATEWAY_WEB_RUNTIME_DIR: runtimeDirectory,
+      }),
+    );
+
+    await expect(
+      service.write({
+        allowed_incoming_message_types: ['unknown.type'] as never[],
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -56,7 +73,7 @@ describe('GatewayWebConfigService', () => {
         {
           assistant_api_url: 'invalid-url',
           assistant_memory_url: 'http://assistant-memory:3000',
-          callback_base_url: 'ftp://bad',
+          allowed_incoming_message_types: ['unknown.type'],
           user_id: ' ',
         },
         null,
@@ -69,7 +86,6 @@ describe('GatewayWebConfigService', () => {
       new ConfigService({
         ASSISTANT_API_URL: 'http://assistant-api:3000',
         ASSISTANT_MEMORY_URL: 'http://assistant-memory:3000',
-        CALLBACK_BASE_URL: 'http://gateway-web:3000',
         GATEWAY_WEB_RUNTIME_DIR: runtimeDirectory,
         GATEWAY_WEB_USER_ID: 'default-user',
       }),
@@ -78,7 +94,7 @@ describe('GatewayWebConfigService', () => {
     await expect(service.read()).resolves.toEqual({
       assistant_api_url: 'http://assistant-api:3000',
       assistant_memory_url: 'http://assistant-memory:3000',
-      callback_base_url: 'http://gateway-web:3000',
+      allowed_incoming_message_types: [...GATEWAY_WEB_ALLOWED_INCOMING_MESSAGE_TYPES],
       user_id: 'default-user',
     });
 

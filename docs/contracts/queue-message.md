@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Describe the Redis transport shapes between `assistant-api` and `assistant-worker`.
+Describe the Redis transport shapes between `assistant-api` and `assistant-orchestrator`.
 
 ## Execution Job Minimum Fields
 
@@ -29,10 +29,10 @@ Describe the Redis transport shapes between `assistant-api` and `assistant-worke
 ## Rules
 
 - `assistant-api` writes execution jobs.
-- `assistant-worker` reads execution jobs.
-- `assistant-worker` writes run events.
+- `assistant-orchestrator` reads execution jobs.
+- `assistant-orchestrator` writes run events.
 - `assistant-api` reads run events.
-- `assistant-worker` must not derive gateway callback endpoints directly.
+- `assistant-orchestrator` must not derive gateway callback endpoints directly.
 - `request_id` is stable across execution retries for the same accepted request.
 - `runId` is stable across all run events for the same execution attempt.
 - `sequence` is monotonically increasing inside one `runId`.

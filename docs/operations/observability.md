@@ -17,7 +17,7 @@ Describe status, metrics, and documentation endpoints.
 ## OpenAPI
 
 - `assistant-api` exposes `GET /openapi.json`
-- `assistant-worker` exposes `GET /openapi.json`
+- `assistant-orchestrator` exposes `GET /openapi.json`
 - `assistant-memory` exposes `GET /openapi.json`
 - `dashboard` exposes `GET /openapi.json`
 - `gateway-web` exposes `GET /openapi.json`

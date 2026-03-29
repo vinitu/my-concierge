@@ -22,8 +22,7 @@ export class AssistantApiClientService {
   async sendConversation(request: ConversationRequest): Promise<void> {
     const config = await this.gatewayWebConfigService.read();
     const assistantApiUrl = trimTrailingSlash(config.assistant_api_url);
-    const callbackBaseUrl = trimTrailingSlash(config.callback_base_url);
-    const url = `${assistantApiUrl}/conversation/api/direct/${encodeURIComponent(request.userId)}`;
+    const url = `${assistantApiUrl}/conversation/web/direct/${encodeURIComponent(request.userId)}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -31,9 +30,6 @@ export class AssistantApiClientService {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        callback: {
-          base_url: callbackBaseUrl,
-        },
         conversation_id: request.conversationId,
         message: request.message,
       }),

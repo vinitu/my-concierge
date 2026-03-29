@@ -94,7 +94,7 @@ export class AssistantApiRootController {
           <div class="card-shell">
             <h2>Current Runtime</h2>
             <p class="mb-2">Queue adapter: <code>${this.escape(this.queueService.driverName())}</code></p>
-            <p class="mb-0">Public intake endpoint: <code>POST /conversation/:direction/:chat/:contact</code></p>
+            <p class="mb-0">Public intake endpoint: <code>POST /conversation/:direction/:chat/:userId</code></p>
           </div>
         </div>
         <div class="col-lg-6">

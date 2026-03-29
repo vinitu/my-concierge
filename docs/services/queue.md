@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Transport execution jobs from `assistant-api` to `assistant-worker` and run events back from `assistant-worker` to `assistant-api`.
+Transport execution jobs from `assistant-api` to `assistant-orchestrator` and run events back from `assistant-orchestrator` to `assistant-api`.
 
 ## Responsibilities
 
@@ -18,7 +18,7 @@ Transport execution jobs from `assistant-api` to `assistant-worker` and run even
 ```mermaid
 flowchart LR
     API["assistant-api"] <--> Q["queue"]
-    Q <--> Worker["assistant-worker"]
+    Q <--> Worker["assistant-orchestrator"]
 ```
 
 ## Endpoints
@@ -30,10 +30,10 @@ flowchart LR
 - `queue` does not expose its own Prometheus endpoint in this repository.
 - Queue depth is surfaced through:
   - `queue_messages{service="assistant-api"}`
-  - `queue_messages{service="assistant-worker"}`
+  - `queue_messages{service="assistant-orchestrator"}`
 
 ## Rules
 
-- The queue is the transport layer between `assistant-api` and `assistant-worker` in both directions.
+- The queue is the transport layer between `assistant-api` and `assistant-orchestrator` in both directions.
 - The queue contract must stay stable across retries and scaling.
 - Redis is the queue technology.

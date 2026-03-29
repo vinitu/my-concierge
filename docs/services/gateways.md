@@ -44,7 +44,7 @@ flowchart LR
 - assistant business logic does not live in gateways
 - `assistant-api` owns all external callback delivery
 - gateways translate callback payloads into channel-native delivery
-- gateways may keep local transport runtimes, but canonical assistant conversation state still lives in `assistant-worker`
+- gateways may keep local transport runtimes, but canonical assistant conversation state lives in `assistant-memory`
 
 ## Related Documents
 

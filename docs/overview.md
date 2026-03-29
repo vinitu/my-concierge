@@ -25,15 +25,16 @@ It separates product rules, architecture rules, service rules, API contracts, de
 ## Main Ideas
 
 - The local runtime is named `assistant`.
-- `assistant` is centered on `assistant-api`, `assistant-worker`, and `assistant-memory`.
+- `assistant` is centered on `assistant-api`, `assistant-orchestrator`, and `assistant-memory`.
 - `assistant-api` accepts inbound requests, writes jobs to Redis, consumes run events from Redis, and owns all external callbacks.
-- `assistant-worker` consumes execution jobs from Redis, runs the LangChain.js-based assistant loop, and publishes run events back to Redis.
+- `assistant-orchestrator` consumes execution jobs from Redis, runs orchestration/tools flow, calls `assistant-llm` for generation, and publishes run events back to Redis.
+- `assistant-llm` is the central LLM service for provider config, model catalog, and message-based generations.
 - `assistant-memory` is the durable memory service for retrieval, writes, profile state, and memory maintenance.
 - MySQL is the canonical store for conversation state and durable memory data.
-- Redis is the transport layer between `assistant-api` and `assistant-worker` in both directions.
-- `dashboard`, `gateway-web`, `gateway-telegram`, `gateway-email`, `assistant-api`, `assistant-worker`, and `assistant-memory` are implemented in this repository.
+- Redis is the transport layer between `assistant-api` and `assistant-orchestrator` in both directions.
+- `dashboard`, `gateway-web`, `gateway-telegram`, `gateway-email`, `assistant-api`, `assistant-orchestrator`, `assistant-llm`, and `assistant-memory` are implemented in this repository.
 - All runtime components expose `GET /status` and `GET /metrics`.
-- `assistant-api`, `assistant-worker`, `assistant-memory`, `dashboard`, `gateway-web`, `gateway-telegram`, and `gateway-email` expose `GET /openapi.json`.
+- `assistant-api`, `assistant-orchestrator`, `assistant-llm`, `assistant-memory`, `dashboard`, `gateway-web`, `gateway-telegram`, and `gateway-email` expose `GET /openapi.json`.
 - One shared Swagger UI may show multiple OpenAPI schemas.
 - Docker Compose is the default runtime.
 

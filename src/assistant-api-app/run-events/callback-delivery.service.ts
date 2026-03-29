@@ -1,45 +1,79 @@
-import { Injectable } from '@nestjs/common';
-import type { RunEvent } from '../../contracts/assistant-transport';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import type { RunEvent } from "../../contracts/assistant-transport";
 
 function trimTrailingSlash(value: string): string {
-  return value.endsWith('/') ? value.slice(0, -1) : value;
+  return value.endsWith("/") ? value.slice(0, -1) : value;
 }
 
 @Injectable()
 export class CallbackDeliveryService {
+  constructor(private readonly configService: ConfigService) {}
+
   async deliver(event: RunEvent): Promise<boolean> {
-    if (event.eventType === 'run.started') {
+    const baseUrl = this.baseUrlForDirection(event.direction);
+    if (event.eventType === "run.started") {
       return true;
     }
 
-    if (event.eventType === 'run.thinking') {
+    if (event.eventType.startsWith("memory.")) {
+      const memoryEvent = this.normalizeMemoryEventForCallback(event);
+      if (!memoryEvent) {
+        return true;
+      }
       return this.send(
-        this.callbackUrl(event.callback.base_url, 'thinking', event.conversationId),
-        { seconds: Number(event.payload.seconds ?? 1) },
+        this.callbackUrl(baseUrl, "event", event.conversationId),
+        {
+          conversation_id: event.conversationId,
+          direction: event.direction,
+          message: memoryEvent.message,
+          payload: event.payload,
+          type: memoryEvent.type,
+          user_id: event.userId,
+        },
+      );
+    }
+
+    if (event.eventType === "run.thinking") {
+      return this.send(
+        this.callbackUrl(baseUrl, "thinking", event.conversationId),
+        {
+          conversation_id: event.conversationId,
+          direction: event.direction,
+          seconds: Number(event.payload.seconds ?? 1),
+          user_id: event.userId,
+        },
       );
     }
 
     const message =
-      typeof event.payload.message === 'string' && event.payload.message.trim().length > 0
+      typeof event.payload.message === "string" &&
+      event.payload.message.trim().length > 0
         ? event.payload.message
-        : event.eventType === 'run.failed'
-          ? 'The assistant run failed.'
-          : '';
+        : event.eventType === "run.failed"
+          ? "The assistant run failed."
+          : "";
 
     return this.send(
-      this.callbackUrl(event.callback.base_url, 'response', event.conversationId),
+      this.callbackUrl(baseUrl, "response", event.conversationId),
       {
-        error: event.eventType === 'run.failed',
+        conversation_id: event.conversationId,
+        direction: event.direction,
+        error: event.eventType === "run.failed",
         message,
+        user_id: event.userId,
       },
     );
   }
 
-  private async send(url: string, body: Record<string, unknown>): Promise<boolean> {
+  private async send(
+    url: string,
+    body: Record<string, unknown>,
+  ): Promise<boolean> {
     const response = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
       },
       body: JSON.stringify(body),
     });
@@ -49,9 +83,48 @@ export class CallbackDeliveryService {
 
   private callbackUrl(
     baseUrl: string,
-    kind: 'response' | 'thinking',
+    kind: "event" | "response" | "thinking",
     conversationId: string,
   ): string {
     return `${trimTrailingSlash(baseUrl)}/${kind}/${encodeURIComponent(conversationId)}`;
+  }
+
+  private normalizeMemoryEventForCallback(
+    event: RunEvent,
+  ): { message: string; type: string } | null {
+    if (event.eventType.startsWith("memory.extract.")) {
+      return null;
+    }
+
+    if (!event.eventType.endsWith(".added")) {
+      return null;
+    }
+
+    const parts = event.eventType.split(".");
+    const kind = parts.length >= 3 ? parts[1] : "memory";
+    return {
+      message: `Remembered new ${kind}.`,
+      type: event.eventType,
+    };
+  }
+
+  private baseUrlForDirection(direction: string): string {
+    const normalized = direction.trim().toLowerCase();
+    if (normalized === "email") {
+      return this.configService.get<string>(
+        "GATEWAY_EMAIL_CALLBACK_URL",
+        "http://gateway-email:3000",
+      );
+    }
+    if (normalized === "telegram") {
+      return this.configService.get<string>(
+        "GATEWAY_TELEGRAM_CALLBACK_URL",
+        "http://gateway-telegram:3000",
+      );
+    }
+    return this.configService.get<string>(
+      "GATEWAY_WEB_CALLBACK_URL",
+      "http://gateway-web:3000",
+    );
   }
 }

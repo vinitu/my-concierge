@@ -10,7 +10,7 @@ It is a small and minimal alternative to heavier systems like OpenClaw.
 
 ## What Works Now
 
-- Web chat with LLM responses through `gateway-web`, `assistant-api`, and `assistant-worker`
+- Web chat with LLM responses through `gateway-web`, `assistant-api`, and `assistant-orchestrator`
 - Conversation context in the current chat flow
 
 ## Roadmap
@@ -49,7 +49,7 @@ It is a small and minimal alternative to heavier systems like OpenClaw.
 
 ## Repository Status
 
-This repository now contains implemented services: `assistant-api`, `assistant-worker`, `assistant-memory`, `gateway-web`, `gateway-email`, `gateway-telegram`, and `dashboard`.
+This repository now contains implemented services: `assistant-api`, `assistant-orchestrator`, `assistant-llm`, `assistant-memory`, `gateway-web`, `gateway-email`, `gateway-telegram`, and `dashboard`.
 Additional components such as `assistant-scheduler` are currently documented as target services.
 The current source of truth is the code for these services and the project documentation for the wider system.
 
@@ -68,7 +68,7 @@ The current source of truth is the code for these services and the project docum
 - [Persistence schema](./docs/architecture/persistence-schema.md)
 - [Repository layout](./docs/architecture/repository-layout.md)
 - [Application endpoints](./docs/contracts/application-endpoints.md)
-- [assistant-worker system prompt](./docs/contracts/assistant-worker-system-prompt.md)
+- [assistant-orchestrator system prompt](./docs/contracts/assistant-orchestrator-system-prompt.md)
 - [Docker Compose](./docs/deployment/docker-compose.md)
 - [Assistant](./docs/services/assistant.md)
 - [Assistant Memory](./docs/services/assistant/assistant-memory.md)
@@ -78,18 +78,18 @@ The current source of truth is the code for these services and the project docum
 ## Implemented Today
 
 - Local runtime named `assistant`
-- Core backend split into `assistant-api` and `assistant-worker`
-- Redis-based asynchronous flow between `assistant-api` and `assistant-worker` in both directions
+- Core backend split into `assistant-api` and `assistant-orchestrator`
+- Redis-based asynchronous flow between `assistant-api` and `assistant-orchestrator` in both directions
 - `assistant-api` accepts requests, validates them, enqueues jobs, consumes run events, and owns all external callbacks
 - `assistant-api` supports env-based queue adapters and currently uses Redis by default through `QUEUE_ADAPTER=redis`
-- `assistant-worker` reads queued jobs, loads bootstrap runtime context from `runtime/assistant-worker/`, runs the LangChain.js-based execution flow, publishes run events, persists canonical conversation state in MySQL, and exposes a worker settings page with provider status
+- `assistant-orchestrator` reads queued jobs, loads bootstrap runtime context from `runtime/assistant-orchestrator/`, runs the execution flow via `assistant-llm`, publishes run events, and appends canonical conversation state through `assistant-memory`
 - `assistant-memory` exposes typed memory APIs for profile state, search, writes, archive, compact, and reindex operations
 - `gateway-web` provides the browser chat UI, persists browser chat history in `runtime/gateway-web/`, and uses a cookie-backed session id
 - `gateway-web` exposes `/`, `WS /ws`, `/response/:conversationId`, `/thinking/:conversationId`, `/status`, `/metrics`, and `/openapi.json`
 - `gateway-telegram` provides its own web panel, keeps a local chat runtime, and delivers replies through the Telegram Bot API with preserved reply context
 - `gateway-email` provides its own web panel, keeps a local mailbox runtime, syncs IMAP state, and delivers replies by SMTP with preserved thread headers
 - `dashboard` aggregates service links and polls service statuses over HTTP every `DASHBOARD_REFRESH_SECONDS`
-- `assistant-api`, `assistant-worker`, `assistant-memory`, `gateway-web`, `gateway-telegram`, `gateway-email`, and `dashboard` expose `/status`, `/metrics`, and OpenAPI documentation
+- `assistant-api`, `assistant-orchestrator`, `assistant-llm`, `assistant-memory`, `gateway-web`, `gateway-telegram`, `gateway-email`, and `dashboard` expose `/status`, `/metrics`, and OpenAPI documentation
 - Default local runtime is Docker Compose
 - The system is prepared for home deployment and future horizontal scaling
 
@@ -108,7 +108,7 @@ The current source of truth is the code for these services and the project docum
 
 ### Structure
 
-- [assistant](./docs/services/assistant.md): core backend component that includes [assistant-api](./docs/services/assistant/assistant-api.md), [queue](./docs/services/queue.md), [assistant-worker](./docs/services/assistant/assistant-worker.md), and [assistant-memory](./docs/services/assistant/assistant-memory.md)
+- [assistant](./docs/services/assistant.md): core backend component that includes [assistant-api](./docs/services/assistant/assistant-api.md), [queue](./docs/services/queue.md), [assistant-orchestrator](./docs/services/assistant/assistant-orchestrator.md), [assistant-llm](./docs/services/assistant/assistant-llm.md), and [assistant-memory](./docs/services/assistant/assistant-memory.md)
 - [assistant-memory](./docs/services/assistant/assistant-memory.md): durable memory service for profile state and memory operations
 - [gateways](./docs/services/gateways.md): channel-facing layer that includes [gateway-web](./docs/services/gateways/gateway-web.md), [gateway-telegram](./docs/services/gateways/gateway-telegram.md), and [gateway-email](./docs/services/gateways/gateway-email.md)
 - [assistant-scheduler](./docs/services/assistant-scheduler.md): scheduled trigger component that only sends requests into `assistant`
@@ -130,7 +130,7 @@ flowchart LR
     subgraph Assistant["assistant"]
         direction LR
         API["assistant-api"] <--> Q["queue"]
-        Q <--> Worker["assistant-worker"]
+        Q <--> Worker["assistant-orchestrator"]
         Worker --> Memory["assistant-memory"]
     end
 ```
@@ -140,16 +140,16 @@ flowchart LR
 The local runtime is named `assistant`.
 It is split into service-specific runtime directories under `runtime/`.
 In Docker Compose, each service mounts only its own runtime directory:
-- `assistant-worker`: `./runtime/assistant-worker:/app/runtime`
+- `assistant-orchestrator`: `./runtime/assistant-orchestrator:/app/runtime`
 - `gateway-web`: `./runtime/gateway-web:/app/runtime`
 - `gateway-telegram`: `./runtime/gateway-telegram:/app/runtime`
 - `gateway-email`: `./runtime/gateway-email:/app/runtime`
 
 Expected runtime files and folders:
 
-- `runtime/assistant-worker/SYSTEM.js`
-- `runtime/assistant-worker/skills/`
-- `runtime/assistant-worker/config/`
+- `runtime/assistant-orchestrator/SYSTEM.js`
+- `runtime/assistant-orchestrator/skills/`
+- `runtime/assistant-orchestrator/config/`
 - `runtime/gateway-web/conversations/`
 - `runtime/gateway-telegram/conversations/`
 - `runtime/gateway-email/conversations/`
@@ -161,9 +161,10 @@ The repository already includes a starter runtime directory in [runtime](./runti
 
 - [assistant-api](./docs/services/assistant/assistant-api.md): receives inbound requests, validates them, enqueues work, consumes run events, and owns external callback delivery
 
-### assistant-worker
+### assistant-orchestrator
 
-- [assistant-worker](./docs/services/assistant/assistant-worker.md): processes queued jobs, runs the assistant execution flow, publishes run events, and exposes operational endpoints plus provider status
+- [assistant-orchestrator](./docs/services/assistant/assistant-orchestrator.md): processes queued jobs, runs runtime/tool orchestration, publishes run events, and exposes operational endpoints
+- [assistant-llm](./docs/services/assistant/assistant-llm.md): central LLM provider, model, and generation service for orchestrator and memory enrichment
 
 ### assistant-memory
 
@@ -171,11 +172,11 @@ The repository already includes a starter runtime directory in [runtime](./runti
 
 ### assistant
 
-- [assistant](./docs/services/assistant.md): groups `assistant-api`, `queue`, `assistant-worker`, and `assistant-memory` into the core backend component
+- [assistant](./docs/services/assistant.md): groups `assistant-api`, `queue`, `assistant-orchestrator`, `assistant-llm`, and `assistant-memory` into the core backend component
 
 ### queue
 
-- [queue](./docs/services/queue.md): transports execution jobs to `assistant-worker` and run events back to `assistant-api`
+- [queue](./docs/services/queue.md): transports execution jobs to `assistant-orchestrator` and run events back to `assistant-api`
 
 ### gateway-web
 
@@ -215,7 +216,8 @@ It contains the metrics flow diagram and per-service metric tables.
 | Host port | Service | Purpose |
 |---------|-------------|---------|
 | [http://localhost:3000/](http://localhost:3000/) | [`assistant-api`](./docker-compose.yaml) | HTTP API |
-| [http://localhost:3001/](http://localhost:3001/) | [`assistant-worker`](./docker-compose.yaml) | Worker settings page, provider status, and service |
+| [http://localhost:3001/](http://localhost:3001/) | [`assistant-orchestrator`](./docker-compose.yaml) | Runtime orchestration service |
+| [http://localhost:3003/](http://localhost:3003/) | [`assistant-llm`](./docker-compose.yaml) | LLM provider/model settings and generation API |
 | [http://localhost:3002/](http://localhost:3002/) | [`assistant-memory`](./docker-compose.yaml) | Memory API and operational endpoints |
 | [http://localhost:8079/](http://localhost:8079/) | [`gateway-web`](./docker-compose.yaml) | Web chat UI, WebSocket, callbacks |
 | [http://localhost:8081/](http://localhost:8081/) | [`gateway-telegram`](./docker-compose.yaml) | Telegram gateway |
@@ -249,7 +251,7 @@ For local Ollama:
 - `OLLAMA_BASE_URL=http://host.docker.internal:11434`
 - `OLLAMA_MODEL=gemma3:1b`
 
-4. If you want `deepseek` or `ollama` instead of `xai`, open [http://localhost:3001/](http://localhost:3001/) after startup and switch the worker provider there.
+4. To switch provider or model, open [http://localhost:3003/](http://localhost:3003/) (or the dashboard) and update `assistant-llm` settings.
 
 5. Start the local stack:
 
@@ -280,8 +282,8 @@ make down
 ## Local Commands
 
 - `make env`: create `.env` from `.env.example` if it does not exist
-- `make build`: build local `assistant-api`, `assistant-worker`, and `gateway-web` Docker images
-- `make up`: start local `assistant-api`, `assistant-worker`, and `gateway-web`
+- `make build`: build local Docker images for the stack
+- `make up`: start local Docker Compose stack
 - `make down`: stop the local Docker Compose stack
 - `npm run build`: build the NestJS service
 - `npm test`: run unit tests

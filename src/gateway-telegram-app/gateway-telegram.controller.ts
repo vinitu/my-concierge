@@ -73,9 +73,9 @@ export class GatewayTelegramController {
     if (!ingestion.duplicate && text.length > 0) {
       await this.assistantApiClientService.sendConversation({
         chat: ingestion.thread.chat_id,
-        contact: ingestion.thread.contact,
         conversationId: ingestion.conversation_id,
         message: text,
+        userId: ingestion.thread.contact,
       });
     }
 

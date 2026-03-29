@@ -101,10 +101,10 @@ export class GatewayEmailSyncService implements OnModuleDestroy, OnModuleInit {
         }
 
         await this.assistantApiClientService.sendConversation({
-          contact: ingestion.thread.contact || inboundMessage.from,
           conversationId: ingestion.conversation_id,
           mailbox: ingestion.thread.mailbox,
           message: inboundMessage.text,
+          userId: ingestion.thread.contact || inboundMessage.from,
         });
         processed += 1;
       }

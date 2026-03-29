@@ -2,7 +2,7 @@
 
 ## Goal
 
-Describe how `assistant-api` and `assistant-worker` communicate through Redis in both directions.
+Describe how `assistant-api` and `assistant-orchestrator` communicate through Redis in both directions.
 
 ## Transport Model
 
@@ -12,9 +12,9 @@ There are two logical flows:
 
 1. execution jobs
    - `assistant-api` writes
-   - `assistant-worker` reads
+   - `assistant-orchestrator` reads
 2. run events
-   - `assistant-worker` writes
+   - `assistant-orchestrator` writes
    - `assistant-api` reads
 
 ## Relations
@@ -23,7 +23,7 @@ There are two logical flows:
 flowchart LR
     Gateway["gateway"] --> API["assistant-api"]
     API --> Jobs["redis execution jobs"]
-    Jobs --> Worker["assistant-worker"]
+    Jobs --> Worker["assistant-orchestrator"]
     Worker --> Events["redis run events"]
     Events --> API
 ```
@@ -35,12 +35,12 @@ flowchart LR
 3. `assistant-api` stores callback routing metadata.
 4. `assistant-api` writes one execution job to Redis.
 5. `assistant-api` returns `202 Accepted`.
-6. `assistant-worker` reserves the next execution job.
-7. `assistant-worker` processes the run.
+6. `assistant-orchestrator` reserves the next execution job.
+7. `assistant-orchestrator` processes the run.
 
 ## Run Event Flow
 
-1. `assistant-worker` publishes a run event to Redis.
+1. `assistant-orchestrator` publishes a run event to Redis.
 2. `assistant-api` consumes the event.
 3. `assistant-api` resolves the gateway callback route.
 4. `assistant-api` performs callback delivery.
@@ -77,8 +77,8 @@ Run event minimum fields:
 ## Queue Rules
 
 - `assistant-api` owns enqueueing execution jobs.
-- `assistant-worker` owns publishing run events.
-- `assistant-worker` must not derive gateway callback endpoints from job payloads.
+- `assistant-orchestrator` owns publishing run events.
+- `assistant-orchestrator` must not derive gateway callback endpoints from job payloads.
 - queue messages must be idempotent enough for retries
 - execution jobs and run events are separate logical streams
 - queue transport stays internal and is not exposed as a public API
@@ -86,8 +86,8 @@ Run event minimum fields:
 ## Failure Handling
 
 - if `assistant-api` fails after enqueueing, the job remains in Redis
-- if `assistant-worker` fails before publishing a final event, the run is incomplete and may be retried
-- if callback delivery fails, the retry belongs to `assistant-api`, not to `assistant-worker`
+- if `assistant-orchestrator` fails before publishing a final event, the run is incomplete and may be retried
+- if callback delivery fails, the retry belongs to `assistant-api`, not to `assistant-orchestrator`
 
 ## Retry And Idempotency Rules
 

@@ -11,9 +11,6 @@ import { AssistantApiMetricsService } from './observability/assistant-api-metric
 import { QueueService } from './queue/queue.service';
 
 interface ConversationBody {
-  callback?: {
-    base_url?: string;
-  };
   conversation_id?: string;
   message?: string;
 }
@@ -25,25 +22,20 @@ export class ConversationController {
     private readonly queueService: QueueService,
   ) {}
 
-  @Post('conversation/:direction/:chat/:contact')
+  @Post('conversation/:direction/:chat/:userId')
   @HttpCode(202)
   async acceptConversation(
     @Param('direction') direction: string,
     @Param('chat') chat: string,
-    @Param('contact') contact: string,
+    @Param('userId') userId: string,
     @Body() body: ConversationBody,
   ): Promise<{ request_id: string; status: string }> {
     const message = body.message?.trim() ?? '';
-    const callbackBaseUrl = body.callback?.base_url?.trim() ?? '';
     const conversationId = body.conversation_id?.trim() ?? '';
     const requestId = randomUUID();
 
     if (!message) {
       throw new BadRequestException('message must not be empty');
-    }
-
-    if (!callbackBaseUrl) {
-      throw new BadRequestException('callback.base_url must not be empty');
     }
 
     if (!conversationId) {
@@ -52,15 +44,12 @@ export class ConversationController {
 
     await this.queueService.enqueue({
       accepted_at: new Date().toISOString(),
-      callback: {
-        base_url: callbackBaseUrl,
-      },
       chat,
       conversation_id: conversationId,
-      contact,
       direction,
       message,
       request_id: requestId,
+      user_id: userId,
     });
 
     this.metricsService.recordAcceptedConversation();

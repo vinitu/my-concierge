@@ -15,23 +15,17 @@ export class GatewayTelegramAssistantApiClientService {
 
   async sendConversation(input: {
     chat: string;
-    contact: string;
     conversationId: string;
     message: string;
+    userId: string;
   }): Promise<void> {
     const assistantApiUrl = trimTrailingSlash(
       this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:3000'),
     );
-    const callbackBaseUrl = trimTrailingSlash(
-      this.configService.get<string>('CALLBACK_BASE_URL', 'http://localhost:3003'),
-    );
-    const url = `${assistantApiUrl}/conversation/telegram/${encodeURIComponent(input.chat)}/${encodeURIComponent(input.contact)}`;
+    const url = `${assistantApiUrl}/conversation/telegram/${encodeURIComponent(input.chat)}/${encodeURIComponent(input.userId)}`;
 
     const response = await fetch(url, {
       body: JSON.stringify({
-        callback: {
-          base_url: callbackBaseUrl,
-        },
         conversation_id: input.conversationId,
         message: input.message,
       }),

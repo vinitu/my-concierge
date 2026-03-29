@@ -58,12 +58,12 @@ flowchart LR
 4. `gateway-web` resolves the stable browser `conversation_id` from the cookie and maps the WebSocket connection to it.
 5. `gateway-web` calls `assistant-api`.
 6. `assistant-api` accepts the message and writes it to the queue.
-7. `assistant-worker` processes the job.
-8. While the worker run is active, `assistant-worker` may publish `thinking` run events.
+7. `assistant-orchestrator` processes the job.
+8. While the worker run is active, `assistant-orchestrator` may publish `thinking` run events.
 9. `assistant-api` consumes those events and may send `POST /thinking/:conversationId`.
 10. `gateway-web` forwards the thinking state to the active browser session for the requested number of seconds.
 11. `assistant-api` sends the final callback to `POST /response/:conversationId`.
-12. `assistant-worker` appends the user/assistant exchange to canonical conversation state in `assistant-memory`.
+12. `assistant-orchestrator` appends the user/assistant exchange to canonical conversation state in `assistant-memory`.
 13. `gateway-web` finds the right WebSocket session.
 14. `gateway-web` sends the assistant message back to the browser.
 

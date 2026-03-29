@@ -17,7 +17,7 @@ It collects service-local metrics and makes them queryable for dashboards and al
 ```mermaid
 flowchart LR
     Prom["prometheus"] --> API["assistant-api /metrics"]
-    Prom --> Worker["assistant-worker /metrics"]
+    Prom --> Worker["assistant-orchestrator /metrics"]
     Prom --> Memory["assistant-memory /metrics"]
     Prom --> Web["gateway-web /metrics"]
     Prom --> Telegram["gateway-telegram /metrics"]

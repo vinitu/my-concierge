@@ -66,6 +66,20 @@ export class ConversationRegistryService {
     client.emit('assistant.error', { message });
     return true;
   }
+
+  sendAssistantEvent(
+    conversationId: string,
+    event: { message?: string; payload?: unknown; type: string },
+  ): boolean {
+    const client = this.conversations.get(conversationId);
+
+    if (!client) {
+      return false;
+    }
+
+    client.emit('assistant.event', event);
+    return true;
+  }
 }
 
 // Backward-compatible alias for existing imports during migration.

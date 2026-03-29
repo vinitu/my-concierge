@@ -47,11 +47,8 @@ describe('assistant-api (e2e)', () => {
 
   it('accepts a conversation and writes it into the file queue', async () => {
     const response = await request(app.getHttpServer())
-      .post('/conversation/api/direct/alex')
+      .post('/conversation/web/direct/alex')
       .send({
-        callback: {
-          base_url: 'http://gateway-web:3000',
-        },
         conversation_id: 'alex',
         message: 'Turn on the kitchen lights',
       });
@@ -66,11 +63,8 @@ describe('assistant-api (e2e)', () => {
 
   it('rejects a request without message', async () => {
     const response = await request(app.getHttpServer())
-      .post('/conversation/api/direct/alex')
+      .post('/conversation/web/direct/alex')
       .send({
-        callback: {
-          base_url: 'http://gateway-web:3000',
-        },
         conversation_id: 'alex',
         message: '   ',
       });

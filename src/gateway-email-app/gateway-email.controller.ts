@@ -68,10 +68,10 @@ export class GatewayEmailController {
 
     if (!ingestion.duplicate && body.text.trim().length > 0) {
       await this.assistantApiClientService.sendConversation({
-        contact: ingestion.thread.contact || body.from,
         conversationId: ingestion.conversation_id,
         mailbox: ingestion.thread.mailbox,
         message: body.text,
+        userId: ingestion.thread.contact || body.from,
       });
     }
 

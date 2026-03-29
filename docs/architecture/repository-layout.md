@@ -7,7 +7,7 @@ Describe how the project should be stored in the repository.
 ## Current Layout Model
 
 The project stays in one repository.
-Right now, `gateway-web`, `assistant-api`, and `assistant-worker` are implemented.
+Right now, `gateway-web`, `assistant-api`, and `assistant-orchestrator` are implemented.
 `assistant-memory` is part of the target service layout.
 To keep the first version simple, the implemented services live in the repository root.
 
@@ -51,7 +51,7 @@ my-concierge/
     operations/
 
   runtime/
-    assistant-worker/
+    assistant-orchestrator/
       SYSTEM.js
       skills/
       config/
@@ -83,7 +83,7 @@ my-concierge/
   apps/
     assistant-api/
     assistant-memory/
-    assistant-worker/
+    assistant-orchestrator/
     gateway-telegram/
     gateway-email/
     gateway-web/

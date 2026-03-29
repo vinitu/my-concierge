@@ -167,6 +167,15 @@ function connectSocket() {
     clearThinking();
     appendMessage('error', payload.message);
   });
+
+  socket.on('assistant.event', (payload) => {
+    const type = typeof payload?.type === 'string' ? payload.type : 'assistant.event';
+    const message =
+      typeof payload?.message === 'string' && payload.message.trim().length > 0
+        ? payload.message
+        : JSON.stringify(payload?.payload ?? {});
+    appendMessage('system', `[${type}] ${message}`);
+  });
 }
 
 form.addEventListener('submit', (event) => {

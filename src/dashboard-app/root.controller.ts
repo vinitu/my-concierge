@@ -1,6 +1,6 @@
-import { Controller, Get, Header } from '@nestjs/common';
-import { DashboardMetricsService } from './observability/dashboard-metrics.service';
-import { DashboardStatusService } from './dashboard-status.service';
+import { Controller, Get, Header } from "@nestjs/common";
+import { DashboardMetricsService } from "./observability/dashboard-metrics.service";
+import { DashboardStatusService } from "./dashboard-status.service";
 
 @Controller()
 export class DashboardRootController {
@@ -10,9 +10,9 @@ export class DashboardRootController {
   ) {}
 
   @Get()
-  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header("Content-Type", "text/html; charset=utf-8")
   getRoot(): string {
-    this.dashboardMetricsService.recordEndpointRequest('/');
+    this.dashboardMetricsService.recordEndpointRequest("/");
 
     return `<!doctype html>
 <html lang="en">
@@ -23,6 +23,12 @@ export class DashboardRootController {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
     <style>
       :root {
         color-scheme: light;
@@ -147,7 +153,8 @@ export class DashboardRootController {
       .status-line { margin-top: 8px; color: var(--muted); min-height: 20px; }
       .embedded-chat {
         width: 100%;
-        min-height: 70vh;
+        min-height: 84vh;
+        height: calc(100vh - 170px);
         border: 1px solid var(--line);
         border-radius: 12px;
         background: #fff;
@@ -188,28 +195,61 @@ export class DashboardRootController {
       </main>
     </div>
     <script>
-      const ASSISTANT_WORKER_TOOL_NAMES = [
+      const ASSISTANT_ORCHESTRATOR_TOOL_NAMES = [
         'time_current',
         'web_search',
-        'mem_search',
-        'mem_preference_search',
-        'mem_fact_search',
-        'mem_routine_search',
-        'mem_project_search',
-        'mem_episode_search',
-        'mem_rule_search',
-        'mem_preference_write',
-        'mem_fact_write',
-        'mem_routine_write',
-        'mem_project_write',
-        'mem_episode_write',
-        'mem_rule_write',
-        'mem_conversation_search',
+        'memory_search',
+        'memory_preference_search',
+        'memory_fact_search',
+        'memory_routine_search',
+        'memory_project_search',
+        'memory_episode_search',
+        'memory_rule_search',
+        'memory_preference_write',
+        'memory_fact_write',
+        'memory_routine_write',
+        'memory_project_write',
+        'memory_episode_write',
+        'memory_rule_write',
+        'memory_conversation_search',
         'skill_execute',
+      ];
+      const GATEWAY_WEB_INCOMING_MESSAGE_TYPES = [
+        { group: 'Response', value: 'response.message', description: 'Assistant response message' },
+        { group: 'Response', value: 'response.error', description: 'Assistant error response' },
+        { group: 'Response', value: 'response.thinking', description: 'Thinking progress update' },
+        { group: 'Extract', value: 'memory.extract.started', description: 'Started memory extraction' },
+        { group: 'Extract', value: 'memory.extract.completed', description: 'Completed memory extraction' },
+        { group: 'Extract', value: 'memory.extract.failed', description: 'Failed memory extraction' },
+        { group: 'Preference', value: 'memory.preference.added', description: 'Added preference to memory' },
+        { group: 'Preference', value: 'memory.preference.updated', description: 'Updated preference in memory' },
+        { group: 'Preference', value: 'memory.preference.deleted', description: 'Deleted preference from memory' },
+        { group: 'Preference', value: 'memory.preference.readed', description: 'Read preference from memory' },
+        { group: 'Fact', value: 'memory.fact.added', description: 'Added fact to memory' },
+        { group: 'Fact', value: 'memory.fact.updated', description: 'Updated fact in memory' },
+        { group: 'Fact', value: 'memory.fact.deleted', description: 'Deleted fact from memory' },
+        { group: 'Fact', value: 'memory.fact.readed', description: 'Read fact from memory' },
+        { group: 'Routine', value: 'memory.routine.added', description: 'Added routine to memory' },
+        { group: 'Routine', value: 'memory.routine.updated', description: 'Updated routine in memory' },
+        { group: 'Routine', value: 'memory.routine.deleted', description: 'Deleted routine from memory' },
+        { group: 'Routine', value: 'memory.routine.readed', description: 'Read routine from memory' },
+        { group: 'Project', value: 'memory.project.added', description: 'Added project to memory' },
+        { group: 'Project', value: 'memory.project.updated', description: 'Updated project in memory' },
+        { group: 'Project', value: 'memory.project.deleted', description: 'Deleted project from memory' },
+        { group: 'Project', value: 'memory.project.readed', description: 'Read project from memory' },
+        { group: 'Episode', value: 'memory.episode.added', description: 'Added episode to memory' },
+        { group: 'Episode', value: 'memory.episode.updated', description: 'Updated episode in memory' },
+        { group: 'Episode', value: 'memory.episode.deleted', description: 'Deleted episode from memory' },
+        { group: 'Episode', value: 'memory.episode.readed', description: 'Read episode from memory' },
+        { group: 'Rule', value: 'memory.rule.added', description: 'Added rule to memory' },
+        { group: 'Rule', value: 'memory.rule.updated', description: 'Updated rule in memory' },
+        { group: 'Rule', value: 'memory.rule.deleted', description: 'Deleted rule from memory' },
+        { group: 'Rule', value: 'memory.rule.readed', description: 'Read rule from memory' },
       ];
       const ASSISTANT_MEMORY_SECTIONS = [
         { id: 'profile', label: 'Profile' },
         { id: 'conversations', label: 'Conversations' },
+        { id: 'settings', label: 'Settings' },
         { id: 'preferences', label: 'Preferences' },
         { id: 'facts', label: 'Facts' },
         { id: 'routines', label: 'Routines' },
@@ -222,7 +262,7 @@ export class DashboardRootController {
         selectedService: null,
         selectedSection: 'general',
         currentConfig: null,
-        workerLlmTab: 'ollama',
+        assistantLlmTab: 'ollama',
       };
 
       function escapeHtml(value) {
@@ -260,19 +300,111 @@ export class DashboardRootController {
         }
       }
 
+      function allowedSectionsForService(serviceKey) {
+        if (serviceKey === 'assistant-orchestrator') {
+          return ['settings', 'tools', 'skills', 'integrations'];
+        }
+        if (serviceKey === 'assistant-llm') {
+          return ['provider', 'llms'];
+        }
+        if (serviceKey === 'assistant-memory') {
+          return ASSISTANT_MEMORY_SECTIONS.map((item) => item.id);
+        }
+        if (serviceKey === 'gateway-web') {
+          return ['settings', 'chat'];
+        }
+        return ['general'];
+      }
+
+      function parseHash() {
+        const raw = window.location.hash.replace(/^#/, '').trim();
+        if (!raw) {
+          return null;
+        }
+        const params = new URLSearchParams(raw);
+        const service = params.get('service');
+        const section = params.get('section');
+        if (!service) {
+          return null;
+        }
+        return { section, service };
+      }
+
+      function isKnownService(serviceKey) {
+        return state.services.some((entry) => entry.key === serviceKey);
+      }
+
+      function normalizeSection(serviceKey, section) {
+        const allowed = allowedSectionsForService(serviceKey);
+        if (typeof section === 'string' && allowed.includes(section)) {
+          return section;
+        }
+        return defaultSectionForService(serviceKey);
+      }
+
+      function applyHashState() {
+        const parsed = parseHash();
+        if (!parsed || !isKnownService(parsed.service)) {
+          if (!state.selectedService && state.services.length > 0) {
+            state.selectedService = state.services[0].key;
+          }
+          if (state.selectedService) {
+            state.selectedSection = defaultSectionForService(state.selectedService);
+          }
+          return false;
+        }
+
+        state.selectedService = parsed.service;
+        state.selectedSection = normalizeSection(parsed.service, parsed.section);
+        return true;
+      }
+
+      function updateHashFromState() {
+        if (!state.selectedService) {
+          return;
+        }
+        const normalizedSection = normalizeSection(
+          state.selectedService,
+          state.selectedSection,
+        );
+        const next = '#service=' + encodeURIComponent(state.selectedService) +
+          '&section=' + encodeURIComponent(normalizedSection);
+        if (window.location.hash !== next) {
+          window.location.hash = next;
+        }
+      }
+
+      function navigateTo(serviceKey, section) {
+        state.selectedService = serviceKey;
+        state.selectedSection = normalizeSection(serviceKey, section);
+        state.currentConfig = null;
+        updateHashFromState();
+        renderMenu();
+        void renderService();
+      }
+
       function renderMenu() {
         const menu = document.getElementById('service-menu');
         menu.innerHTML = state.services.map((service) => {
           const active = service.key === state.selectedService ? 'active' : '';
           const serviceButton = '<button class="' + active + '" data-key="' + escapeHtml(service.key) + '">' + escapeHtml(service.name) + '</button>';
-          if (service.key === 'assistant-worker' && service.key === state.selectedService) {
+          if (service.key === 'assistant-orchestrator' && service.key === state.selectedService) {
             const subItems = [
-              { id: 'general', label: 'General' },
-              { id: 'provider', label: 'Provider' },
-              { id: 'llms', label: 'LLMs' },
+              { id: 'settings', label: 'Settings' },
               { id: 'tools', label: 'Tools' },
               { id: 'skills', label: 'Skills' },
               { id: 'integrations', label: 'Integrations' },
+            ];
+            const submenu = '<div class="submenu">' + subItems.map((item) => {
+              const subActive = item.id === state.selectedSection ? 'active' : '';
+              return '<button class="' + subActive + '" data-section="' + escapeHtml(item.id) + '">' + escapeHtml(item.label) + '</button>';
+            }).join('') + '</div>';
+            return serviceButton + submenu;
+          }
+          if (service.key === 'assistant-llm' && service.key === state.selectedService) {
+            const subItems = [
+              { id: 'provider', label: 'Provider' },
+              { id: 'llms', label: 'LLMs' },
             ];
             const submenu = '<div class="submenu">' + subItems.map((item) => {
               const subActive = item.id === state.selectedSection ? 'active' : '';
@@ -289,7 +421,6 @@ export class DashboardRootController {
           }
           if (service.key === 'gateway-web' && service.key === state.selectedService) {
             const subItems = [
-              { id: 'general', label: 'General' },
               { id: 'settings', label: 'Settings' },
               { id: 'chat', label: 'Chat' },
             ];
@@ -303,26 +434,24 @@ export class DashboardRootController {
         }).join('');
         menu.querySelectorAll('button[data-key]').forEach((button) => {
           button.addEventListener('click', () => {
-            state.selectedService = button.dataset.key;
-            state.selectedSection = defaultSectionForService(state.selectedService);
-            state.currentConfig = null;
-            renderMenu();
-            void renderService();
+            navigateTo(
+              button.dataset.key,
+              defaultSectionForService(button.dataset.key),
+            );
           });
         });
         menu.querySelectorAll('button[data-section]').forEach((button) => {
           button.addEventListener('click', () => {
-            state.selectedSection = button.dataset.section;
-            void renderService();
-            renderMenu();
+            navigateTo(state.selectedService, button.dataset.section);
           });
         });
       }
 
       function defaultSectionForService(serviceKey) {
-        if (serviceKey === 'assistant-worker') return 'general';
+        if (serviceKey === 'assistant-orchestrator') return 'settings';
+        if (serviceKey === 'assistant-llm') return 'provider';
         if (serviceKey === 'assistant-memory') return 'profile';
-        if (serviceKey === 'gateway-web') return 'general';
+        if (serviceKey === 'gateway-web') return 'settings';
         return 'general';
       }
 
@@ -330,8 +459,22 @@ export class DashboardRootController {
         const service = state.services.find((entry) => entry.key === state.selectedService);
         if (!service) return;
 
-        document.getElementById('service-title').textContent = service.name;
-        document.getElementById('service-description').textContent = service.notes;
+        const serviceTitle = document.getElementById('service-title');
+        const serviceDescription = document.getElementById('service-description');
+        const isGatewayWebChat =
+          service.key === 'gateway-web' && state.selectedSection === 'chat';
+
+        if (isGatewayWebChat) {
+          serviceTitle.textContent = '';
+          serviceDescription.textContent = '';
+          serviceTitle.style.display = 'none';
+          serviceDescription.style.display = 'none';
+        } else {
+          serviceTitle.textContent = service.name;
+          serviceDescription.textContent = service.notes;
+          serviceTitle.style.display = '';
+          serviceDescription.style.display = '';
+        }
 
         const content = document.getElementById('service-content');
         if (service.key === 'assistant-memory') {
@@ -339,48 +482,33 @@ export class DashboardRootController {
           return;
         }
 
-        if (service.key === 'assistant-worker' && state.selectedSection === 'general') {
-          content.innerHTML = '<div class="list">' +
-            '<div class="item"><strong>Prefix:</strong> <code>' + escapeHtml(service.prefix || '-') + '</code></div>' +
-            '<div class="item"><strong>Status endpoint:</strong> <code>' + escapeHtml(service.status_url || 'not exposed') + '</code></div>' +
-            '<div class="item"><strong>Menu:</strong> Provider, LLMs, Tools, Skills, Integrations</div>' +
-            '<div class="actions"><a href="' + escapeHtml(service.prefix || '/') + '">Open service panel via dashboard prefix</a></div>' +
-          '</div>';
+        if (service.key === 'assistant-orchestrator' && state.selectedSection === 'settings') {
+          await renderSettingsTab(service);
           return;
         }
 
-        if (service.key === 'assistant-worker' && state.selectedSection === 'provider') {
-          await renderAssistantWorkerProvider(service);
+        if (service.key === 'assistant-orchestrator' && state.selectedSection === 'tools') {
+          await renderAssistantOrchestratorTools(service);
           return;
         }
 
-        if (service.key === 'assistant-worker' && state.selectedSection === 'llms') {
-          await renderAssistantWorkerLlms(service);
+        if (service.key === 'assistant-orchestrator' && state.selectedSection === 'skills') {
+          await renderAssistantOrchestratorSkills(service);
           return;
         }
 
-        if (service.key === 'assistant-worker' && state.selectedSection === 'tools') {
-          await renderAssistantWorkerTools(service);
+        if (service.key === 'assistant-orchestrator' && state.selectedSection === 'integrations') {
+          await renderAssistantOrchestratorIntegrations(service);
           return;
         }
 
-        if (service.key === 'assistant-worker' && state.selectedSection === 'skills') {
-          await renderAssistantWorkerSkills(service);
+        if (service.key === 'assistant-llm' && state.selectedSection === 'provider') {
+          await renderAssistantLlmProvider(service);
           return;
         }
 
-        if (service.key === 'assistant-worker' && state.selectedSection === 'integrations') {
-          await renderAssistantWorkerIntegrations(service);
-          return;
-        }
-
-        if (service.key === 'gateway-web' && state.selectedSection === 'general') {
-          content.innerHTML = '<div class="list">' +
-            '<div class="item"><strong>Prefix:</strong> <code>' + escapeHtml(service.prefix || '-') + '</code></div>' +
-            '<div class="item"><strong>Status endpoint:</strong> <code>' + escapeHtml(service.status_url || 'not exposed') + '</code></div>' +
-            '<div class="item"><strong>Menu:</strong> General, Settings, Chat</div>' +
-            '<div class="actions"><a href="' + escapeHtml(service.prefix || '/') + '">Open service panel via dashboard prefix</a></div>' +
-          '</div>';
+        if (service.key === 'assistant-llm' && state.selectedSection === 'llms') {
+          await renderAssistantLlmConnections(service);
           return;
         }
 
@@ -391,7 +519,6 @@ export class DashboardRootController {
 
         if (service.key === 'gateway-web' && state.selectedSection === 'chat') {
           content.innerHTML =
-            '<div class="item" style="margin-bottom:10px"><strong>Gateway chat</strong><div class="meta">Embedded chat via dashboard proxy.</div></div>' +
             '<iframe class="embedded-chat" src="' + escapeHtml((service.prefix || '') + '/') + '" title="gateway-web chat"></iframe>';
           return;
         }
@@ -409,7 +536,7 @@ export class DashboardRootController {
               await renderSettingsTab(service);
             }
           }
-          if (service.key !== 'assistant-worker' && service.entities.length > 0) {
+          if (service.key !== 'assistant-orchestrator' && service.entities.length > 0) {
             const entitiesHtml = service.entities.map((entity) =>
               '<div class="item"><strong>' + escapeHtml(entity.label) + '</strong><div class="actions"><a href="#" data-open-entity="' + escapeHtml(entity.id) + '">Open</a></div></div>',
             ).join('');
@@ -437,7 +564,12 @@ export class DashboardRootController {
         }
         const config = await response.json();
         state.currentConfig = config;
-        const keys = Object.keys(config);
+        const keys = editableConfigKeys(service.key, config);
+
+        if (keys.length === 0) {
+          content.innerHTML = '<div class="status-line">No editable settings in this section</div>';
+          return;
+        }
 
         content.innerHTML = '<form id="settings-form">' +
           keys.map((key) => renderField(key, config[key])).join('') +
@@ -461,6 +593,14 @@ export class DashboardRootController {
           });
           status.textContent = putResponse.ok ? 'Saved' : 'Failed to save';
         });
+      }
+
+      function editableConfigKeys(serviceKey, config) {
+        if (serviceKey === 'assistant-orchestrator') {
+          return ['memory_window', 'run_timeout_seconds', 'thinking_interval_seconds']
+            .filter((key) => Object.prototype.hasOwnProperty.call(config, key));
+        }
+        return Object.keys(config);
       }
 
       async function ensureServiceConfig(service) {
@@ -490,120 +630,7 @@ export class DashboardRootController {
         return state.currentConfig;
       }
 
-      async function renderAssistantWorkerProvider(service) {
-        const content = document.getElementById('service-content');
-        content.innerHTML = '<div class="status-line">Loading provider settings...</div>';
-        let config;
-        let modelsByProvider = null;
-        try {
-          config = await ensureServiceConfig(service);
-        } catch {
-          content.innerHTML = '<div class="status-line">Failed to load provider settings</div>';
-          return;
-        }
-
-        try {
-          const modelsResponse = await fetch(buildServiceUrl(service, '/models'));
-          if (modelsResponse.ok) {
-            const modelsPayload = await modelsResponse.json();
-            if (modelsPayload && typeof modelsPayload === 'object' && modelsPayload.models) {
-              modelsByProvider = modelsPayload.models;
-            }
-          }
-        } catch {}
-
-        const providerOptions = ['deepseek', 'xai', 'ollama'];
-        const selectedProvider = providerOptions.includes(config.provider)
-          ? config.provider
-          : 'xai';
-        const initialModels = modelsByProvider && Array.isArray(modelsByProvider[selectedProvider])
-          ? modelsByProvider[selectedProvider]
-          : [config.model].filter((entry) => typeof entry === 'string' && entry.length > 0);
-
-        let providerStatusHtml = '<div class="item">Provider status is unavailable</div>';
-        try {
-          const statusResponse = await fetch(buildServiceUrl(service, '/provider-status'));
-          if (statusResponse.ok) {
-            const providerStatus = await statusResponse.json();
-            providerStatusHtml = '<div class="item"><strong>Runtime status:</strong> ' +
-              escapeHtml(providerStatus.status || 'unknown') +
-              ' · reachable=' + escapeHtml(String(providerStatus.reachable)) +
-              ' · model=' + escapeHtml(providerStatus.model || '') +
-              '</div>';
-          }
-        } catch {}
-
-        content.innerHTML = '<div class="list" style="margin-bottom:10px">' + providerStatusHtml + '</div>' +
-          '<form id="worker-provider-form">' +
-          '<div class="row">' +
-            '<label>Provider<select id="worker-provider">' +
-              providerOptions.map((provider) =>
-                '<option value="' + escapeHtml(provider) + '"' +
-                (provider === selectedProvider ? ' selected' : '') + '>' +
-                escapeHtml(provider) +
-                '</option>',
-              ).join('') +
-            '</select></label>' +
-            '<label>Model<select id="worker-model">' +
-              initialModels.map((model) =>
-                '<option value="' + escapeHtml(model) + '"' +
-                (model === config.model ? ' selected' : '') + '>' +
-                escapeHtml(model) +
-                '</option>',
-              ).join('') +
-            '</select></label>' +
-          '</div>' +
-          '<div class="row">' +
-            '<label>Memory window<input id="worker-memory-window" type="number" value="' + escapeHtml(String(config.memory_window ?? '')) + '" /></label>' +
-            '<label>Thinking interval (sec)<input id="worker-thinking-interval" type="number" value="' + escapeHtml(String(config.thinking_interval_seconds ?? '')) + '" /></label>' +
-          '</div>' +
-          '<div class="row">' +
-            '<label>Run timeout (sec)<input id="worker-run-timeout" type="number" value="' + escapeHtml(String(config.run_timeout_seconds ?? '')) + '" /></label>' +
-          '</div>' +
-          '<div class="actions"><button type="submit">Save Provider</button></div>' +
-          '<div id="worker-provider-status" class="status-line"></div>' +
-        '</form>';
-
-        const providerSelect = document.getElementById('worker-provider');
-        const modelSelect = document.getElementById('worker-model');
-        const renderProviderModels = (provider, selectedModel) => {
-          const models = modelsByProvider && Array.isArray(modelsByProvider[provider])
-            ? modelsByProvider[provider]
-            : [];
-          const source = models.length > 0 ? models : [selectedModel].filter((entry) => typeof entry === 'string' && entry.length > 0);
-          modelSelect.innerHTML = source.map((model) =>
-            '<option value="' + escapeHtml(model) + '"' +
-            (model === selectedModel ? ' selected' : '') + '>' +
-            escapeHtml(model) +
-            '</option>',
-          ).join('');
-        };
-        providerSelect.addEventListener('change', () => {
-          const nextProvider = providerSelect.value;
-          renderProviderModels(nextProvider, modelSelect.value || config.model || '');
-        });
-
-        document.getElementById('worker-provider-form').addEventListener('submit', async (event) => {
-          event.preventDefault();
-          const status = document.getElementById('worker-provider-status');
-          status.textContent = 'Saving...';
-          const patch = {
-            provider: document.getElementById('worker-provider').value.trim(),
-            model: document.getElementById('worker-model').value.trim(),
-            memory_window: Number.parseInt(document.getElementById('worker-memory-window').value, 10),
-            thinking_interval_seconds: Number.parseInt(document.getElementById('worker-thinking-interval').value, 10),
-            run_timeout_seconds: Number.parseInt(document.getElementById('worker-run-timeout').value, 10),
-          };
-          try {
-            await saveServiceConfig(service, patch);
-            status.textContent = 'Saved';
-          } catch {
-            status.textContent = 'Failed to save';
-          }
-        });
-      }
-
-      async function renderAssistantWorkerTools(service) {
+      async function renderAssistantOrchestratorTools(service) {
         const content = document.getElementById('service-content');
         content.innerHTML = '<div class="status-line">Loading tools...</div>';
         let config;
@@ -615,16 +642,27 @@ export class DashboardRootController {
         }
 
         const enabledSet = new Set(Array.isArray(config.enabled_tools) ? config.enabled_tools : []);
-        content.innerHTML = '<form id="worker-tools-form">' +
-          '<p class="description">Select tools enabled for assistant-worker runtime.</p>' +
-          '<div class="list">' +
-            ASSISTANT_WORKER_TOOL_NAMES.map((toolName) =>
-              '<label class="item"><span><input type="checkbox" data-tool-name="' + escapeHtml(toolName) + '"' + (enabledSet.has(toolName) ? ' checked' : '') + ' /> ' + escapeHtml(toolName) + '</span></label>',
-            ).join('') +
-          '</div>' +
-          '<div class="actions"><button type="submit">Save Tools</button></div>' +
-          '<div id="worker-tools-status" class="status-line"></div>' +
-        '</form>';
+        content.innerHTML =
+          '<form id="worker-tools-form" class="card border-0 shadow-sm">' +
+            '<div class="card-body">' +
+              '<h5 class="card-title mb-2">Enabled Tools</h5>' +
+              '<p class="text-secondary mb-3">Select tools enabled for assistant-orchestrator runtime.</p>' +
+              '<div class="row g-2">' +
+                ASSISTANT_ORCHESTRATOR_TOOL_NAMES.map((toolName) =>
+                  '<div class="col-md-6">' +
+                    '<div class="form-check">' +
+                      '<input class="form-check-input" type="checkbox" data-tool-name="' + escapeHtml(toolName) + '" id="worker-tool-' + escapeHtml(toolName) + '"' + (enabledSet.has(toolName) ? ' checked' : '') + ' />' +
+                      '<label class="form-check-label fw-semibold" for="worker-tool-' + escapeHtml(toolName) + '">' + escapeHtml(toolName) + '</label>' +
+                    '</div>' +
+                  '</div>',
+                ).join('') +
+              '</div>' +
+              '<div class="mt-3 d-flex gap-2 align-items-center">' +
+                '<button type="submit" class="btn btn-dark">Save tools</button>' +
+                '<div id="worker-tools-status" class="text-secondary"></div>' +
+              '</div>' +
+            '</div>' +
+          '</form>';
 
         document.getElementById('worker-tools-form').addEventListener('submit', async (event) => {
           event.preventDefault();
@@ -643,7 +681,7 @@ export class DashboardRootController {
         });
       }
 
-      async function renderAssistantWorkerSkills(service) {
+      async function renderAssistantOrchestratorSkills(service) {
         const content = document.getElementById('service-content');
         content.innerHTML = '<div class="status-line">Loading skills...</div>';
 
@@ -656,7 +694,7 @@ export class DashboardRootController {
           const payload = await response.json();
           const skills = Array.isArray(payload.skills) ? payload.skills : [];
           if (skills.length === 0) {
-            content.innerHTML = '<div class="item">No local skills found in runtime/assistant-worker/skills.</div>';
+            content.innerHTML = '<div class="item">No local skills found in runtime/assistant-orchestrator/skills.</div>';
             return;
           }
 
@@ -740,6 +778,223 @@ export class DashboardRootController {
         });
       }
 
+      function renderAssistantLlmTabs(active) {
+        return '<div class="subtabs">' +
+          ['ollama', 'deepseek', 'xai'].map((provider) => {
+            const activeClass = provider === active ? 'active' : '';
+            const title = provider === 'deepseek' ? 'DeepSeek' : provider === 'xai' ? 'XAI' : 'Ollama';
+            return '<a role="tab" href="#" class="' + activeClass + '" data-llm-tab="' + provider + '">' + title + '</a>';
+          }).join('') +
+        '</div>';
+      }
+
+      async function renderAssistantLlmGeneral(service) {
+        const content = document.getElementById('service-content');
+        content.innerHTML = '<div class="status-line">Loading assistant-llm status...</div>';
+        let providerStatus = null;
+        let models = null;
+        try {
+          const statusResponse = await fetch(buildServiceUrl(service, '/provider-status'));
+          if (statusResponse.ok) {
+            providerStatus = await statusResponse.json();
+          }
+          const modelsResponse = await fetch(buildServiceUrl(service, '/models'));
+          if (modelsResponse.ok) {
+            const payload = await modelsResponse.json();
+            if (payload && typeof payload === 'object') {
+              models = payload.models;
+            }
+          }
+        } catch {}
+
+        content.innerHTML =
+          '<div class="list">' +
+            '<div class="item"><strong>Prefix:</strong> <code>' + escapeHtml(service.prefix || '-') + '</code></div>' +
+            '<div class="item"><strong>Status endpoint:</strong> <code>' + escapeHtml(service.status_url || 'not exposed') + '</code></div>' +
+            '<div class="item"><strong>Menu:</strong> General, Provider, LLMs (Ollama/DeepSeek/XAI)</div>' +
+            '<div class="item"><strong>Provider status:</strong> ' + escapeHtml(providerStatus?.status || 'unknown') + '</div>' +
+            '<div class="item"><strong>Reachable:</strong> ' + escapeHtml(String(providerStatus?.reachable ?? false)) + '</div>' +
+            '<div class="item"><strong>Current provider/model:</strong> ' + escapeHtml((providerStatus?.provider || '-') + ' / ' + (providerStatus?.model || '-')) + '</div>' +
+            '<div class="actions"><a href="' + escapeHtml(service.prefix || '/') + '">Open service panel via dashboard prefix</a></div>' +
+          '</div>' +
+          '<div class="list" style="margin-top:10px">' +
+            '<div class="item"><strong>Available models:</strong></div>' +
+            '<pre>' + escapeHtml(JSON.stringify(models || {}, null, 2)) + '</pre>' +
+          '</div>';
+      }
+
+      async function renderAssistantLlmProvider(service) {
+        const content = document.getElementById('service-content');
+        content.innerHTML = '<div class="status-line">Loading provider settings...</div>';
+        let config;
+        let modelsByProvider = null;
+        try {
+          config = await ensureServiceConfig(service);
+        } catch {
+          content.innerHTML = '<div class="status-line">Failed to load provider settings</div>';
+          return;
+        }
+
+        try {
+          const modelsResponse = await fetch(buildServiceUrl(service, '/models'));
+          if (modelsResponse.ok) {
+            const modelsPayload = await modelsResponse.json();
+            if (modelsPayload && typeof modelsPayload === 'object' && modelsPayload.models) {
+              modelsByProvider = modelsPayload.models;
+            }
+          }
+        } catch {}
+
+        const providerOptions = ['deepseek', 'xai', 'ollama'];
+        const selectedProvider = providerOptions.includes(config.provider) ? config.provider : 'ollama';
+        const initialModels = modelsByProvider && Array.isArray(modelsByProvider[selectedProvider])
+          ? modelsByProvider[selectedProvider]
+          : [config.model].filter((entry) => typeof entry === 'string' && entry.length > 0);
+
+        content.innerHTML =
+          '<form id="assistant-llm-provider-form">' +
+            '<div class="row">' +
+              '<label>Provider<select id="assistant-llm-provider">' +
+                providerOptions.map((provider) =>
+                  '<option value="' + escapeHtml(provider) + '"' +
+                  (provider === selectedProvider ? ' selected' : '') + '>' +
+                  escapeHtml(provider) +
+                  '</option>',
+                ).join('') +
+              '</select></label>' +
+              '<label>Model<select id="assistant-llm-model">' +
+                initialModels.map((model) =>
+                  '<option value="' + escapeHtml(model) + '"' +
+                  (model === config.model ? ' selected' : '') + '>' +
+                  escapeHtml(model) +
+                  '</option>',
+                ).join('') +
+              '</select></label>' +
+            '</div>' +
+            '<div class="row">' +
+              '<label>Structured mode (true/false)<input id="assistant-llm-structured-mode" value="' + escapeHtml(String(config.structured_mode ?? true)) + '" /></label>' +
+              '<label>Small model safe mode (true/false)<input id="assistant-llm-small-safe-mode" value="' + escapeHtml(String(config.small_model_safe_mode ?? false)) + '" /></label>' +
+            '</div>' +
+            '<div class="actions"><button type="submit">Save Provider</button></div>' +
+            '<div id="assistant-llm-provider-status" class="status-line"></div>' +
+          '</form>';
+
+        const providerSelect = document.getElementById('assistant-llm-provider');
+        const modelSelect = document.getElementById('assistant-llm-model');
+        const renderProviderModels = (provider, selectedModel) => {
+          const models = modelsByProvider && Array.isArray(modelsByProvider[provider])
+            ? modelsByProvider[provider]
+            : [];
+          const source = models.length > 0
+            ? models
+            : [selectedModel].filter((entry) => typeof entry === 'string' && entry.length > 0);
+          modelSelect.innerHTML = source.map((model) =>
+            '<option value="' + escapeHtml(model) + '"' +
+            (model === selectedModel ? ' selected' : '') + '>' +
+            escapeHtml(model) +
+            '</option>',
+          ).join('');
+        };
+        providerSelect.addEventListener('change', () => {
+          const nextProvider = providerSelect.value;
+          renderProviderModels(nextProvider, modelSelect.value || config.model || '');
+        });
+
+        document.getElementById('assistant-llm-provider-form').addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const status = document.getElementById('assistant-llm-provider-status');
+          status.textContent = 'Saving...';
+          const patch = {
+            provider: document.getElementById('assistant-llm-provider').value.trim(),
+            model: document.getElementById('assistant-llm-model').value.trim(),
+            structured_mode: document.getElementById('assistant-llm-structured-mode').value.trim().toLowerCase() === 'true',
+            small_model_safe_mode: document.getElementById('assistant-llm-small-safe-mode').value.trim().toLowerCase() === 'true',
+          };
+          try {
+            await saveServiceConfig(service, patch);
+            status.textContent = 'Saved';
+          } catch {
+            status.textContent = 'Failed to save';
+          }
+        });
+      }
+
+      async function renderAssistantLlmConnections(service) {
+        const content = document.getElementById('service-content');
+        content.innerHTML = '<div class="status-line">Loading LLM connection settings...</div>';
+        let config;
+        try {
+          config = await ensureServiceConfig(service);
+        } catch {
+          content.innerHTML = '<div class="status-line">Failed to load LLM settings</div>';
+          return;
+        }
+
+        const provider = state.assistantLlmTab;
+        const fieldsByProvider = {
+          ollama: {
+            title: 'Ollama',
+            base_url_key: 'ollama_base_url',
+            timeout_key: 'ollama_timeout_ms',
+            api_key_key: null,
+          },
+          deepseek: {
+            title: 'DeepSeek',
+            base_url_key: 'deepseek_base_url',
+            timeout_key: 'deepseek_timeout_ms',
+            api_key_key: 'deepseek_api_key',
+          },
+          xai: {
+            title: 'XAI',
+            base_url_key: 'xai_base_url',
+            timeout_key: 'xai_timeout_ms',
+            api_key_key: 'xai_api_key',
+          },
+        };
+        const spec = fieldsByProvider[provider];
+        const apiKeyInput = spec.api_key_key
+          ? '<label>API key<input id="assistant-llm-api-key" type="password" value="' + escapeHtml(config[spec.api_key_key] || '') + '" /></label>'
+          : '';
+
+        content.innerHTML =
+          renderAssistantLlmTabs(provider) +
+          '<form id="assistant-llm-connections-form">' +
+            '<p class="description">' + escapeHtml(spec.title) + ' connection settings.</p>' +
+            apiKeyInput +
+            '<label>Base URL<input id="assistant-llm-base-url" value="' + escapeHtml(config[spec.base_url_key] || '') + '" /></label>' +
+            '<label>Timeout (ms)<input id="assistant-llm-timeout" type="number" value="' + escapeHtml(String(config[spec.timeout_key] ?? '')) + '" /></label>' +
+            '<div class="actions"><button type="submit">Save ' + escapeHtml(spec.title) + '</button></div>' +
+            '<div id="assistant-llm-connections-status" class="status-line"></div>' +
+          '</form>';
+
+        content.querySelectorAll('a[data-llm-tab]').forEach((tabLink) => {
+          tabLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            state.assistantLlmTab = tabLink.dataset.llmTab;
+            void renderAssistantLlmConnections(service);
+          });
+        });
+
+        document.getElementById('assistant-llm-connections-form').addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const status = document.getElementById('assistant-llm-connections-status');
+          status.textContent = 'Saving...';
+          const patch = {
+            [spec.base_url_key]: document.getElementById('assistant-llm-base-url').value.trim(),
+            [spec.timeout_key]: Number.parseInt(document.getElementById('assistant-llm-timeout').value, 10),
+          };
+          if (spec.api_key_key) {
+            patch[spec.api_key_key] = document.getElementById('assistant-llm-api-key').value;
+          }
+          try {
+            await saveServiceConfig(service, patch);
+            status.textContent = 'Saved';
+          } catch {
+            status.textContent = 'Failed to save';
+          }
+        });
+      }
+
       async function renderGatewayWebSettings(service) {
         const content = document.getElementById('service-content');
         content.innerHTML = '<div class="status-line">Loading gateway-web settings...</div>';
@@ -751,37 +1006,58 @@ export class DashboardRootController {
           return;
         }
 
+        const allowedTypes = Array.isArray(config.allowed_incoming_message_types)
+          ? config.allowed_incoming_message_types
+          : GATEWAY_WEB_INCOMING_MESSAGE_TYPES.map((item) => item.value);
+        const groups = [];
+        for (const item of GATEWAY_WEB_INCOMING_MESSAGE_TYPES) {
+          let group = groups.find((entry) => entry.name === item.group);
+          if (!group) {
+            group = { name: item.group, items: [] };
+            groups.push(group);
+          }
+          group.items.push(item);
+        }
+        const incomingTypeControls = groups.map((group) =>
+          '<div class="border rounded-3 p-3 mb-3">' +
+            '<h6 class="mb-2">' + escapeHtml(group.name) + '</h6>' +
+            '<div class="d-grid gap-2">' +
+              group.items.map((item) =>
+                '<div class="form-check">' +
+                  '<input class="form-check-input gw-incoming-type" type="checkbox" id="gw-incoming-' + escapeHtml(item.value) + '" value="' + escapeHtml(item.value) + '"' +
+                    (allowedTypes.includes(item.value) ? ' checked' : '') +
+                  ' />' +
+                  '<label class="form-check-label fw-semibold" for="gw-incoming-' + escapeHtml(item.value) + '">' +
+                    escapeHtml(item.value + ' - ' + item.description) +
+                  '</label>' +
+                '</div>',
+              ).join('') +
+            '</div>' +
+          '</div>',
+        ).join('');
+
         content.innerHTML =
-          '<form id="gateway-web-settings-form">' +
-            '<div class="list">' +
-              '<div class="item">' +
-                '<strong>Assistant API</strong>' +
-                '<div class="row" style="margin-top:8px">' +
-                  '<label>Assistant API URL<input id="gw-assistant-api-url" value="' + escapeHtml(config.assistant_api_url || '') + '" /></label>' +
-                  '<label>Assistant Memory URL<input id="gw-assistant-memory-url" value="' + escapeHtml(config.assistant_memory_url || '') + '" /></label>' +
-                '</div>' +
-              '</div>' +
-              '<div class="item">' +
-                '<strong>Callback</strong>' +
-                '<div class="row" style="margin-top:8px">' +
-                  '<label>Callback base URL<input id="gw-callback-base-url" value="' + escapeHtml(config.callback_base_url || '') + '" /></label>' +
-                  '<label>User ID<input id="gw-user-id" value="' + escapeHtml(config.user_id || '') + '" /></label>' +
-                '</div>' +
+          '<form id="gateway-web-settings-form" class="card border-0 shadow-sm">' +
+            '<div class="card-body">' +
+              '<h5 class="card-title mb-2">Callbacks</h5>' +
+              '<p class="text-secondary mb-3">Choose which callback message types are delivered to web chat.</p>' +
+              incomingTypeControls +
+              '<div class="mt-3 d-flex gap-2 align-items-center">' +
+                '<button type="submit" class="btn btn-dark">Save gateway-web settings</button>' +
+                '<div id="gateway-web-settings-status" class="text-secondary"></div>' +
               '</div>' +
             '</div>' +
-            '<div class="actions"><button type="submit">Save gateway-web settings</button></div>' +
-            '<div id="gateway-web-settings-status" class="status-line"></div>' +
           '</form>';
 
         document.getElementById('gateway-web-settings-form').addEventListener('submit', async (event) => {
           event.preventDefault();
           const status = document.getElementById('gateway-web-settings-status');
           status.textContent = 'Saving...';
+          const selectedIncomingTypes = Array.from(
+            content.querySelectorAll('.gw-incoming-type:checked'),
+          ).map((checkbox) => checkbox.value);
           const patch = {
-            assistant_api_url: document.getElementById('gw-assistant-api-url').value.trim(),
-            assistant_memory_url: document.getElementById('gw-assistant-memory-url').value.trim(),
-            callback_base_url: document.getElementById('gw-callback-base-url').value.trim(),
-            user_id: document.getElementById('gw-user-id').value.trim(),
+            allowed_incoming_message_types: selectedIncomingTypes,
           };
           try {
             await saveServiceConfig(service, patch);
@@ -794,6 +1070,81 @@ export class DashboardRootController {
 
       async function renderAssistantMemorySection(service, section) {
         const content = document.getElementById('service-content');
+
+        if (section === 'settings') {
+          content.innerHTML = '<div class="status-line">Loading memory settings...</div>';
+          try {
+            const response = await fetch(buildServiceUrl(service, '/config'));
+            if (!response.ok) {
+              content.innerHTML = '<div class="status-line">Failed to load memory settings</div>';
+              return;
+            }
+            const config = await response.json();
+            const enabledExtracts = Array.isArray(config.enabled_extracts)
+              ? config.enabled_extracts
+              : [];
+            const extractOptions = [
+              'profile',
+              'preference',
+              'fact',
+              'routine',
+              'project',
+              'episode',
+              'rule',
+            ];
+            content.innerHTML =
+              '<form id="assistant-memory-settings-form" class="card border-0 shadow-sm">' +
+                '<div class="card-body">' +
+                  '<h5 class="card-title mb-2">Conversation Enrichment</h5>' +
+                  '<p class="text-secondary mb-3">Choose which extracts run asynchronously after conversation append.</p>' +
+                  '<div class="row g-2">' +
+                    extractOptions.map((extract) =>
+                      '<div class="col-md-6">' +
+                        '<div class="form-check">' +
+                          '<input class="form-check-input memory-extract" type="checkbox" id="memory-extract-' + escapeHtml(extract) + '" value="' + escapeHtml(extract) + '"' +
+                            (enabledExtracts.includes(extract) ? ' checked' : '') +
+                          ' />' +
+                          '<label class="form-check-label fw-semibold" for="memory-extract-' + escapeHtml(extract) + '">' + escapeHtml(extract) + '</label>' +
+                        '</div>' +
+                      '</div>',
+                    ).join('') +
+                  '</div>' +
+                  '<div class="mt-3 d-flex gap-2 align-items-center">' +
+                    '<button type="submit" class="btn btn-dark">Save memory settings</button>' +
+                    '<div id="assistant-memory-settings-status" class="text-secondary"></div>' +
+                  '</div>' +
+                '</div>' +
+              '</form>';
+
+            document
+              .getElementById('assistant-memory-settings-form')
+              .addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const status = document.getElementById('assistant-memory-settings-status');
+                status.textContent = 'Saving...';
+                const enabled = Array.from(
+                  content.querySelectorAll('input.memory-extract:checked'),
+                ).map((element) => element.value);
+                try {
+                  const saveResponse = await fetch(buildServiceUrl(service, '/config'), {
+                    method: 'PUT',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ enabled_extracts: enabled }),
+                  });
+                  if (!saveResponse.ok) {
+                    status.textContent = 'Failed to save';
+                    return;
+                  }
+                  status.textContent = 'Saved';
+                } catch {
+                  status.textContent = 'Failed to save';
+                }
+              });
+          } catch {
+            content.innerHTML = '<div class="status-line">Failed to load memory settings</div>';
+          }
+          return;
+        }
 
         if (section === 'profile') {
           content.innerHTML = '<div class="status-line">Loading profile...</div>';
@@ -842,9 +1193,9 @@ export class DashboardRootController {
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({
                   chat: firstConversation?.chat || 'direct',
-                  contact: firstConversation?.contact || 'default-user',
+                  user_id: firstConversation?.user_id || firstConversation?.contact || 'default-user',
                   conversation_id: firstConversationId,
-                  direction: firstConversation?.direction || 'api',
+                  direction: firstConversation?.direction || 'web',
                 }),
               });
               if (readResponse.ok) {
@@ -859,11 +1210,11 @@ export class DashboardRootController {
                     const conversationId = conversation.thread_id || conversation.conversationId || '';
                     const updatedAt = conversation.updated_at || conversation.updatedAt || '';
                     const chat = conversation.chat || 'direct';
-                    const contact = conversation.contact || 'default-user';
-                    const direction = conversation.direction || 'api';
-                    return '<button class="item" style="text-align:left;cursor:pointer" data-conversation-id="' + escapeHtml(conversationId) + '" data-chat="' + escapeHtml(chat) + '" data-contact="' + escapeHtml(contact) + '" data-direction="' + escapeHtml(direction) + '">' +
+                    const userId = conversation.user_id || conversation.contact || 'default-user';
+                    const direction = conversation.direction || 'web';
+                    return '<button class="item" style="text-align:left;cursor:pointer" data-conversation-id="' + escapeHtml(conversationId) + '" data-chat="' + escapeHtml(chat) + '" data-user-id="' + escapeHtml(userId) + '" data-direction="' + escapeHtml(direction) + '">' +
                       '<strong>' + escapeHtml(conversationId) + '</strong><br />' +
-                      '<span class="meta">' + escapeHtml(direction + '/' + chat + '/' + contact) + ' · updated=' + escapeHtml(updatedAt) + '</span>' +
+                      '<span class="meta">' + escapeHtml(direction + '/' + chat + '/' + userId) + ' · updated=' + escapeHtml(updatedAt) + '</span>' +
                     '</button>';
                   }).join('') +
                 '</div>' +
@@ -878,14 +1229,14 @@ export class DashboardRootController {
 
                 try {
                   const chat = button.dataset.chat || 'direct';
-                  const contact = button.dataset.contact || 'default-user';
-                  const direction = button.dataset.direction || 'api';
+                  const userId = button.dataset.userId || 'default-user';
+                  const direction = button.dataset.direction || 'web';
                   const readResponse = await fetch(buildServiceUrl(service, '/v1/conversations/read'), {
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
                     body: JSON.stringify({
                       chat,
-                      contact,
+                      user_id: userId,
                       conversation_id: conversationId,
                       direction,
                     }),
@@ -978,92 +1329,7 @@ export class DashboardRootController {
         }
       }
 
-      function renderWorkerLlmSubtabs(active) {
-        return '<div class="subtabs">' +
-          ['ollama', 'deepseek', 'xai'].map((provider) => {
-            const activeClass = provider === active ? 'active' : '';
-            const title = provider === 'deepseek' ? 'DeepSeek' : provider === 'xai' ? 'XAI' : 'Ollama';
-            return '<a role="tab" href="#" class="' + activeClass + '" data-llm-tab="' + provider + '">' + title + '</a>';
-          }).join('') +
-        '</div>';
-      }
-
-      async function renderAssistantWorkerLlms(service) {
-        const content = document.getElementById('service-content');
-        content.innerHTML = '<div class="status-line">Loading LLM settings...</div>';
-        let config;
-        try {
-          config = await ensureServiceConfig(service);
-        } catch {
-          content.innerHTML = '<div class="status-line">Failed to load LLM settings</div>';
-          return;
-        }
-
-        const provider = state.workerLlmTab;
-        const fieldsByProvider = {
-          ollama: {
-            title: 'Ollama',
-            base_url_key: 'ollama_base_url',
-            timeout_key: 'ollama_timeout_ms',
-            api_key_key: null,
-          },
-          deepseek: {
-            title: 'DeepSeek',
-            base_url_key: 'deepseek_base_url',
-            timeout_key: 'deepseek_timeout_ms',
-            api_key_key: 'deepseek_api_key',
-          },
-          xai: {
-            title: 'XAI',
-            base_url_key: 'xai_base_url',
-            timeout_key: 'xai_timeout_ms',
-            api_key_key: 'xai_api_key',
-          },
-        };
-        const spec = fieldsByProvider[provider];
-        const apiKeyInput = spec.api_key_key
-          ? '<label>API key<input id="worker-llm-api-key" type="password" value="' + escapeHtml(config[spec.api_key_key] || '') + '" /></label>'
-          : '';
-
-        content.innerHTML = renderWorkerLlmSubtabs(provider) +
-          '<form id="worker-llm-form">' +
-            '<p class="description">' + escapeHtml(spec.title) + ' connection settings.</p>' +
-            apiKeyInput +
-            '<label>Base URL<input id="worker-llm-base-url" value="' + escapeHtml(config[spec.base_url_key] || '') + '" /></label>' +
-            '<label>Timeout (ms)<input id="worker-llm-timeout" type="number" value="' + escapeHtml(String(config[spec.timeout_key] ?? '')) + '" /></label>' +
-            '<div class="actions"><button type="submit">Save ' + escapeHtml(spec.title) + '</button></div>' +
-            '<div id="worker-llm-status" class="status-line"></div>' +
-          '</form>';
-
-        content.querySelectorAll('a[data-llm-tab]').forEach((tabLink) => {
-          tabLink.addEventListener('click', (event) => {
-            event.preventDefault();
-            state.workerLlmTab = tabLink.dataset.llmTab;
-            void renderAssistantWorkerLlms(service);
-          });
-        });
-
-        document.getElementById('worker-llm-form').addEventListener('submit', async (event) => {
-          event.preventDefault();
-          const status = document.getElementById('worker-llm-status');
-          status.textContent = 'Saving...';
-          const patch = {
-            [spec.base_url_key]: document.getElementById('worker-llm-base-url').value.trim(),
-            [spec.timeout_key]: Number.parseInt(document.getElementById('worker-llm-timeout').value, 10),
-          };
-          if (spec.api_key_key) {
-            patch[spec.api_key_key] = document.getElementById('worker-llm-api-key').value;
-          }
-          try {
-            await saveServiceConfig(service, patch);
-            status.textContent = 'Saved';
-          } catch {
-            status.textContent = 'Failed to save';
-          }
-        });
-      }
-
-      async function renderAssistantWorkerIntegrations(service) {
+      async function renderAssistantOrchestratorIntegrations(service) {
         const content = document.getElementById('service-content');
         content.innerHTML = '<div class="status-line">Loading integrations...</div>';
         let config;
@@ -1160,8 +1426,26 @@ export class DashboardRootController {
 
       async function bootstrap() {
         await loadCatalog();
+        const hashApplied = applyHashState();
+        if (state.selectedService) {
+          if (!hashApplied) {
+            state.selectedSection = defaultSectionForService(state.selectedService);
+          }
+          updateHashFromState();
+        }
+        if (!hashApplied && state.selectedService) {
+          state.selectedSection = defaultSectionForService(state.selectedService);
+        }
         renderMenu();
         await renderService();
+        window.addEventListener('hashchange', () => {
+          if (!applyHashState()) {
+            return;
+          }
+          state.currentConfig = null;
+          renderMenu();
+          void renderService();
+        });
       }
 
       void bootstrap();

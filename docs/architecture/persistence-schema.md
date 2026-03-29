@@ -6,7 +6,7 @@ Describe the canonical MySQL schema for conversation state and durable memory.
 
 ## Ownership
 
-- `assistant-worker` owns conversation tables
+- `assistant-orchestrator` owns conversation tables
 - `assistant-memory` owns durable memory tables
 - both domains live in the same MySQL deployment
 
@@ -158,7 +158,7 @@ Required columns:
 
 ## Schema Rules
 
-- `assistant-worker` writes only to conversation tables
+- `assistant-orchestrator` writes only to conversation tables
 - `assistant-memory` writes only to memory tables
 - durable memory rows are archived, not hard-deleted, during normal operations
 - timestamps use UTC with millisecond precision
@@ -168,5 +168,5 @@ Required columns:
 ## Related Documents
 
 - [Memory Architecture](./memory.md)
-- [assistant-worker](../services/assistant/assistant-worker.md)
+- [assistant-orchestrator](../services/assistant/assistant-orchestrator.md)
 - [assistant-memory](../services/assistant/assistant-memory.md)

@@ -31,3 +31,7 @@ runtime/gateway-web/logs/*
 !runtime/gateway-web/logs/.gitkeep
 runtime/gateway-web/cache/*
 !runtime/gateway-web/cache/.gitkeep
+runtime/assistant-orchestrator/config/*
+!runtime/assistant-orchestrator/config/README.md
+runtime/assistant-llm/config/*
+!runtime/assistant-llm/config/README.md

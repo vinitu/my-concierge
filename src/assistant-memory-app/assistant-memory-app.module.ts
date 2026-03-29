@@ -1,18 +1,23 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { APP_INTERCEPTOR } from '@nestjs/core';
-import { MysqlService } from '../persistence/mysql.service';
-import { AssistantMemoryMetricsController } from './observability/assistant-memory-metrics.controller';
-import { AssistantMemoryMetricsService } from './observability/assistant-memory-metrics.service';
-import { HttpRequestMetricsInterceptor } from './observability/http-request-metrics.interceptor';
-import { AssistantMemoryController } from './memory/assistant-memory.controller';
-import { AssistantMemoryService } from './memory/assistant-memory.service';
-import { AssistantMemoryOpenApiController } from './openapi.controller';
-import { AssistantMemoryRootController } from './root.controller';
-import { AssistantMemoryStatusController } from './status.controller';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
+import { APP_INTERCEPTOR } from "@nestjs/core";
+import { MysqlService } from "../persistence/mysql.service";
+import { AssistantMemoryConfigController } from "./assistant-memory-config.controller";
+import { AssistantMemoryConfigService } from "./assistant-memory-config.service";
+import { AssistantMemoryMetricsController } from "./observability/assistant-memory-metrics.controller";
+import { AssistantMemoryMetricsService } from "./observability/assistant-memory-metrics.service";
+import { HttpRequestMetricsInterceptor } from "./observability/http-request-metrics.interceptor";
+import { AssistantMemoryController } from "./memory/assistant-memory.controller";
+import { AssistantMemoryEnrichmentService } from "./memory/assistant-memory-enrichment.service";
+import { AssistantMemoryService } from "./memory/assistant-memory.service";
+import { AssistantMemoryOpenApiController } from "./openapi.controller";
+import { AssistantMemoryRunEventPublisherService } from "./run-events/assistant-memory-run-event-publisher.service";
+import { AssistantMemoryRootController } from "./root.controller";
+import { AssistantMemoryStatusController } from "./status.controller";
 
 @Module({
   controllers: [
+    AssistantMemoryConfigController,
     AssistantMemoryController,
     AssistantMemoryMetricsController,
     AssistantMemoryOpenApiController,
@@ -21,8 +26,11 @@ import { AssistantMemoryStatusController } from './status.controller';
   ],
   imports: [ConfigModule.forRoot({ isGlobal: true })],
   providers: [
+    AssistantMemoryConfigService,
     AssistantMemoryMetricsService,
     MysqlService,
+    AssistantMemoryEnrichmentService,
+    AssistantMemoryRunEventPublisherService,
     AssistantMemoryService,
     HttpRequestMetricsInterceptor,
     {

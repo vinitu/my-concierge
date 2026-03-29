@@ -11,14 +11,14 @@ Describe how assistant replies leave the core runtime and return to gateways.
 That means:
 
 - gateways send requests into `assistant-api`
-- `assistant-worker` publishes run events only
+- `assistant-orchestrator` publishes run events only
 - `assistant-api` consumes those events and performs callbacks
 
 ## Relations
 
 ```mermaid
 flowchart LR
-    Worker["assistant-worker"] --> Events["redis run events"]
+    Worker["assistant-orchestrator"] --> Events["redis run events"]
     Events --> API["assistant-api"]
     API --> Web["gateway-web callbacks"]
     API --> Telegram["gateway-telegram callbacks"]
@@ -27,7 +27,7 @@ flowchart LR
 
 ## Callback Flow
 
-1. `assistant-worker` publishes `run.thinking`, `run.completed`, or `run.failed`.
+1. `assistant-orchestrator` publishes `run.thinking`, `run.completed`, or `run.failed`.
 2. `assistant-api` reads the event from Redis.
 3. `assistant-api` resolves the callback target from stored routing metadata.
 4. `assistant-api` sends the matching callback request to the gateway.
@@ -79,7 +79,7 @@ Failure payload:
 
 ## Callback Rules
 
-- `assistant-worker` never calls gateway callback endpoints directly
+- `assistant-orchestrator` never calls gateway callback endpoints directly
 - callback retries belong to `assistant-api`
 - gateways must tolerate duplicate callback delivery
 - final delivery semantics are channel-specific inside gateways

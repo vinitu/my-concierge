@@ -28,6 +28,9 @@ services:
     restart: unless-stopped
     environment:
       APP_ROLE: assistant-api
+      GATEWAY_EMAIL_CALLBACK_URL: http://gateway-email:3000
+      GATEWAY_TELEGRAM_CALLBACK_URL: http://gateway-telegram:3000
+      GATEWAY_WEB_CALLBACK_URL: http://gateway-web:3000
       NODE_ENV: production
       PORT: 3000
       QUEUE_ADAPTER: redis
@@ -38,19 +41,21 @@ services:
     depends_on:
       - queue
 
-  assistant-worker:
+  assistant-orchestrator:
     build:
       context: .
       dockerfile: Dockerfile
-    image: myconcierge-assistant-worker:local
-    container_name: myconcierge-assistant-worker
+    image: myconcierge-assistant-orchestrator:local
+    container_name: myconcierge-assistant-orchestrator
     restart: unless-stopped
     depends_on:
       - queue
       - mysql
+      - assistant-llm
     environment:
-      APP_ROLE: assistant-worker
+      APP_ROLE: assistant-orchestrator
       ASSISTANT_DATADIR: ${ASSISTANT_DATADIR:-/app/runtime}
+      ASSISTANT_LLM_URL: http://assistant-llm:3000
       ASSISTANT_MEMORY_URL: http://assistant-memory:3000
       MYSQL_DATABASE: ${MYSQL_DATABASE:-my_concierge}
       MYSQL_HOST: mysql
@@ -63,21 +68,36 @@ services:
       REDIS_URL: redis://queue:6379
       REDIS_QUEUE_NAME: assistant:queue
       WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-500}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
-      DEEPSEEK_TIMEOUT_MS: ${DEEPSEEK_TIMEOUT_MS:-360000}
-      XAI_API_KEY: ${XAI_API_KEY}
-      XAI_BASE_URL: ${XAI_BASE_URL:-https://api.x.ai/v1}
-      XAI_MODEL: ${XAI_MODEL:-grok-4}
-      XAI_TIMEOUT_MS: ${XAI_TIMEOUT_MS:-360000}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3:1b}
-      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-360000}
     ports:
       - "3001:3000"
     volumes:
-      - ./runtime/assistant-worker:/app/runtime
+      - ./runtime/assistant-orchestrator:/app/runtime
+
+  assistant-llm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myconcierge-assistant-llm:local
+    container_name: myconcierge-assistant-llm
+    restart: unless-stopped
+    environment:
+      APP_ROLE: assistant-llm
+      ASSISTANT_DATADIR: ${ASSISTANT_LLM_DATADIR:-/app/runtime}
+      NODE_ENV: production
+      PORT: 3000
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_TIMEOUT_MS: ${DEEPSEEK_TIMEOUT_MS:-360000}
+      XAI_API_KEY: ${XAI_API_KEY}
+      XAI_BASE_URL: ${XAI_BASE_URL:-https://api.x.ai/v1}
+      XAI_TIMEOUT_MS: ${XAI_TIMEOUT_MS:-360000}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-360000}
+      LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+    ports:
+      - "3003:3000"
+    volumes:
+      - ./runtime/assistant-llm:/app/runtime
 
   assistant-memory:
     build:
@@ -88,8 +108,11 @@ services:
     restart: unless-stopped
     depends_on:
       - mysql
+      - queue
+      - assistant-llm
     environment:
       APP_ROLE: assistant-memory
+      ASSISTANT_LLM_URL: http://assistant-llm:3000
       MYSQL_DATABASE: ${MYSQL_DATABASE:-my_concierge}
       MYSQL_HOST: mysql
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-myconcierge}
@@ -97,6 +120,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-myconcierge}
       NODE_ENV: production
       PORT: 3000
+      REDIS_URL: redis://queue:6379
     ports:
       - "3002:3000"
 
@@ -112,7 +136,6 @@ services:
     environment:
       APP_ROLE: gateway-telegram
       ASSISTANT_API_URL: http://assistant-api:3000
-      CALLBACK_BASE_URL: http://gateway-telegram:3000
       GATEWAY_TELEGRAM_RUNTIME_DIR: ${GATEWAY_TELEGRAM_RUNTIME_DIR:-/app/runtime}
       NODE_ENV: production
       PORT: 3000
@@ -135,7 +158,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       ASSISTANT_API_URL: http://assistant-api:3000
-      CALLBACK_BASE_URL: http://gateway-web:3000
+      ASSISTANT_MEMORY_URL: http://assistant-memory:3000
       GATEWAY_WEB_RUNTIME_DIR: ${GATEWAY_WEB_RUNTIME_DIR:-/app/runtime}
     ports:
       - "8079:3000"
@@ -171,7 +194,8 @@ services:
     restart: unless-stopped
     depends_on:
       - assistant-api
-      - assistant-worker
+      - assistant-orchestrator
+      - assistant-llm
       - assistant-memory
       - gateway-web
       - gateway-telegram
@@ -197,7 +221,8 @@ services:
     restart: unless-stopped
     depends_on:
       - assistant-api
-      - assistant-worker
+      - assistant-orchestrator
+      - assistant-llm
       - assistant-memory
       - gateway-telegram
       - gateway-email
@@ -206,7 +231,8 @@ services:
       URLS: |
         [
           { "url": "http://localhost:3000/openapi.json", "name": "assistant-api" },
-          { "url": "http://localhost:3001/openapi.json", "name": "assistant-worker" },
+          { "url": "http://localhost:3001/openapi.json", "name": "assistant-orchestrator" },
+          { "url": "http://localhost:3003/openapi.json", "name": "assistant-llm" },
           { "url": "http://localhost:3002/openapi.json", "name": "assistant-memory" },
           { "url": "http://localhost:8079/openapi.json", "name": "gateway-web" },
           { "url": "http://localhost:8081/openapi.json", "name": "gateway-telegram" },

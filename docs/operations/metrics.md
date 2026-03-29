@@ -13,12 +13,12 @@ The current metrics flow is service-local: each service produces and serves its 
 flowchart LR
     Prom["Metrics scraper"] --> GW["gateway-web /metrics"]
     Prom --> API["assistant-api /metrics"]
-    Prom --> Worker["assistant-worker /metrics"]
+    Prom --> Worker["assistant-orchestrator /metrics"]
     Prom --> Memory["assistant-memory /metrics"]
 
     GW --> GWReg["gateway-web metric registry"]
     API --> APIReg["assistant-api metric registry"]
-    Worker --> WorkerReg["assistant-worker metric registry"]
+    Worker --> WorkerReg["assistant-orchestrator metric registry"]
     Memory --> MemoryReg["assistant-memory metric registry"]
 ```
 
@@ -43,14 +43,14 @@ flowchart LR
 | `callback_deliveries_total` | `counter` | `service`, `status` | Total number of callback deliveries |
 | `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |
 
-## `assistant-worker`
+## `assistant-orchestrator`
 
 | Metric | Type | Labels | Description |
 |---------|---------|---------|-------------|
 | `http_request_time_ms` | `histogram` | `route`, `service`, `response_code` | HTTP request duration in milliseconds |
 | `processed_jobs_total` | `counter` | `service` | Total number of processed queue jobs |
 | `run_events_total` | `counter` | `service`, `event_type`, `status` | Total number of published run events |
-| `queue_messages` | `gauge` | `service` | Current number of queue messages visible to `assistant-worker` |
+| `queue_messages` | `gauge` | `service` | Current number of queue messages visible to `assistant-orchestrator` |
 | `endpoint_requests_total` | `counter` | `endpoint`, `service` | Total number of endpoint requests |
 
 ## `assistant-memory`

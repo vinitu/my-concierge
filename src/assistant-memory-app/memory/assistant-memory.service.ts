@@ -2,11 +2,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   mkdir,
+  readdir,
   readFile,
   writeFile,
 } from 'node:fs/promises';
@@ -23,6 +25,7 @@ import type {
   BaseMemoryWriteCandidate,
   ConversationAppendRequest,
   ConversationReadRequest,
+  ConversationMessage,
   ConversationSearchRequest,
   ConversationSearchResponse,
   ConversationState,
@@ -43,6 +46,7 @@ import type {
 } from '../../contracts/assistant-memory';
 import { MysqlService } from '../../persistence/mysql.service';
 import { AssistantMemoryMetricsService } from '../observability/assistant-memory-metrics.service';
+import { AssistantMemoryRunEventPublisherService } from '../run-events/assistant-memory-run-event-publisher.service';
 
 interface StoredIdempotencyRecord {
   createdAt: string;
@@ -54,6 +58,23 @@ interface AssistantMemoryStore {
   entries: MemoryEntry[];
   idempotency: Record<string, StoredIdempotencyRecord>;
   profile: AssistantProfile;
+}
+
+interface StoredConversationState {
+  chat: string;
+  user_id: string;
+  context: string;
+  direction: string;
+  messages: ConversationMessage[];
+  updated_at: string | null;
+}
+
+type MemoryEventAction = 'added' | 'deleted' | 'readed' | 'updated';
+
+interface MemoryEventContext {
+  direction?: string;
+  sourceRequestId?: string;
+  userId?: string;
 }
 
 type MysqlQueryable = Pick<Pool, 'query'> | Pick<PoolConnection, 'query'>;
@@ -69,6 +90,7 @@ const EMPTY_PROFILE: AssistantProfile = {
 
 @Injectable()
 export class AssistantMemoryService {
+  private readonly logger = new Logger(AssistantMemoryService.name);
   private schemaReady = false;
   private conversationSchemaReady = false;
 
@@ -76,6 +98,7 @@ export class AssistantMemoryService {
     private readonly configService: ConfigService,
     private readonly metricsService: AssistantMemoryMetricsService,
     private readonly mysqlService: MysqlService,
+    private readonly assistantMemoryRunEventPublisherService: AssistantMemoryRunEventPublisherService,
   ) {}
 
   async getProfile(): Promise<AssistantProfile> {
@@ -116,6 +139,7 @@ export class AssistantMemoryService {
     kind: MemoryKind,
     idempotencyKey: string | undefined,
     entries: BaseMemoryWriteCandidate[],
+    eventContext?: MemoryEventContext,
   ): Promise<MemoryWriteResult> {
     const typedEntries = entries.map((entry) => ({
       ...entry,
@@ -123,10 +147,10 @@ export class AssistantMemoryService {
     }));
 
     if (this.storeDriver() === 'file') {
-      return this.writeInFile(idempotencyKey, typedEntries);
+      return this.writeInFile(idempotencyKey, typedEntries, eventContext);
     }
 
-    return this.writeInMysql(idempotencyKey, typedEntries);
+    return this.writeInMysql(idempotencyKey, typedEntries, eventContext);
   }
 
   async getMemoryByKind(kind: MemoryKind, memoryId: string): Promise<MemoryEntry> {
@@ -139,11 +163,19 @@ export class AssistantMemoryService {
       }
 
       this.assertKindMatch(kind, entry);
+      this.logMemoryEvent(kind, 'readed', entry.id, {
+        conversationThreadId: entry.conversationThreadId,
+        scope: entry.scope,
+      });
       return entry;
     }
 
     const entry = await this.getMemoryFromMysql(memoryId);
     this.assertKindMatch(kind, entry);
+    this.logMemoryEvent(kind, 'readed', entry.id, {
+      conversationThreadId: entry.conversationThreadId,
+      scope: entry.scope,
+    });
     return entry;
   }
 
@@ -180,10 +212,7 @@ export class AssistantMemoryService {
 
   async listConversations(): Promise<ConversationThreadListResponse> {
     if (this.storeDriver() === 'file') {
-      return {
-        count: 0,
-        threads: [],
-      };
+      return this.listConversationsFromFile();
     }
 
     await this.assertConversationMysqlSchemaReady();
@@ -192,7 +221,7 @@ export class AssistantMemoryService {
       Array<
         RowDataPacket & {
           chat: string;
-          contact: string;
+          user_id: string;
           direction: string;
           thread_id: string;
           updated_at: Date | string | null;
@@ -200,7 +229,7 @@ export class AssistantMemoryService {
       >
     >(
       `
-        SELECT id AS thread_id, direction, chat, contact, updated_at
+        SELECT id AS thread_id, direction, chat, contact AS user_id, updated_at
         FROM conversation_threads
         ORDER BY COALESCE(updated_at, created_at) DESC
         LIMIT 100
@@ -211,7 +240,7 @@ export class AssistantMemoryService {
       count: rows.length,
       threads: rows.map((row) => ({
         chat: row.chat,
-        contact: row.contact,
+        user_id: row.user_id,
         direction: row.direction,
         thread_id: row.thread_id,
         updated_at: this.toIsoString(row.updated_at),
@@ -220,32 +249,34 @@ export class AssistantMemoryService {
   }
 
   async readConversation(body: ConversationReadRequest): Promise<ConversationState> {
+    const userId = body.user_id?.trim() || 'default-user';
     const conversationMessage = {
       chat: body.chat,
-      contact: body.contact,
+      user_id: userId,
       conversation_id: body.conversation_id,
       direction: body.direction,
       message: '',
     };
 
     if (this.storeDriver() === 'file') {
-      return this.emptyConversationState(conversationMessage);
+      return this.readConversationFromFile(conversationMessage);
     }
 
     return this.readConversationFromMysql(conversationMessage);
   }
 
   async appendConversation(body: ConversationAppendRequest): Promise<ConversationState> {
+    const userId = body.user_id?.trim() || 'default-user';
     const message = {
       chat: body.chat,
-      contact: body.contact,
+      user_id: userId,
       conversation_id: body.conversation_id,
       direction: body.direction,
       message: body.message,
     };
 
     if (this.storeDriver() === 'file') {
-      return this.emptyConversationState(message);
+      return this.appendConversationInFile(body);
     }
 
     await this.assertConversationMysqlSchemaReady();
@@ -269,7 +300,7 @@ export class AssistantMemoryService {
           message.conversation_id,
           message.direction,
           message.chat,
-          message.contact,
+          message.user_id,
           now,
           now,
           now,
@@ -289,7 +320,7 @@ export class AssistantMemoryService {
         [
           message.direction,
           message.chat,
-          message.contact,
+          message.user_id,
           now,
           now,
           message.conversation_id,
@@ -328,13 +359,13 @@ export class AssistantMemoryService {
         [
           `turn_${randomUUID()}`,
           message.conversation_id,
-          body.run_id ?? null,
+          body.request_id ?? null,
           message.message,
           nextSequence + 1,
           now,
           `turn_${randomUUID()}`,
           message.conversation_id,
-          body.run_id ?? null,
+          body.request_id ?? null,
           body.reply.message,
           nextSequence + 2,
           now,
@@ -354,6 +385,16 @@ export class AssistantMemoryService {
         [message.conversation_id, summary, now],
       );
       await connection.commit();
+      this.logger.debug(
+        [
+          'Conversation append committed',
+          `conversation_id=${message.conversation_id}`,
+          `request_id=${body.request_id ?? '(none)'}`,
+          `summary_len=${summary.length}`,
+          `user_msg_len=${message.message.length}`,
+          `assistant_msg_len=${body.reply.message.length}`,
+        ].join(' '),
+      );
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -368,11 +409,7 @@ export class AssistantMemoryService {
     body: ConversationSearchRequest,
   ): Promise<ConversationSearchResponse> {
     if (this.storeDriver() === 'file') {
-      return {
-        messages: [],
-        summary: '',
-        thread_id: body.conversation_id,
-      };
+      return this.searchConversationInFile(body);
     }
 
     await this.assertConversationMysqlSchemaReady();
@@ -609,6 +646,7 @@ export class AssistantMemoryService {
   private async writeInMysql(
     idempotencyKey: string | undefined,
     entries: MemoryWriteCandidate[],
+    eventContext?: MemoryEventContext,
   ): Promise<MemoryWriteResult> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       throw new BadRequestException('Idempotency-Key header is required');
@@ -700,6 +738,13 @@ export class AssistantMemoryService {
             );
           }
           savedEntries.push(await this.getMemoryFromMysql(existingId, connection));
+        this.logMemoryEvent(candidate.kind, 'updated', existingId, {
+          conversationThreadId: candidate.conversationThreadId ?? null,
+          direction: eventContext?.direction,
+          scope: candidate.scope,
+          sourceRequestId: eventContext?.sourceRequestId,
+          userId: eventContext?.userId,
+        });
           updated += 1;
           continue;
         }
@@ -744,6 +789,13 @@ export class AssistantMemoryService {
           );
         }
         savedEntries.push(await this.getMemoryFromMysql(memoryId, connection));
+        this.logMemoryEvent(candidate.kind, 'added', memoryId, {
+          conversationThreadId: candidate.conversationThreadId ?? null,
+          direction: eventContext?.direction,
+          scope: candidate.scope,
+          sourceRequestId: eventContext?.sourceRequestId,
+          userId: eventContext?.userId,
+        });
         created += 1;
       }
 
@@ -866,6 +918,10 @@ export class AssistantMemoryService {
 
     this.metricsService.recordArchive(kind, true);
     await this.refreshEntryCountsInMysql();
+    this.logMemoryEvent(kind, 'deleted', memoryId, {
+      conversationThreadId: entry.conversationThreadId,
+      scope: entry.scope,
+    });
     return {
       archivedAt: now,
       id: memoryId,
@@ -1015,6 +1071,7 @@ export class AssistantMemoryService {
   private async writeInFile(
     idempotencyKey: string | undefined,
     entries: MemoryWriteCandidate[],
+    eventContext?: MemoryEventContext,
   ): Promise<MemoryWriteResult> {
     if (!idempotencyKey || idempotencyKey.trim().length === 0) {
       throw new BadRequestException('Idempotency-Key header is required');
@@ -1060,6 +1117,13 @@ export class AssistantMemoryService {
         existingEntry.tags = Array.from(new Set([...existingEntry.tags, ...normalizedTags])).sort();
         existingEntry.updatedAt = now;
         savedEntries.push(existingEntry);
+        this.logMemoryEvent(candidate.kind, 'updated', existingEntry.id, {
+          conversationThreadId: candidate.conversationThreadId ?? existingEntry.conversationThreadId,
+          direction: eventContext?.direction,
+          scope: candidate.scope,
+          sourceRequestId: eventContext?.sourceRequestId,
+          userId: eventContext?.userId,
+        });
         updated += 1;
         continue;
       }
@@ -1081,6 +1145,13 @@ export class AssistantMemoryService {
 
       store.entries.push(nextEntry);
       savedEntries.push(nextEntry);
+      this.logMemoryEvent(candidate.kind, 'added', nextEntry.id, {
+        conversationThreadId: nextEntry.conversationThreadId,
+        direction: eventContext?.direction,
+        scope: nextEntry.scope,
+        sourceRequestId: eventContext?.sourceRequestId,
+        userId: eventContext?.userId,
+      });
       created += 1;
     }
 
@@ -1119,6 +1190,10 @@ export class AssistantMemoryService {
     await this.writeStore(store);
     this.metricsService.recordArchive(kind, true);
     await this.refreshEntryCountsInFile(store);
+    this.logMemoryEvent(kind, 'deleted', entry.id, {
+      conversationThreadId: entry.conversationThreadId,
+      scope: entry.scope,
+    });
 
     return {
       archivedAt,
@@ -1409,11 +1484,23 @@ export class AssistantMemoryService {
 
   private storagePath(): string {
     return join(
-      this.configService.get<string>(
-        'ASSISTANT_MEMORY_DATADIR',
-        join(process.cwd(), 'runtime', 'assistant-memory'),
-      ),
+      this.datadir(),
       'memory-store.json',
+    );
+  }
+
+  private conversationsDirectory(): string {
+    return join(this.datadir(), 'conversations');
+  }
+
+  private conversationPath(conversationId: string): string {
+    return join(this.conversationsDirectory(), `${conversationId}.json`);
+  }
+
+  private datadir(): string {
+    return this.configService.get<string>(
+      'ASSISTANT_MEMORY_DATADIR',
+      join(process.cwd(), 'runtime', 'assistant-memory'),
     );
   }
 
@@ -1481,10 +1568,198 @@ export class AssistantMemoryService {
     await writeFile(this.storagePath(), `${JSON.stringify(store, null, 2)}\n`, 'utf8');
   }
 
+  private async listConversationsFromFile(): Promise<ConversationThreadListResponse> {
+    try {
+      const entries = await readdir(this.conversationsDirectory(), { withFileTypes: true });
+      const threads: ConversationThreadListResponse['threads'] = [];
+
+      for (const entry of entries) {
+        if (!entry.isFile() || !entry.name.endsWith('.json')) {
+          continue;
+        }
+
+        const conversationId = entry.name.slice(0, -5);
+        const state = await this.readConversationFileState(conversationId);
+        if (!state) {
+          continue;
+        }
+
+        threads.push({
+          chat: state.chat,
+          user_id: state.user_id,
+          direction: state.direction,
+          thread_id: conversationId,
+          updated_at: state.updated_at,
+        });
+      }
+
+      threads.sort((left, right) =>
+        String(right.updated_at ?? '').localeCompare(String(left.updated_at ?? '')),
+      );
+
+      return {
+        count: threads.length,
+        threads: threads.slice(0, 100),
+      };
+    } catch (error) {
+      if (this.isMissingPath(error)) {
+        return {
+          count: 0,
+          threads: [],
+        };
+      }
+
+      throw error;
+    }
+  }
+
+  private async readConversationFromFile(message: {
+    chat: string;
+    user_id: string;
+    conversation_id: string;
+    direction: string;
+    message: string;
+  }): Promise<ConversationState> {
+    const stored = await this.readConversationFileState(message.conversation_id);
+    if (!stored) {
+      return this.emptyConversationState(message);
+    }
+
+    return {
+      chat: stored.chat,
+      user_id: stored.user_id,
+      context: stored.context,
+      direction: stored.direction,
+      messages: stored.messages,
+      updated_at: stored.updated_at,
+    };
+  }
+
+  private async appendConversationInFile(
+    body: ConversationAppendRequest,
+  ): Promise<ConversationState> {
+    const current = await this.readConversationFromFile({
+      chat: body.chat,
+      user_id: body.user_id,
+      conversation_id: body.conversation_id,
+      direction: body.direction,
+      message: body.message,
+    });
+    const nowIso = new Date().toISOString();
+    const nextContext = body.reply.context.trim();
+    const nextMessages: ConversationMessage[] = [
+      ...current.messages,
+      {
+        content: body.message,
+        created_at: nowIso,
+        role: 'user' as const,
+      },
+      {
+        content: body.reply.message,
+        created_at: nowIso,
+        role: 'assistant' as const,
+      },
+    ].slice(-20);
+    const nextState: StoredConversationState = {
+      chat: body.chat,
+      user_id: body.user_id,
+      context: nextContext.length > 0 ? nextContext : current.context,
+      direction: body.direction,
+      messages: nextMessages,
+      updated_at: nowIso,
+    };
+
+    await mkdir(this.conversationsDirectory(), { recursive: true });
+    await writeFile(
+      this.conversationPath(body.conversation_id),
+      `${JSON.stringify(nextState, null, 2)}\n`,
+      'utf8',
+    );
+
+    return {
+      chat: nextState.chat,
+      user_id: nextState.user_id,
+      context: nextState.context,
+      direction: nextState.direction,
+      messages: nextState.messages,
+      updated_at: nextState.updated_at,
+    };
+  }
+
+  private async searchConversationInFile(
+    body: ConversationSearchRequest,
+  ): Promise<ConversationSearchResponse> {
+    const state = await this.readConversationFileState(body.conversation_id);
+    if (!state) {
+      return {
+        messages: [],
+        summary: '',
+        thread_id: body.conversation_id,
+      };
+    }
+
+    const limit = Math.max(1, Math.min(20, Math.floor(body.limit)));
+
+    return {
+      messages: state.messages.slice(-limit),
+      summary: state.context,
+      thread_id: body.conversation_id,
+    };
+  }
+
+  private async readConversationFileState(
+    conversationId: string,
+  ): Promise<StoredConversationState | null> {
+    try {
+      const raw = await readFile(this.conversationPath(conversationId), 'utf8');
+      const parsed = JSON.parse(raw) as Partial<StoredConversationState>;
+      const messages = Array.isArray(parsed.messages)
+        ? parsed.messages
+            .map((entry) => this.normalizeConversationMessage(entry))
+            .filter((entry): entry is ConversationMessage => entry !== null)
+        : [];
+
+      return {
+        chat: typeof parsed.chat === 'string' ? parsed.chat : 'direct',
+        user_id: typeof parsed.user_id === 'string' ? parsed.user_id : 'default-user',
+        context: typeof parsed.context === 'string' ? parsed.context : '',
+        direction: typeof parsed.direction === 'string' ? parsed.direction : 'web',
+        messages,
+        updated_at: typeof parsed.updated_at === 'string' ? parsed.updated_at : null,
+      };
+    } catch (error) {
+      if (this.isMissingPath(error)) {
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
+  private normalizeConversationMessage(value: unknown): ConversationMessage | null {
+    if (typeof value !== 'object' || value === null) {
+      return null;
+    }
+
+    const message = value as Partial<ConversationMessage>;
+    if (message.role !== 'assistant' && message.role !== 'user') {
+      return null;
+    }
+    if (typeof message.content !== 'string' || typeof message.created_at !== 'string') {
+      return null;
+    }
+
+    return {
+      content: message.content,
+      created_at: message.created_at,
+      role: message.role,
+    };
+  }
+
   private async readConversationFromMysql(
     message: {
       chat: string;
-      contact: string;
+      user_id: string;
       conversation_id: string;
       direction: string;
       message: string;
@@ -1497,14 +1772,14 @@ export class AssistantMemoryService {
       Array<
         RowDataPacket & {
           chat: string;
-          contact: string;
+          user_id: string;
           direction: string;
           updated_at: Date | string | null;
         }
       >
     >(
       `
-        SELECT chat, contact, direction, updated_at
+        SELECT chat, contact AS user_id, direction, updated_at
         FROM conversation_threads
         WHERE id = ?
         LIMIT 1
@@ -1546,7 +1821,7 @@ export class AssistantMemoryService {
 
     return {
       chat: threads[0].chat,
-      contact: threads[0].contact,
+      user_id: threads[0].user_id,
       context: summaries[0]?.summary ?? '',
       direction: threads[0].direction,
       messages: turnRows
@@ -1563,12 +1838,12 @@ export class AssistantMemoryService {
 
   private emptyConversationState(message: {
     chat: string;
-    contact: string;
+    user_id: string;
     direction: string;
   }): ConversationState {
     return {
       chat: message.chat,
-      contact: message.contact,
+      user_id: message.user_id,
       context: '',
       direction: message.direction,
       messages: [],
@@ -1718,5 +1993,63 @@ export class AssistantMemoryService {
       `,
       [this.toMysqlDateTime(new Date()), ...ids],
     );
+  }
+
+  private isMissingPath(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    );
+  }
+
+  private logMemoryEvent(
+    kind: MemoryKind,
+    action: MemoryEventAction,
+    memoryId: string,
+    details?: {
+      conversationThreadId?: string | null;
+      direction?: string;
+      scope?: string;
+      sourceRequestId?: string;
+      userId?: string;
+    },
+  ): void {
+    this.logger.log(
+      [
+        `memory.${kind}.${action}`,
+        `id=${memoryId}`,
+        `thread=${details?.conversationThreadId ?? '-'}`,
+        `direction=${details?.direction ?? '-'}`,
+        `user_id=${details?.userId ?? '-'}`,
+        `scope=${details?.scope ?? '-'}`,
+        `source_request_id=${details?.sourceRequestId ?? '-'}`,
+      ].join(' '),
+    );
+
+    const conversationId = details?.conversationThreadId?.trim();
+    if (!conversationId || this.storeDriver() === 'file') {
+      return;
+    }
+
+    const eventType = `memory.${kind}.${action}` as const;
+    void this.assistantMemoryRunEventPublisherService
+      .publish(eventType, conversationId, {
+        direction: details?.direction ?? 'web',
+        id: memoryId,
+        kind,
+        message: eventType,
+        source_request_id: details?.sourceRequestId ?? null,
+        scope: details?.scope ?? null,
+        user_id: details?.userId ?? 'default-user',
+      }, details?.sourceRequestId, details?.direction ?? 'web', details?.userId ?? 'default-user')
+      .catch((error) => {
+        this.logger.warn(
+          `Failed to publish memory event ${eventType} id=${memoryId} conversationId=${conversationId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      });
   }
 }

@@ -8,6 +8,7 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type {
   AssistantProfile,
   ConversationAppendRequest,
@@ -36,10 +37,14 @@ import type {
   TypedMemorySearchRequest,
 } from '../../contracts/assistant-memory';
 import { AssistantMemoryService } from './assistant-memory.service';
+import { AssistantMemoryEnrichmentService } from './assistant-memory-enrichment.service';
 
 @Controller('v1')
 export class AssistantMemoryController {
-  constructor(private readonly assistantMemoryService: AssistantMemoryService) {}
+  constructor(
+    private readonly assistantMemoryService: AssistantMemoryService,
+    private readonly assistantMemoryEnrichmentService: AssistantMemoryEnrichmentService,
+  ) {}
 
   @Get('profile')
   getProfile(): Promise<AssistantProfile> {
@@ -238,8 +243,20 @@ export class AssistantMemoryController {
 
   @Post('conversations/append')
   @HttpCode(200)
-  appendConversation(@Body() body: ConversationAppendRequest): Promise<ConversationState> {
-    return this.assistantMemoryService.appendConversation(body);
+  async appendConversation(@Body() body: ConversationAppendRequest): Promise<ConversationState> {
+    const state = await this.assistantMemoryService.appendConversation(body);
+    const requestId = body.request_id?.trim().length
+      ? body.request_id.trim()
+      : `append_${Date.now().toString(36)}_${randomUUID().replaceAll('-', '')}`;
+    await this.assistantMemoryEnrichmentService.enqueue({
+      chat: body.chat,
+      conversation_id: body.conversation_id,
+      direction: body.direction,
+      request_id: requestId,
+      user_id: body.user_id || 'default-user',
+    });
+
+    return state;
   }
 
   @Post('conversations/search')

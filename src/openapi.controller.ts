@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { GATEWAY_WEB_ALLOWED_INCOMING_MESSAGE_TYPES } from './chat/gateway-web-config.service';
 
 @Controller()
 export class GatewayWebOpenApiController {
@@ -39,11 +40,49 @@ export class GatewayWebOpenApiController {
             responses: {
               '200': {
                 description: 'Current gateway-web config',
+                content: {
+                  'application/json': {
+                    schema: {
+                      type: 'object',
+                      properties: {
+                        assistant_api_url: { type: 'string' },
+                        assistant_memory_url: { type: 'string' },
+                        allowed_incoming_message_types: {
+                          type: 'array',
+                          items: {
+                            type: 'string',
+                            enum: [...GATEWAY_WEB_ALLOWED_INCOMING_MESSAGE_TYPES],
+                          },
+                        },
+                        user_id: { type: 'string' },
+                      },
+                    },
+                  },
+                },
               },
             },
           },
           put: {
             summary: 'Update gateway-web runtime config',
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      allowed_incoming_message_types: {
+                        type: 'array',
+                        items: {
+                          type: 'string',
+                          enum: [...GATEWAY_WEB_ALLOWED_INCOMING_MESSAGE_TYPES],
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
             responses: {
               '200': {
                 description: 'Updated gateway-web config',
@@ -111,6 +150,40 @@ export class GatewayWebOpenApiController {
             responses: {
               '200': {
                 description: 'Thinking state accepted and mapped to a browser session',
+              },
+            },
+          },
+        },
+        '/event/{conversationId}': {
+          post: {
+            summary: 'Receive assistant event callback for a browser conversation',
+            parameters: [
+              {
+                name: 'conversationId',
+                in: 'path',
+                required: true,
+                schema: { type: 'string' },
+              },
+            ],
+            requestBody: {
+              required: true,
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    required: ['type'],
+                    properties: {
+                      message: { type: 'string' },
+                      payload: { type: 'object', additionalProperties: true },
+                      type: { type: 'string' },
+                    },
+                  },
+                },
+              },
+            },
+            responses: {
+              '200': {
+                description: 'Event callback accepted and mapped to a browser session',
               },
             },
           },

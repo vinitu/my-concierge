@@ -14,9 +14,9 @@ describe('GatewayWebRuntimeService', () => {
       new Response(
         JSON.stringify({
           chat: 'direct',
-          contact: 'default-user',
+          user_id: 'default-user',
           context: '',
-          direction: 'api',
+          direction: 'web',
           messages: [
             {
               content: 'hello',
@@ -39,7 +39,6 @@ describe('GatewayWebRuntimeService', () => {
       read: jest.fn().mockResolvedValue({
         assistant_api_url: 'http://assistant-api:3000',
         assistant_memory_url: 'http://assistant-memory:3000',
-        callback_base_url: 'http://gateway-web:3000',
         user_id: 'default-user',
       }),
     } as unknown as GatewayWebConfigService;
@@ -69,7 +68,6 @@ describe('GatewayWebRuntimeService', () => {
       read: jest.fn().mockResolvedValue({
         assistant_api_url: 'http://assistant-api:3000',
         assistant_memory_url: 'http://assistant-memory:3000',
-        callback_base_url: 'http://gateway-web:3000',
         user_id: 'default-user',
       }),
     } as unknown as GatewayWebConfigService;

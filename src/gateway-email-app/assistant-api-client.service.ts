@@ -14,18 +14,15 @@ export class GatewayEmailAssistantApiClientService {
   ) {}
 
   async sendConversation(input: {
-    contact: string;
     conversationId: string;
     mailbox: string;
     message: string;
+    userId: string;
   }): Promise<void> {
     const assistantApiUrl = trimTrailingSlash(
       this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:3000'),
     );
-    const callbackBaseUrl = trimTrailingSlash(
-      this.configService.get<string>('CALLBACK_BASE_URL', 'http://localhost:3004'),
-    );
-    const url = `${assistantApiUrl}/conversation/email/${encodeURIComponent(input.mailbox)}/${encodeURIComponent(input.contact)}`;
+    const url = `${assistantApiUrl}/conversation/email/${encodeURIComponent(input.mailbox)}/${encodeURIComponent(input.userId)}`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -33,9 +30,6 @@ export class GatewayEmailAssistantApiClientService {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        callback: {
-          base_url: callbackBaseUrl,
-        },
         conversation_id: input.conversationId,
         message: input.message,
       }),

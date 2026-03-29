@@ -7,7 +7,7 @@ Describe the target cluster runtime.
 ## Main Rules
 
 - `assistant-api` runs as a scalable deployment
-- `assistant-worker` runs as a scalable deployment
+- `assistant-orchestrator` runs as a scalable deployment
 - `assistant-scheduler` runs as `CronJob` when it is schedule-based
 - Queue runs as its own service
 - Prometheus reads `/metrics`

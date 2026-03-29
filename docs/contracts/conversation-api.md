@@ -5,8 +5,8 @@
 1. The client sends a message to `assistant-api`.
 2. `assistant-api` validates the request and enqueues it.
 3. `assistant-api` returns an immediate acceptance response.
-4. `assistant-worker` reads the queued job later.
-5. `assistant-worker` publishes periodic `thinking` run events while the worker run is active.
+4. `assistant-orchestrator` reads the queued job later.
+5. `assistant-orchestrator` publishes periodic `thinking` run events while the worker run is active.
 6. `assistant-api` consumes those run events and sends callbacks to the gateway host.
 
 ## Endpoint

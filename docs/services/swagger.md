@@ -7,7 +7,7 @@ Show one shared Swagger UI for the runtime.
 ## Responsibilities
 
 - Read `assistant-api` OpenAPI schema
-- Read `assistant-worker` OpenAPI schema
+- Read `assistant-orchestrator` OpenAPI schema
 - Read `assistant-memory` OpenAPI schema
 - Read `dashboard` OpenAPI schema
 - Read `gateway-web` OpenAPI schema
@@ -21,7 +21,7 @@ Show one shared Swagger UI for the runtime.
 ```mermaid
 flowchart LR
     Swagger["swagger"] --> API["assistant-api /openapi.json"]
-    Swagger --> Worker["assistant-worker /openapi.json"]
+    Swagger --> Worker["assistant-orchestrator /openapi.json"]
     Swagger --> Memory["assistant-memory /openapi.json"]
     Swagger --> Dashboard["dashboard /openapi.json"]
     Swagger --> GatewayWeb["gateway-web /openapi.json"]

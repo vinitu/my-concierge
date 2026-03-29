@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { mkdtemp } from 'node:fs/promises';
@@ -6,6 +7,59 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { AssistantMemoryAppModule } from '../src/assistant-memory-app/assistant-memory-app.module';
+import { AssistantMemoryEnrichmentService } from '../src/assistant-memory-app/memory/assistant-memory-enrichment.service';
+import { AssistantMemoryService } from '../src/assistant-memory-app/memory/assistant-memory.service';
+
+@Injectable()
+class DeterministicEnrichmentService {
+  constructor(private readonly assistantMemoryService: AssistantMemoryService) {}
+
+  async enqueue(job: { conversation_id: string; request_id: string }): Promise<void> {
+    const history = await this.assistantMemoryService.searchConversation({
+      conversation_id: job.conversation_id,
+      limit: 20,
+    });
+
+    const userMessages = history.messages
+      .filter((message) => message.role === 'user')
+      .map((message) => message.content)
+      .join('\n');
+    const match = this.extractUserName(userMessages);
+
+    if (!match) {
+      return;
+    }
+
+    await this.assistantMemoryService.writeByKind(
+      'fact',
+      `test-enrichment:${job.request_id}:fact`,
+      [
+        {
+          confidence: 0.92,
+          content: `User name is ${match}.`,
+          conversationThreadId: job.conversation_id,
+          scope: 'conversation',
+          source: 'assistant-memory-enrichment',
+          tags: ['identity', 'name'],
+        },
+      ],
+    );
+  }
+
+  private extractUserName(text: string): string | null {
+    const cyrillic = text.match(/меня\s+зовут\s+([A-Za-zА-Яа-яЁё-]+)/iu);
+    if (cyrillic?.[1]) {
+      return cyrillic[1];
+    }
+
+    const latin = text.match(/my\s+name\s+is\s+([A-Za-z-]+)/i);
+    if (latin?.[1]) {
+      return latin[1];
+    }
+
+    return null;
+  }
+}
 
 describe('assistant-memory (e2e)', () => {
   let app: NestExpressApplication;
@@ -57,7 +111,7 @@ describe('assistant-memory (e2e)', () => {
         preferences: {
           response_style: 'concise',
         },
-        source: 'assistant-worker',
+        source: 'assistant-orchestrator',
         timezone: 'Europe/Warsaw',
       });
 
@@ -74,7 +128,7 @@ describe('assistant-memory (e2e)', () => {
             content: 'Alex prefers concise replies.',
             conversationThreadId: 'thread_1',
             scope: 'conversation',
-            source: 'assistant-worker',
+            source: 'assistant-orchestrator',
             tags: ['api', 'style'],
           },
         ],
@@ -94,7 +148,7 @@ describe('assistant-memory (e2e)', () => {
             content: 'On 2026-03-27, callbacks were assigned only to assistant-api.',
             conversationThreadId: 'thread_1',
             scope: 'architecture',
-            source: 'assistant-worker',
+            source: 'assistant-orchestrator',
             tags: ['architecture', 'callbacks'],
           },
         ],
@@ -141,5 +195,111 @@ describe('assistant-memory (e2e)', () => {
     expect(archiveResponse.status).toBe(200);
     expect(archiveResponse.body.status).toBe('archived');
     expect(archiveResponse.body.kind).toBe('preference');
+  });
+});
+
+describe('assistant-memory fact extraction from conversation (e2e)', () => {
+  let app: NestExpressApplication;
+
+  beforeAll(async () => {
+    const datadir = await mkdtemp(join(tmpdir(), 'assistant-memory-conversation-facts-'));
+    const moduleRef = await Test.createTestingModule({
+      imports: [AssistantMemoryAppModule],
+    })
+      .overrideProvider(ConfigService)
+      .useValue(
+        new ConfigService({
+          ASSISTANT_MEMORY_DATADIR: datadir,
+          ASSISTANT_MEMORY_STORE_DRIVER: 'file',
+        }),
+      )
+      .overrideProvider(AssistantMemoryEnrichmentService)
+      .useClass(DeterministicEnrichmentService)
+      .compile();
+
+    app = moduleRef.createNestApplication<NestExpressApplication>();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('extracts fact from conversation append when request_id is provided', async () => {
+    const conversationId = 'thread_fact_extract_1';
+    const appendResponse = await request(app.getHttpServer())
+      .post('/v1/conversations/append')
+      .send({
+        chat: 'web',
+        user_id: 'default-user',
+        conversation_id: conversationId,
+        direction: 'web',
+        message: 'меня зовут Дмитрий',
+        reply: {
+          context: 'Пользователь представился.',
+          message: 'Приятно познакомиться, Дмитрий.',
+        },
+        request_id: 'req_fact_extract_1',
+      });
+
+    expect(appendResponse.status).toBe(200);
+    expect(appendResponse.body.messages).toHaveLength(2);
+
+    const factsResponse = await request(app.getHttpServer())
+      .post('/v1/facts/search')
+      .send({
+        conversationThreadId: conversationId,
+        query: 'Дмитрий',
+      });
+
+    expect(factsResponse.status).toBe(200);
+    expect(factsResponse.body.count).toBeGreaterThanOrEqual(1);
+    expect(
+      factsResponse.body.entries.some(
+        (entry: { content?: string; kind?: string; source?: string }) =>
+          entry.kind === 'fact' &&
+          entry.source === 'assistant-memory-enrichment' &&
+          typeof entry.content === 'string' &&
+          entry.content.includes('Дмитрий'),
+      ),
+    ).toBe(true);
+  });
+
+  it('extracts fact from conversation append even without request_id', async () => {
+    const conversationId = 'thread_fact_extract_2';
+    const appendResponse = await request(app.getHttpServer())
+      .post('/v1/conversations/append')
+      .send({
+        chat: 'web',
+        user_id: 'default-user',
+        conversation_id: conversationId,
+        direction: 'web',
+        message: 'меня зовут Алексей',
+        reply: {
+          context: '',
+          message: 'Хорошо.',
+        },
+      });
+
+    expect(appendResponse.status).toBe(200);
+
+    const factsResponse = await request(app.getHttpServer())
+      .post('/v1/facts/search')
+      .send({
+        conversationThreadId: conversationId,
+        query: 'Алексей',
+      });
+
+    expect(factsResponse.status).toBe(200);
+    expect(factsResponse.body.count).toBeGreaterThanOrEqual(1);
+    expect(
+      factsResponse.body.entries.some(
+        (entry: { content?: string; kind?: string; source?: string }) =>
+          entry.kind === 'fact' &&
+          entry.source === 'assistant-memory-enrichment' &&
+          typeof entry.content === 'string' &&
+          entry.content.includes('Алексей'),
+      ),
+    ).toBe(true);
   });
 });

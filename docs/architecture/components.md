@@ -8,7 +8,8 @@ Describe the main components and their boundaries.
 
 - `assistant-api`
 - `queue`
-- `assistant-worker`
+- `assistant-orchestrator`
+- `assistant-llm`
 - `assistant-memory`
 - `gateway-telegram`
 - `gateway-email`
@@ -31,19 +32,18 @@ Describe the main components and their boundaries.
 
 ### `queue`
 
-- Transport layer between `assistant-api` and `assistant-worker`
+- Transport layer between `assistant-api` and `assistant-orchestrator`
 - Stores accepted jobs and worker run events
 - Supports Redis-based transport in both directions
 
-### `assistant-worker`
+### `assistant-orchestrator`
 
 - Reads jobs from the queue
 - Runs assistant business logic
 - Loads assistant runtime context from the runtime directory
 - Builds context for the current run
-- Calls LLM providers through one shared provider interface
-- Uses LangChain.js for the agent loop
-- Persists conversation state
+- Calls `assistant-llm` for generation and summarization
+- Persists conversation state through `assistant-memory`
 - Publishes run events back to the queue
 - Exposes `GET /status`
 - Exposes `GET /metrics`
@@ -55,6 +55,7 @@ Describe the main components and their boundaries.
 - Owns canonical profile storage
 - Validates memory writes
 - Deduplicates and compacts memory
+- Runs asynchronous post-append enrichment using `assistant-llm`
 - Exposes `GET /status`
 - Exposes `GET /metrics`
 - Exposes `GET /openapi.json`
@@ -105,7 +106,8 @@ Describe the main components and their boundaries.
 ### `swagger`
 
 - Reads OpenAPI from `assistant-api`
-- Reads OpenAPI from `assistant-worker`
+- Reads OpenAPI from `assistant-orchestrator`
+- Reads OpenAPI from `assistant-llm`
 - Reads OpenAPI from `assistant-memory`
 - Reads OpenAPI from `gateway-web`
 - Reads OpenAPI from `gateway-telegram`
@@ -118,14 +120,25 @@ Describe the main components and their boundaries.
 - Stores time-series data
 - Exposes query endpoints for dashboards and alerts
 
+### `assistant-llm`
+
+- Owns LLM provider and model settings
+- Exposes provider status and model catalog
+- Executes main, summarize, and extract-memory generations
+- Provides unified messages-based provider adapter layer
+- Exposes `GET /status`
+- Exposes `GET /metrics`
+- Exposes `GET /openapi.json`
+
 ## Boundary Rules
 
 - Channel components stay thin.
 - `assistant-api` stays thin.
-- Assistant business logic lives in `assistant-worker`.
-- `assistant-api` and `assistant-worker` communicate through Redis-based jobs and run events.
+- Assistant business logic lives in `assistant-orchestrator`.
+- `assistant-api` and `assistant-orchestrator` communicate through Redis-based jobs and run events.
 - `assistant-api` owns all replies to gateways.
 - `assistant-scheduler` only triggers work and does not receive assistant replies.
 - LLM provider selection must stay behind one worker-facing interface.
-- `assistant-worker` must not call gateway callback endpoints directly.
-- `assistant-worker` uses `assistant-memory` for durable memory operations.
+- `assistant-orchestrator` must delegate generation calls to `assistant-llm`.
+- `assistant-orchestrator` must not call gateway callback endpoints directly.
+- `assistant-orchestrator` uses `assistant-memory` for durable memory operations.

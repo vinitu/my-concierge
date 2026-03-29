@@ -2,12 +2,13 @@
 
 ## Goal
 
-Describe how durable memory works across `assistant-worker`, `assistant-memory`, and MySQL.
+Describe how durable memory and conversation-enrichment memory work across `assistant-orchestrator`, `assistant-memory`, `assistant-llm`, and MySQL.
 
 ## Ownership Model
 
-- `assistant-worker` owns conversation state
+- `assistant-memory` owns canonical conversation state
 - `assistant-memory` owns durable memory state
+- `assistant-orchestrator` owns runtime orchestration only
 - MySQL is the canonical storage backend for both domains
 
 This split is important:
@@ -19,9 +20,10 @@ This split is important:
 
 ```mermaid
 flowchart LR
-    Worker["assistant-worker"] --> Conv["conversation tables in mysql"]
-    Worker <--> Memory["assistant-memory"]
+    Worker["assistant-orchestrator"] <--> Memory["assistant-memory"]
+    Memory --> Conv["conversation tables in mysql"]
     Memory --> Durable["memory tables in mysql"]
+    Memory --> LLM["assistant-llm extract-memory"]
 ```
 
 ## Memory Types
@@ -119,7 +121,7 @@ Examples:
 
 - `On 2026-03-27, the architecture changed so assistant-api owns all callbacks`
 - `Discussed email threading and decided one email chain maps to one conversation_id`
-- `Chose LangChain.js as the only runtime for assistant-worker`
+- `Chose assistant-llm as the single generation runtime for assistant-orchestrator and enrichment`
 
 ### `rule`
 
@@ -137,19 +139,20 @@ Examples:
 
 ## Read Path
 
-1. `assistant-worker` starts a run from a queued job.
-2. `assistant-worker` loads the conversation summary and recent turns from MySQL.
-3. `assistant-worker` calls `assistant-memory` with a retrieval query.
+1. `assistant-orchestrator` starts a run from a queued job.
+2. `assistant-orchestrator` loads the conversation summary and recent turns from MySQL.
+3. `assistant-orchestrator` calls `assistant-memory` with a retrieval query.
 4. `assistant-memory` ranks relevant entries and returns a filtered result set.
-5. `assistant-worker` injects only the top relevant memory items into the LangChain.js context.
+5. `assistant-orchestrator` injects only top relevant memory into the messages context sent to `assistant-llm`.
 
 ## Write Path
 
-1. The LangChain.js run produces a final answer and optional memory candidates.
-2. `assistant-worker` persists conversation turns and summaries in MySQL.
-3. `assistant-worker` sends memory candidates to `assistant-memory`.
-4. `assistant-memory` validates, deduplicates, and persists accepted entries.
-5. `assistant-memory` may update profile state or retrieval metadata when needed.
+1. Main generation returns final answer and optional memory candidates.
+2. `assistant-orchestrator` appends conversation exchange through `assistant-memory`.
+3. `assistant-memory` persists conversation turns and summary in MySQL.
+4. `assistant-memory` validates and stores explicit memory writes.
+5. `assistant-memory` runs asynchronous enrichment and calls `assistant-llm /v1/generate/extract-memory`.
+6. `assistant-memory` applies profile patch and typed memory writes from enrichment output.
 
 ## Type Selection Rules
 
@@ -174,8 +177,8 @@ Do not use:
 
 - conversation summaries are not durable memory entries
 - not every assistant message creates a memory entry
-- `assistant-worker` does not write directly to memory tables
-- `assistant-memory` does not own conversation turns
+- `assistant-orchestrator` does not write directly to memory tables
+- `assistant-memory` owns canonical conversation turns
 - full memory history is never injected into the LLM context
 
 ## Retrieval Rules
@@ -210,6 +213,6 @@ The main `assistant-memory` endpoints are:
 ## Related Documents
 
 - [assistant-memory](../services/assistant/assistant-memory.md)
-- [assistant-worker](../services/assistant/assistant-worker.md)
+- [assistant-orchestrator](../services/assistant/assistant-orchestrator.md)
 - [Persistence Schema](./persistence-schema.md)
 - [Conversation API Contract](../contracts/conversation-api.md)

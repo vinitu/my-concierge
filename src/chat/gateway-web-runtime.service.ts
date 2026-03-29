@@ -25,9 +25,9 @@ export class GatewayWebRuntimeService {
   ): Promise<GatewayWebConversationState> {
     const response = await this.fetchMemoryEndpoint('/v1/conversations/read', {
       chat: 'direct',
-      contact: userId,
+      user_id: userId,
       conversation_id: conversationId,
-      direction: 'api',
+      direction: 'web',
     });
 
     if (!response.ok) {

@@ -11,8 +11,9 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 
 ### Scope (list)
 - In: one local runtime named `assistant`
-- In: split runtime parts `assistant-api` and `assistant-worker`
-- In: Redis transport between `assistant-api` and `assistant-worker` in both directions
+- In: split runtime parts `assistant-api` and `assistant-orchestrator`
+- In: one `assistant-llm` service for shared LLM configuration and generation
+- In: Redis transport between `assistant-api` and `assistant-orchestrator` in both directions
 - In: one `assistant-memory` service for durable memory
 - In: communication through Telegram, Email, a simple Web chat, and Scheduler
 - In: MySQL for conversation state and durable memory storage
@@ -26,21 +27,22 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 ### Must-haves
 - The system must use Node.js, TypeScript, and NestJS.
 - The local runtime must be named `assistant`.
-- `assistant` must be split into `assistant-api` and `assistant-worker`.
-- `assistant-api` and `assistant-worker` must communicate through Redis-based jobs and run events.
+- `assistant` must be split into `assistant-api` and `assistant-orchestrator`.
+- `assistant-api` and `assistant-orchestrator` must communicate through Redis-based jobs and run events.
 - `assistant-api` must validate requests, enqueue jobs, consume run events, and own all external callbacks.
-- `assistant-worker` must run assistant business logic.
+- `assistant-orchestrator` must run assistant business logic.
+- `assistant-llm` must own provider/model configuration and generation endpoints.
 - `assistant-memory` must own durable memory retrieval and writes.
 - The system must support Grok in the first version.
 - Later versions must support DeepSeek, OpenAI, and Ollama through the same integration model.
-- `assistant-worker` must call LLMs through one shared provider interface.
-- `assistant-worker` must use LangChain.js.
+- `assistant-orchestrator` must call LLMs through `assistant-llm`.
+- `assistant-runtime` must use message-based prompts and typed parsing without LangChain.js.
 - The system must support Telegram, Email, and Web gateway components.
 - `gateway-web` must provide a simple chat page and WebSocket transport for browser messages.
 - Gateway rollout order is `gateway-web`, then `gateway-email`, then `gateway-telegram`.
 - The system must support a Scheduler component.
 - All runtime components must expose `GET /status` and `GET /metrics`.
-- `assistant-api`, `assistant-worker`, `assistant-memory`, `gateway-web`, `gateway-telegram`, and `gateway-email` must expose their own `GET /openapi.json`.
+- `assistant-api`, `assistant-orchestrator`, `assistant-llm`, `assistant-memory`, `gateway-web`, `gateway-telegram`, and `gateway-email` must expose their own `GET /openapi.json`.
 - One shared Swagger UI must be able to show the available OpenAPI schemas.
 - `GET /metrics` for `assistant-api` must include queue depth.
 - Docker Compose must be the default way to run the project.
@@ -65,19 +67,19 @@ It replaces heavier assistant systems with a simpler runtime and clear component
 - Redis transport is required between API intake and worker execution.
 - Redis is the canonical queue transport.
 - One shared Swagger UI is preferred over multiple Swagger UI services.
-- `assistant-worker` reads `SYSTEM.js` and `skills/` from `runtime/assistant-worker/`.
-- conversation state lives in MySQL under `assistant-worker` ownership.
+- `assistant-orchestrator` reads `SYSTEM.js` and `skills/` from `runtime/assistant-orchestrator/`.
+- conversation state lives in MySQL under `assistant-memory` ownership.
 - durable memory lives behind `assistant-memory`.
 - `gateway-web` conversation history is canonical in `assistant-memory`; local runtime is used for gateway config only.
 
 ### Done checks
 - The documentation is split into overview, architecture, services, contracts, deployment, and operations.
-- The requirements state that `assistant` is split into `assistant-api` and `assistant-worker`.
+- The requirements state that `assistant` is split into `assistant-api` and `assistant-orchestrator`.
 - The requirements state that `assistant-api` owns ingress and external callback delivery.
-- The requirements state that `assistant-worker` runs business logic.
+- The requirements state that `assistant-orchestrator` runs business logic.
 - The requirements state that `assistant-memory` owns durable memory.
 - The requirements state that all runtime components expose `GET /status` and `GET /metrics`.
-- The requirements state that `assistant-api`, `assistant-worker`, `assistant-memory`, `gateway-web`, `gateway-telegram`, and `gateway-email` each expose `GET /openapi.json`.
+- The requirements state that `assistant-api`, `assistant-orchestrator`, `assistant-llm`, `assistant-memory`, `gateway-web`, `gateway-telegram`, and `gateway-email` each expose `GET /openapi.json`.
 - The requirements state that one shared Swagger UI may show the available schemas.
 - The requirements state that Docker Compose is the default runtime.
 

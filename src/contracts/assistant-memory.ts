@@ -1,10 +1,12 @@
 export type MemoryKind =
-  | 'episode'
-  | 'fact'
-  | 'preference'
-  | 'project'
-  | 'routine'
-  | 'rule';
+  | "episode"
+  | "fact"
+  | "preference"
+  | "project"
+  | "routine"
+  | "rule";
+
+export type AssistantMemoryExtractKind = "profile" | MemoryKind;
 
 export interface AssistantProfile {
   constraints: Record<string, unknown>;
@@ -81,7 +83,9 @@ export interface MemoryWriteResult {
   updated: number;
 }
 
-export interface MemoryWriteRequest<TCandidate extends BaseMemoryWriteCandidate> {
+export interface MemoryWriteRequest<
+  TCandidate extends BaseMemoryWriteCandidate,
+> {
   entries: TCandidate[];
 }
 
@@ -95,7 +99,7 @@ export interface ProfileUpdateRequest {
 }
 
 export interface ProfileUpdateResponse {
-  status: 'updated';
+  status: "updated";
   updatedAt: string;
   updatedProfile: AssistantProfile;
 }
@@ -104,28 +108,28 @@ export interface MemoryArchiveResponse {
   archivedAt: string;
   id: string;
   kind: MemoryKind;
-  status: 'archived';
+  status: "archived";
 }
 
 export interface MemoryCompactResponse {
   archived: number;
-  status: 'compacted';
+  status: "compacted";
 }
 
 export interface MemoryReindexResponse {
   indexed: number;
-  status: 'reindexed';
+  status: "reindexed";
 }
 
 export interface ConversationMessage {
   content: string;
   created_at: string;
-  role: 'assistant' | 'user';
+  role: "assistant" | "user";
 }
 
 export interface ConversationState {
   chat: string;
-  contact: string;
+  user_id: string;
   context: string;
   direction: string;
   messages: ConversationMessage[];
@@ -134,7 +138,7 @@ export interface ConversationState {
 
 export interface ConversationReadRequest {
   chat: string;
-  contact: string;
+  user_id: string;
   conversation_id: string;
   direction: string;
 }
@@ -145,7 +149,7 @@ export type ConversationAppendRequest = ConversationReadRequest & {
     context: string;
     message: string;
   };
-  run_id?: string;
+  request_id?: string;
 };
 
 export interface ConversationSearchRequest {
@@ -161,7 +165,7 @@ export interface ConversationSearchResponse {
 
 export interface ConversationThreadListItem {
   chat: string;
-  contact: string;
+  user_id: string;
   direction: string;
   thread_id: string;
   updated_at: string | null;
@@ -170,4 +174,12 @@ export interface ConversationThreadListItem {
 export interface ConversationThreadListResponse {
   count: number;
   threads: ConversationThreadListItem[];
+}
+
+export interface AssistantMemoryConfig {
+  enabled_extracts: AssistantMemoryExtractKind[];
+}
+
+export interface UpdateAssistantMemoryConfigBody {
+  enabled_extracts?: AssistantMemoryExtractKind[];
 }

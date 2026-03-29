@@ -2,7 +2,7 @@
 
 ## Goal
 
-Describe how conversation state works across gateways, `assistant-api`, `assistant-worker`, and MySQL.
+Describe how conversation state works across gateways, `assistant-api`, `assistant-orchestrator`, and MySQL.
 
 ## Ownership Model
 
@@ -23,7 +23,7 @@ This split is important:
 flowchart LR
     Gateway["gateway-* runtime"] <--> API["assistant-api"]
     API <--> Queue["redis"]
-    Queue <--> Worker["assistant-worker"]
+    Queue <--> Worker["assistant-orchestrator"]
     Worker <--> Memory["assistant-memory"]
     Memory --> Conv["conversation tables in mysql"]
 ```
@@ -67,17 +67,17 @@ It does not contain:
 2. The gateway resolves the stable `conversation_id`.
 3. The gateway sends the normalized message to `assistant-api`.
 4. `assistant-api` validates the request and writes an execution job to Redis.
-5. `assistant-worker` reads the job from Redis.
-6. `assistant-worker` loads the conversation summary and recent turns from `assistant-memory`.
-7. `assistant-worker` calls `assistant-memory` only for durable memory retrieval.
-8. The LangChain.js runtime receives bootstrap context, conversation state, retrieved memory, and the current message.
+5. `assistant-orchestrator` reads the job from Redis.
+6. `assistant-orchestrator` loads the conversation summary and recent turns from `assistant-memory`.
+7. `assistant-orchestrator` calls `assistant-memory` only for durable memory retrieval.
+8. `assistant-orchestrator` sends messages-based context to `assistant-llm` for main generation.
 
 ## Write Path
 
-1. The LangChain.js runtime produces the final answer.
-2. `assistant-worker` appends the user turn and assistant turn through `assistant-memory`.
+1. `assistant-llm` returns the final answer (directly or after tool synthesis).
+2. `assistant-orchestrator` appends the user turn and assistant turn through `assistant-memory`.
 3. `assistant-memory` updates the compact conversation summary in MySQL.
-4. `assistant-worker` emits run events to Redis.
+4. `assistant-orchestrator` emits run events to Redis.
 5. `assistant-api` consumes the run events and sends the external callback to the originating gateway.
 6. The gateway updates its own local transport runtime.
 
@@ -107,7 +107,7 @@ sequenceDiagram
     participant Gateway as "gateway-email"
     participant Runtime as "gateway-email runtime"
     participant API as "assistant-api"
-    participant Worker as "assistant-worker"
+    participant Worker as "assistant-orchestrator"
     participant Memory as "assistant-memory"
     participant DB as "MySQL"
 
@@ -121,8 +121,8 @@ sequenceDiagram
     Worker->>DB: Load recent turns and summary
     Worker->>Memory: Search durable memory
     Memory-->>Worker: Relevant facts and episodes
-    Worker->>Worker: Run LangChain.js with conversation + memory
-    Worker->>DB: Append turns and update summary
+    Worker->>Worker: Execute runtime + tools
+    Worker->>Memory: Append turns and summary via conversations/append
     Worker->>API: Publish run.completed via Redis
 
     API->>Gateway: POST /response/{conversation_id}
@@ -147,4 +147,4 @@ See the schema in [Persistence Schema](./persistence-schema.md).
 - [Memory](./memory.md)
 - [Persistence Schema](./persistence-schema.md)
 - [Conversation API Contract](../contracts/conversation-api.md)
-- [assistant-worker](../services/assistant/assistant-worker.md)
+- [assistant-orchestrator](../services/assistant/assistant-orchestrator.md)
