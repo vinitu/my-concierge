@@ -2,7 +2,10 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import type { AssistantLlmMessage } from '../contracts/assistant-llm';
+import type {
+  AssistantLlmAvailableTool,
+  AssistantLlmMessage,
+} from '../contracts/assistant-llm';
 import { AssistantLlmConfigService } from './assistant-llm-config.service';
 import type { AssistantLlmProviderPort } from './assistant-llm-provider-port';
 
@@ -13,19 +16,37 @@ interface OllamaChatResponse {
   };
 }
 
+interface OllamaToolDefinition {
+  function: {
+    description: string;
+    name: string;
+    parameters: {
+      additionalProperties: boolean;
+      properties: Record<string, never>;
+      type: 'object';
+    };
+  };
+  type: 'function';
+}
+
 @Injectable()
 export class OllamaChatService implements AssistantLlmProviderPort {
   private readonly logger = new Logger(OllamaChatService.name);
 
   constructor(private readonly assistantLlmConfigService: AssistantLlmConfigService) {}
 
-  async generateFromMessages(messages: AssistantLlmMessage[]): Promise<string> {
+  async generateFromMessages(
+    messages: AssistantLlmMessage[],
+    availableTools?: AssistantLlmAvailableTool[],
+  ): Promise<string> {
     const config = await this.assistantLlmConfigService.read();
+    const tools = this.toOllamaTools(availableTools);
     const requestBody = {
       messages,
       model: config.provider === 'ollama' ? config.model : 'qwen3:1.7b',
       stream: false,
       think: false,
+      ...(tools.length > 0 ? { tools } : {}),
     };
     return this.sendChat(requestBody, config.ollama_base_url, config.ollama_timeout_ms);
   }
@@ -131,5 +152,39 @@ export class OllamaChatService implements AssistantLlmProviderPort {
     } catch {
       return null;
     }
+  }
+
+  private toOllamaTools(
+    availableTools?: AssistantLlmAvailableTool[],
+  ): OllamaToolDefinition[] {
+    if (!availableTools || availableTools.length === 0) {
+      return [];
+    }
+
+    const seen = new Set<string>();
+    const tools: OllamaToolDefinition[] = [];
+    for (const tool of availableTools) {
+      const name = typeof tool.name === 'string' ? tool.name.trim() : '';
+      if (!name || seen.has(name)) {
+        continue;
+      }
+      seen.add(name);
+      tools.push({
+        function: {
+          description:
+            typeof tool.description === 'string' && tool.description.trim().length > 0
+              ? tool.description.trim()
+              : `Assistant tool ${name}`,
+          name,
+          parameters: {
+            additionalProperties: true,
+            properties: {},
+            type: 'object',
+          },
+        },
+        type: 'function',
+      });
+    }
+    return tools;
   }
 }

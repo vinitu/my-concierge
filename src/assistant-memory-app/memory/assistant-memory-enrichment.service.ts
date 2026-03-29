@@ -8,16 +8,12 @@ import { ConfigService } from "@nestjs/config";
 import { createClient, type RedisClientType } from "redis";
 import type {
   AssistantMemoryExtractKind,
-  BaseMemoryWriteCandidate,
   ConversationMessage,
-  MemoryKind,
 } from "../../contracts/assistant-memory";
-import type {
-  AssistantLlmExtractMemoryResponse,
-  AssistantLlmMessage,
-} from "../../contracts/assistant-llm";
+import type { AssistantLlmMessage } from "../../contracts/assistant-llm";
 import { AssistantMemoryConfigService } from "../assistant-memory-config.service";
 import { AssistantMemoryRunEventPublisherService } from "../run-events/assistant-memory-run-event-publisher.service";
+import { AssistantMemoryLlmClientService } from "./assistant-memory-llm-client.service";
 import { AssistantMemoryService } from "./assistant-memory.service";
 
 interface EnrichmentJob {
@@ -30,10 +26,6 @@ interface EnrichmentJob {
 }
 
 type EnrichmentEnqueueInput = Omit<EnrichmentJob, "extract">;
-
-function trimTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value.slice(0, -1) : value;
-}
 
 @Injectable()
 export class AssistantMemoryEnrichmentService
@@ -48,6 +40,7 @@ export class AssistantMemoryEnrichmentService
     private readonly configService: ConfigService,
     private readonly assistantMemoryConfigService: AssistantMemoryConfigService,
     private readonly assistantMemoryRunEventPublisherService: AssistantMemoryRunEventPublisherService,
+    private readonly assistantMemoryLlmClientService: AssistantMemoryLlmClientService,
     private readonly assistantMemoryService: AssistantMemoryService,
   ) {}
 
@@ -162,14 +155,11 @@ export class AssistantMemoryEnrichmentService
     const messages = history.messages.map((message) =>
       this.mapConversationMessage(message),
     );
-    const extracted = await this.extractMemory(
+    const facts = await this.extractFacts(
       job.conversation_id,
-      job.extract,
       messages,
     );
-
-    await this.applyProfilePatch(extracted);
-    await this.applyTypedWrites(job, extracted);
+    await this.applyFacts(job, facts);
     this.logger.debug(
       `Enrichment job completed request_id=${job.request_id} conversation_id=${job.conversation_id} extract=${job.extract}`,
     );
@@ -184,122 +174,55 @@ export class AssistantMemoryEnrichmentService
     };
   }
 
-  private async extractMemory(
+  private async extractFacts(
     conversationId: string,
-    extract: AssistantMemoryExtractKind,
     messages: AssistantLlmMessage[],
-  ): Promise<AssistantLlmExtractMemoryResponse> {
-    this.logger.debug(
-      `Enrichment extract request conversation_id=${conversationId} extract=${extract} messages=${messages.length}`,
+  ): Promise<string[]> {
+    const extracted = await this.assistantMemoryLlmClientService.extractFacts(
+      conversationId,
+      messages,
     );
-    const response = await fetch(
-      `${this.assistantLlmBaseUrl()}/v1/generate/extract-memory`,
-      {
-        body: JSON.stringify({
-          conversation_id: conversationId,
-          extract,
-          messages,
-        }),
-        headers: { "content-type": "application/json" },
-        method: "POST",
-        signal: AbortSignal.timeout(this.enrichmentTimeoutMs()),
-      },
-    );
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `assistant-llm returned ${String(response.status)} for /v1/generate/extract-memory: ${body}`,
-      );
-    }
-
-    const extracted =
-      (await response.json()) as AssistantLlmExtractMemoryResponse;
     this.logger.debug(
-      `Enrichment extract payload conversation_id=${conversationId} extract=${extract} payload=${this.preview(extracted)}`,
+      `Enrichment extract payload conversation_id=${conversationId} extract=fact payload=${this.preview(extracted)}`,
     );
-    const typedCounts = {
-      episode: extracted.typed_writes.episode?.length ?? 0,
-      fact: extracted.typed_writes.fact?.length ?? 0,
-      preference: extracted.typed_writes.preference?.length ?? 0,
-      project: extracted.typed_writes.project?.length ?? 0,
-      routine: extracted.typed_writes.routine?.length ?? 0,
-      rule: extracted.typed_writes.rule?.length ?? 0,
-    };
     this.logger.debug(
-      `Enrichment extract response conversation_id=${conversationId} extract=${extract} profile_patch_keys=${
-        Object.keys(extracted.profile_patch ?? {}).length
-      } typed_counts=${JSON.stringify(typedCounts)}`,
+      `Enrichment extract response conversation_id=${conversationId} extract=fact items=${extracted.length}`,
     );
     return extracted;
   }
 
-  private async applyProfilePatch(
-    extracted: AssistantLlmExtractMemoryResponse,
-  ): Promise<void> {
-    const patch = extracted.profile_patch;
-    if (Object.keys(patch).length === 0) {
-      this.logger.debug("Enrichment profile patch skipped (empty)");
+  private async applyFacts(job: EnrichmentJob, facts: string[]): Promise<void> {
+    if (facts.length === 0) {
+      this.logger.debug(
+        `Enrichment facts skipped request_id=${job.request_id} conversation_id=${job.conversation_id} extract=fact candidates=0`,
+      );
       return;
     }
-    await this.assistantMemoryService.updateProfile({
-      ...patch,
+
+    const normalized = facts.map((content) => ({
+      confidence: 0.8,
+      content,
+      conversationThreadId: job.conversation_id,
+      scope: "conversation",
       source: "assistant-memory-enrichment",
-    });
+      tags: [],
+    }));
     this.logger.debug(
-      `Enrichment profile patch applied keys=${Object.keys(patch).join(",") || "(none)"}`,
+      `Enrichment fact candidates request_id=${job.request_id} conversation_id=${job.conversation_id} normalized=${this.preview(normalized)}`,
     );
-  }
-
-  private async applyTypedWrites(
-    job: EnrichmentJob,
-    extracted: AssistantLlmExtractMemoryResponse,
-  ): Promise<void> {
-    const byKind: Record<MemoryKind, BaseMemoryWriteCandidate[]> = {
-      episode: extracted.typed_writes.episode ?? [],
-      fact: extracted.typed_writes.fact ?? [],
-      preference: extracted.typed_writes.preference ?? [],
-      project: extracted.typed_writes.project ?? [],
-      routine: extracted.typed_writes.routine ?? [],
-      rule: extracted.typed_writes.rule ?? [],
-    };
-
-    for (const [kind, candidates] of Object.entries(byKind) as Array<
-      [MemoryKind, BaseMemoryWriteCandidate[]]
-    >) {
-      if (candidates.length === 0) {
-        this.logger.debug(
-          `Enrichment typed writes skipped request_id=${job.request_id} conversation_id=${job.conversation_id} extract=${job.extract} kind=${kind} candidates=0`,
-        );
-        continue;
-      }
-
-      const normalized = candidates.map((candidate) => ({
-        confidence: Math.min(0.99, Math.max(0.5, candidate.confidence)),
-        content: candidate.content,
-        conversationThreadId:
-          candidate.conversationThreadId ?? job.conversation_id,
-        scope: candidate.scope || "conversation",
-        source: candidate.source || "assistant-memory-enrichment",
-        tags: candidate.tags ?? [],
-      }));
-      this.logger.debug(
-        `Enrichment typed write candidates request_id=${job.request_id} conversation_id=${job.conversation_id} extract=${job.extract} kind=${kind} normalized=${this.preview(normalized)}`,
-      );
-      const result = await this.assistantMemoryService.writeByKind(
-        kind,
-        `enrichment:${job.request_id}:${kind}`,
-        normalized,
-        {
-          direction: job.direction,
-          sourceRequestId: job.request_id,
-          userId: job.user_id,
-        },
-      );
-      this.logger.debug(
-        `Enrichment typed writes applied request_id=${job.request_id} conversation_id=${job.conversation_id} extract=${job.extract} kind=${kind} candidates=${candidates.length} created=${result.created} updated=${result.updated}`,
-      );
-    }
+    const result = await this.assistantMemoryService.writeByKind(
+      "fact",
+      `enrichment:${job.request_id}:fact`,
+      normalized,
+      {
+        direction: job.direction,
+        sourceRequestId: job.request_id,
+        userId: job.user_id,
+      },
+    );
+    this.logger.debug(
+      `Enrichment facts applied request_id=${job.request_id} conversation_id=${job.conversation_id} candidates=${facts.length} created=${result.created} updated=${result.updated}`,
+    );
   }
 
   private async getClient(): Promise<RedisClientType> {
@@ -327,25 +250,6 @@ export class AssistantMemoryEnrichmentService
     extract: AssistantMemoryExtractKind,
   ): string {
     return `assistant:memory:enrichment:request:${requestId}:${extract}`;
-  }
-
-  private assistantLlmBaseUrl(): string {
-    return trimTrailingSlash(
-      this.configService.get<string>(
-        "ASSISTANT_LLM_URL",
-        "http://assistant-llm:3000",
-      ),
-    );
-  }
-
-  private enrichmentTimeoutMs(): number {
-    return Number.parseInt(
-      this.configService.get<string>(
-        "ASSISTANT_MEMORY_ENRICHMENT_TIMEOUT_MS",
-        "30000",
-      ),
-      10,
-    );
   }
 
   private preview(value: unknown): string {

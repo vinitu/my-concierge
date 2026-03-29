@@ -50,8 +50,6 @@ export class AssistantLlmConfigService {
           this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
         ),
         provider,
-        small_model_safe_mode: this.normalizeBoolean(parsed.small_model_safe_mode, false),
-        structured_mode: this.normalizeBoolean(parsed.structured_mode, true),
         xai_api_key: this.normalizeSecret(
           parsed.xai_api_key,
           this.configService.get<string>('XAI_API_KEY', ''),
@@ -93,11 +91,6 @@ export class AssistantLlmConfigService {
         defaults.ollama_timeout_ms,
       ),
       provider,
-      small_model_safe_mode: this.normalizeBoolean(
-        config.small_model_safe_mode,
-        defaults.small_model_safe_mode,
-      ),
-      structured_mode: this.normalizeBoolean(config.structured_mode, defaults.structured_mode),
       xai_api_key: this.normalizeSecret(config.xai_api_key, defaults.xai_api_key),
       xai_base_url: this.normalizeUrl(config.xai_base_url, defaults.xai_base_url),
       xai_timeout_ms: this.normalizeTimeoutMs(config.xai_timeout_ms, defaults.xai_timeout_ms),
@@ -129,8 +122,6 @@ export class AssistantLlmConfigService {
         this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
       ),
       provider: this.normalizeProvider(this.configService.get<string>('LLM_PROVIDER', 'ollama')),
-      small_model_safe_mode: false,
-      structured_mode: true,
       xai_api_key: this.configService.get<string>('XAI_API_KEY', ''),
       xai_base_url: this.normalizeUrl(
         this.configService.get<string>('XAI_BASE_URL', 'https://api.x.ai/v1'),
@@ -196,25 +187,6 @@ export class AssistantLlmConfigService {
     }
 
     return Math.min(3600000, Math.max(1000, Math.floor(parsed)));
-  }
-
-  private normalizeBoolean(value: unknown, fallback: boolean): boolean {
-    if (typeof value === 'boolean') {
-      return value;
-    }
-    if (typeof value === 'number') {
-      return value !== 0;
-    }
-    if (typeof value === 'string') {
-      const normalized = value.trim().toLowerCase();
-      if (['1', 'true', 'yes', 'on'].includes(normalized)) {
-        return true;
-      }
-      if (['0', 'false', 'no', 'off'].includes(normalized)) {
-        return false;
-      }
-    }
-    return fallback;
   }
 
   private normalizeSecret(value: unknown, fallback: string): string {

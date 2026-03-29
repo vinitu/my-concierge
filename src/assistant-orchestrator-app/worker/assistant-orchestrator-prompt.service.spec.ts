@@ -260,7 +260,7 @@ describe("AssistantOrchestratorPromptService", () => {
     ).toBe(
       JSON.stringify(
         {
-          available_tools: fullToolCatalog(),
+          tools: fullToolCatalog(),
           conversation_context: "Current topic is dinner.",
           retrieved_memory: [
             {
@@ -347,7 +347,7 @@ describe("AssistantOrchestratorPromptService", () => {
     ]);
   });
 
-  it("filters available tools when assistant-orchestrator settings disable some of them", () => {
+  it("filters tools when assistant-orchestrator settings disable some of them", () => {
     const runtimeContext: AssistantOrchestratorRuntimeContext = {
       agents: "[]",
       datadir: "/runtime",
@@ -383,9 +383,9 @@ describe("AssistantOrchestratorPromptService", () => {
         runtimeContext,
         ["time_current", "memory_search"],
       ),
-    ) as { available_tools: Array<{ name: string }> };
+    ) as { tools: Array<{ name: string }> };
 
-    expect(request.available_tools).toEqual([
+    expect(request.tools).toEqual([
       {
         description:
           "Return current date, time, and timezone-aware temporal context.",

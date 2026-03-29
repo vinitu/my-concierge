@@ -6,8 +6,8 @@ Describe the canonical MySQL schema for conversation state and durable memory.
 
 ## Ownership
 
-- `assistant-orchestrator` owns conversation tables
-- `assistant-memory` owns durable memory tables
+- `assistant-memory` owns conversation and durable memory tables
+- `assistant-orchestrator` accesses conversation state only through `assistant-memory` API
 - both domains live in the same MySQL deployment
 
 ## Conversation Tables
@@ -40,7 +40,6 @@ Required columns:
 
 - `id` `varchar(64)` primary key
 - `thread_id` `varchar(64)` not null
-- `run_id` `varchar(64)` null
 - `role` `varchar(32)` not null
 - `message` `text` not null
 - `sequence_no` `bigint` not null
@@ -53,7 +52,6 @@ Foreign keys:
 Indexes:
 
 - unique index on `thread_id, sequence_no`
-- index on `run_id`
 - index on `created_at`
 
 ### `conversation_summaries`

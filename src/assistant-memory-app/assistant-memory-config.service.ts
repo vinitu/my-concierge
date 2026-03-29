@@ -8,15 +8,7 @@ import type {
   UpdateAssistantMemoryConfigBody,
 } from "../contracts/assistant-memory";
 
-const ALL_EXTRACTS: AssistantMemoryExtractKind[] = [
-  "profile",
-  "preference",
-  "fact",
-  "routine",
-  "project",
-  "episode",
-  "rule",
-];
+const ALL_EXTRACTS: AssistantMemoryExtractKind[] = ["fact"];
 
 @Injectable()
 export class AssistantMemoryConfigService {

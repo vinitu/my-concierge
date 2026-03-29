@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -30,6 +31,7 @@ import type {
   MemoryWriteResult,
   PreferenceWriteCandidate,
   ProfileUpdateRequest,
+  ProfileDeleteResponse,
   ProfileUpdateResponse,
   ProjectWriteCandidate,
   RuleWriteCandidate,
@@ -54,6 +56,12 @@ export class AssistantMemoryController {
   @Put('profile')
   updateProfile(@Body() body: ProfileUpdateRequest): Promise<ProfileUpdateResponse> {
     return this.assistantMemoryService.updateProfile(body);
+  }
+
+  @Delete('profile')
+  @HttpCode(200)
+  deleteProfile(): Promise<ProfileDeleteResponse> {
+    return this.assistantMemoryService.deleteProfile();
   }
 
   @Post('search')

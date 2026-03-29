@@ -40,7 +40,7 @@ describe('assistant-llm-output-schema', () => {
     });
   });
 
-  it('rejects legacy mem_* tool names in planning output', async () => {
+  it('rejects unsupported tool names in planning output', async () => {
     await expect(
       assistantPlanningOutputParser.parse(
         JSON.stringify({

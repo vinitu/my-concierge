@@ -67,12 +67,12 @@ Describe the endpoints of all application services in one place.
   Purpose: verify provider reachability and key configuration
 - `GET /models`
   Purpose: list available models by provider
-- `POST /v1/generate/main`
-  Purpose: run main generation from `messages[]`
-- `POST /v1/generate/summarize`
+- `POST /v1/conversation/respond`
+  Purpose: run main generation from `messages[]` and optional `tools[]`
+- `POST /v1/conversation/summarize`
   Purpose: run summary generation
-- `POST /v1/generate/extract-memory`
-  Purpose: extract profile patch and typed memory candidates
+- `POST /v1/memory/facts`
+  Purpose: extract fact candidates from conversation messages
 
 ### Notes
 
@@ -293,14 +293,14 @@ Describe the endpoints of all application services in one place.
 
 ### Notes
 
-- `swagger` reads schemas from `http://localhost:3000/openapi.json`.
-- `swagger` reads schemas from `http://localhost:3001/openapi.json`.
-- `swagger` reads schemas from `http://localhost:3003/openapi.json`.
-- `swagger` reads schemas from `http://assistant-memory:3000/openapi.json`.
+- `swagger` reads schemas from `http://localhost:8084/openapi.json`.
+- `swagger` reads schemas from `http://localhost:8085/openapi.json`.
+- `swagger` reads schemas from `http://localhost:8087/openapi.json`.
+- `swagger` reads schemas from `http://localhost:8086/openapi.json`.
 - `swagger` reads schemas from `http://localhost:8080/openapi.json`.
-- `swagger` reads schemas from `http://localhost:8079/openapi.json`.
 - `swagger` reads schemas from `http://localhost:8081/openapi.json`.
 - `swagger` reads schemas from `http://localhost:8082/openapi.json`.
+- `swagger` reads schemas from `http://localhost:8083/openapi.json`.
 
 ## `prometheus`
 

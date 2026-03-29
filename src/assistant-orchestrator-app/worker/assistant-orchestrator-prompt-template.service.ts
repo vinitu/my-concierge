@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { AssistantLlmAvailableTool } from '../../contracts/assistant-llm';
 import type { AssistantLlmGenerateInput } from './assistant-llm-provider';
 import type { AssistantToolObservation } from './assistant-tool-dispatcher.service';
 import type { AssistantToolName } from './assistant-tool-catalog.service';
@@ -29,5 +30,9 @@ export class AssistantOrchestratorPromptTemplateService {
       observation,
       enabledTools,
     );
+  }
+
+  listAvailableTools(enabledTools?: AssistantToolName[]): AssistantLlmAvailableTool[] {
+    return this.promptService.listAvailableTools(enabledTools);
   }
 }

@@ -20,7 +20,7 @@ export class GatewayTelegramAssistantApiClientService {
     userId: string;
   }): Promise<void> {
     const assistantApiUrl = trimTrailingSlash(
-      this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:3000'),
+      this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:8084'),
     );
     const url = `${assistantApiUrl}/conversation/telegram/${encodeURIComponent(input.chat)}/${encodeURIComponent(input.userId)}`;
 

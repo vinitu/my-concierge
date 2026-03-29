@@ -6,7 +6,7 @@ Define what `assistant-orchestrator` sends to `assistant-llm` during runtime exe
 
 ## Main Request Model
 
-`assistant-orchestrator` sends `messages[]` (role-based chat format) to `assistant-llm /v1/generate/main`.
+`assistant-orchestrator` sends `messages[]` (role-based chat format) to `assistant-llm /v1/conversation/respond`.
 
 Message composition order:
 
@@ -55,7 +55,7 @@ The payload is message-first, not one giant concatenated prompt string.
 
 After final assistant reply, `assistant-orchestrator` sends a separate request to:
 
-- `assistant-llm /v1/generate/summarize`
+- `assistant-llm /v1/conversation/summarize`
 
 Summary result updates `conversation.context`.
 Summary failure must not fail the user reply path.
@@ -64,11 +64,10 @@ Summary failure must not fail the user reply path.
 
 `assistant-memory` runs asynchronous enrichment after conversation append and calls:
 
-- `assistant-llm /v1/generate/extract-memory`
+- `assistant-llm /v1/memory/facts`
 
 This produces:
 
-- profile patch
-- typed memory writes (`preference`, `fact`, `routine`, `project`, `episode`, `rule`)
+- fact items
 
 Enrichment failure does not break append API response.

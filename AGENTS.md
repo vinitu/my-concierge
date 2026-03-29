@@ -1,10 +1,15 @@
 # MyConcierge
 
-Personal home assistant built with NestJS.
+Personal home assistant platform built with NestJS.
 
-## Project overview
+## Project mode
 
-MyConcierge is a lightweight, personalized home assistant designed to replace heavier solutions like OpenClaw. It focuses on solving specific problems with a clean, minimal, low-resource architecture tailored for a single user.
+This is a **new project baseline**.
+
+- Backward compatibility is **not required**
+- Breaking changes are allowed by default
+- Legacy components, legacy endpoints, and legacy configs should be removed, not supported
+- Do not add compatibility aliases, shims, or dual paths unless explicitly requested
 
 ## Tech stack
 
@@ -12,18 +17,6 @@ MyConcierge is a lightweight, personalized home assistant designed to replace he
 - **Framework**: NestJS
 - **Package manager**: npm
 - **Testing**: Jest (unit), Supertest (e2e)
-
-## Project structure
-
-```
-src/
-  app.module.ts       — root module
-  app.controller.ts   — root controller
-  app.service.ts      — root service
-  main.ts             — entry point
-test/
-  app.e2e-spec.ts     — e2e tests
-```
 
 ## Commands
 
@@ -41,31 +34,35 @@ test/
 
 ## Development guidelines
 
-- All code must be covered by tests
-- Write tests for all new features (unit + e2e)
-- After any code change, run the relevant tests before finishing the task
-- Use only the latest stable versions of libraries and dependencies
-- If a newer stable version is available, update to it immediately
-- Be proactive: if a requested change is clear and safe, implement it immediately instead of asking for confirmation
-- Default to making the code changes directly, not just describing them
-- Use strict TypeScript — no `any` types
-- Follow NestJS module pattern: each feature gets its own module
-- Keep controllers thin, business logic in services
-- Use environment variables for configuration (via @nestjs/config)
+- Write tests for every new feature and behavior change
+- After code changes, run relevant tests before finishing
+- Prefer deleting obsolete code over preserving compatibility
+- Use strict TypeScript, avoid `any`
+- Keep controllers thin, move business logic to services
+- Keep configs in env vars and runtime config files only where needed
+- If architecture changes, update docs in the same change
 
-## Architecture decisions
+## Canonical architecture
 
-- Minimalist system — keep dependencies and runtime components small
-- Container-first runtime — use Docker Compose by default and also support Docker and Kubernetes
-- Main runtime process — use a process named `assistant`
-- Runtime startup — `assistant` is a local agent that starts in the working directory and reads `AGENTS.md`, `SOUL.md`, `IDENTITY.md`, `skills/`, and `memory/`
-- API-first architecture — keep assistant logic in one server
-- Interaction model — external interaction with `assistant` happens through the API
-- Telegram, Email, Web, Cron, and Heartbeat components must talk to the server through the API
-- Channel architecture must be extensible so new channels can be added as thin adapters
-- API, Email, and worker processes must support horizontal scaling
-- Scheduled tasks in Kubernetes must use CronJob
-- Use one shared LLM integration layer for DeepSeek, xAI, OpenAI, and Ollama
-- Keep the LLM layer extensible so new providers can be added later
-- Expose Prometheus metrics from the server
-- Single-user system — no multi-tenancy or auth needed initially
+Current canonical assistant services:
+
+- `assistant-api` — ingress and request acceptance
+- `assistant-orchestrator` — run orchestration, tools, callbacks
+- `assistant-llm` — provider/model config and LLM execution
+- `assistant-memory` — conversations + durable memory storage/enrichment
+- `gateway-web` — chat UI and callback display
+
+Rules:
+
+- `assistant-orchestrator` must call `assistant-llm` for LLM operations
+- LLM provider/model settings must live only in `assistant-llm`
+- Conversation API should use canonical identifiers (`direction`, `user_id`, `conversation_id`, `request_id`, `accepted_at`)
+- Memory enrichment is async and should be driven by conversation updates
+- Prefer explicit, typed endpoints over generic multi-purpose endpoints
+- Prometheus metrics and `/status` endpoints are required for services
+
+## Migration policy
+
+- Hard cutovers are preferred
+- When replacing old behavior, remove old code paths in the same PR
+- If migration is needed, keep it minimal and time-boxed, then delete migration-only code

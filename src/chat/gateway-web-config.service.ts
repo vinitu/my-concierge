@@ -28,12 +28,7 @@ export const GATEWAY_WEB_INCOMING_MESSAGE_TYPES = [
 ] as const;
 
 const MEMORY_EVENT_KINDS = [
-  'preference',
   'fact',
-  'routine',
-  'project',
-  'episode',
-  'rule',
 ] as const;
 
 const MEMORY_EVENT_ACTIONS = [
@@ -45,7 +40,6 @@ const MEMORY_EVENT_ACTIONS = [
 
 const MEMORY_EXTRACT_EVENTS = [
   'memory.extract.started',
-  'memory.extract.completed',
   'memory.extract.failed',
 ] as const;
 
@@ -136,12 +130,12 @@ export class GatewayWebConfigService {
   private defaultConfig(): GatewayWebConfig {
     return {
       assistant_api_url: this.normalizeUrl(
-        this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:3000'),
-        'http://localhost:3000',
+        this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:8084'),
+        'http://localhost:8084',
       ),
       assistant_memory_url: this.normalizeUrl(
-        this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:3002'),
-        'http://localhost:3002',
+        this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:8086'),
+        'http://localhost:8086',
       ),
       allowed_incoming_message_types: this.normalizeAllowedIncomingMessageTypes(
         this.configService.get<unknown>('GATEWAY_WEB_ALLOWED_INCOMING_MESSAGE_TYPES'),

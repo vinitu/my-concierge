@@ -533,7 +533,9 @@ export class AssistantOrchestratorProcessorService
 
     if (
       error instanceof Error &&
-      (error.message.includes('MySQL') || error.message.includes('assistant-memory returned'))
+      (error.message.includes('assistant-memory returned') ||
+        error.message.toLowerCase().includes('assistant-memory schema') ||
+        error.message.toLowerCase().includes('conversation_threads'))
     ) {
       return 'PERSISTENCE_ERROR';
     }
@@ -591,20 +593,20 @@ export class AssistantOrchestratorProcessorService
       return 'assistant-orchestrator could not reach Ollama or the selected local model is unavailable. Check the AI settings in the assistant-llm web panel.';
     }
 
-    if (message.includes('missing mysql schema table')) {
-      return 'assistant-orchestrator MySQL conversation storage is not ready. Run `npm run db:migrate` and restart the stack.';
-    }
-
     if (message.includes('assistant-memory schema is outdated')) {
       return 'assistant-memory uses an old conversation schema. Run `npm run db:migrate` and restart the stack.';
     }
 
-    if (message.includes('assistant-memory returned')) {
-      return 'assistant-orchestrator could not save conversation state in assistant-memory. Check assistant-memory logs and run `npm run db:migrate`.';
+    if (message.includes('missing assistant-memory schema table')) {
+      return 'assistant-memory schema is not ready. Run `npm run db:migrate` and restart the stack.';
     }
 
-    if (message.includes('mysql')) {
-      return 'assistant-orchestrator could not save conversation state because MySQL is unavailable.';
+    if (message.includes('missing mysql schema table')) {
+      return 'assistant-memory conversation schema is not ready. Run `npm run db:migrate` and restart the stack.';
+    }
+
+    if (message.includes('assistant-memory returned')) {
+      return 'assistant-orchestrator could not save conversation state in assistant-memory. Check assistant-memory logs and run `npm run db:migrate`.';
     }
 
     return `assistant-orchestrator failed while processing the message. Check the ${this.providerLabel(

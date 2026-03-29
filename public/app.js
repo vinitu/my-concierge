@@ -63,7 +63,7 @@ function appendMessage(role, text) {
 function isFailureMessage(text) {
   const normalized = String(text ?? '').toLowerCase();
   return (
-    normalized.includes('assistant-worker failed while processing the message') ||
+    normalized.includes('assistant-orchestrator failed while processing the message') ||
     normalized.includes('run failed') ||
     normalized.includes('tool is disabled') ||
     normalized.includes('provider_error') ||

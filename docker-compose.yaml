@@ -37,7 +37,7 @@ services:
       REDIS_URL: redis://queue:6379
       REDIS_QUEUE_NAME: assistant:queue
     ports:
-      - "3000:3000"
+      - "8084:3000"
     depends_on:
       - queue
 
@@ -69,7 +69,7 @@ services:
       REDIS_QUEUE_NAME: assistant:queue
       WORKER_POLL_INTERVAL_MS: ${WORKER_POLL_INTERVAL_MS:-500}
     ports:
-      - "3001:3000"
+      - "8085:3000"
     volumes:
       - ./runtime/assistant-orchestrator:/app/runtime
 
@@ -95,7 +95,7 @@ services:
       OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-360000}
       LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
     ports:
-      - "3003:3000"
+      - "8087:3000"
     volumes:
       - ./runtime/assistant-llm:/app/runtime
 
@@ -122,7 +122,7 @@ services:
       PORT: 3000
       REDIS_URL: redis://queue:6379
     ports:
-      - "3002:3000"
+      - "8086:3000"
 
   gateway-telegram:
     build:
@@ -140,7 +140,7 @@ services:
       NODE_ENV: production
       PORT: 3000
     ports:
-      - "8081:3000"
+      - "8082:3000"
     volumes:
       - ./runtime/gateway-telegram:/app/runtime
 
@@ -161,7 +161,7 @@ services:
       ASSISTANT_MEMORY_URL: http://assistant-memory:3000
       GATEWAY_WEB_RUNTIME_DIR: ${GATEWAY_WEB_RUNTIME_DIR:-/app/runtime}
     ports:
-      - "8079:3000"
+      - "8081:3000"
     volumes:
       - ./runtime/gateway-web:/app/runtime
 
@@ -181,7 +181,7 @@ services:
       PORT: 3000
       ASSISTANT_API_URL: http://assistant-api:3000
     ports:
-      - "8082:3000"
+      - "8083:3000"
     volumes:
       - ./runtime/gateway-email:/app/runtime
 
@@ -210,7 +210,13 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-myconcierge}
       MYSQL_PORT: 3306
       MYSQL_USER: ${MYSQL_USER:-myconcierge}
-      DASHBOARD_GATEWAY_WEB_PANEL_URL: http://localhost:8079
+      DASHBOARD_ASSISTANT_API_PANEL_URL: http://localhost:8084
+      DASHBOARD_ASSISTANT_ORCHESTRATOR_PANEL_URL: http://localhost:8085
+      DASHBOARD_ASSISTANT_MEMORY_PANEL_URL: http://localhost:8086
+      DASHBOARD_ASSISTANT_LLM_PANEL_URL: http://localhost:8087
+      DASHBOARD_GATEWAY_WEB_PANEL_URL: http://localhost:8081
+      DASHBOARD_GATEWAY_TELEGRAM_PANEL_URL: http://localhost:8082
+      DASHBOARD_GATEWAY_EMAIL_PANEL_URL: http://localhost:8083
       DASHBOARD_PANEL_URL: http://localhost:8080
     ports:
       - "8080:3000"
@@ -230,13 +236,13 @@ services:
     environment:
       URLS: |
         [
-          { "url": "http://localhost:3000/openapi.json", "name": "assistant-api" },
-          { "url": "http://localhost:3001/openapi.json", "name": "assistant-orchestrator" },
-          { "url": "http://localhost:3003/openapi.json", "name": "assistant-llm" },
-          { "url": "http://localhost:3002/openapi.json", "name": "assistant-memory" },
-          { "url": "http://localhost:8079/openapi.json", "name": "gateway-web" },
-          { "url": "http://localhost:8081/openapi.json", "name": "gateway-telegram" },
-          { "url": "http://localhost:8082/openapi.json", "name": "gateway-email" },
+          { "url": "http://localhost:8084/openapi.json", "name": "assistant-api" },
+          { "url": "http://localhost:8085/openapi.json", "name": "assistant-orchestrator" },
+          { "url": "http://localhost:8087/openapi.json", "name": "assistant-llm" },
+          { "url": "http://localhost:8086/openapi.json", "name": "assistant-memory" },
+          { "url": "http://localhost:8081/openapi.json", "name": "gateway-web" },
+          { "url": "http://localhost:8082/openapi.json", "name": "gateway-telegram" },
+          { "url": "http://localhost:8083/openapi.json", "name": "gateway-email" },
           { "url": "http://localhost:8080/openapi.json", "name": "dashboard" }
         ]
     ports:

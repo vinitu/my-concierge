@@ -199,18 +199,8 @@ export class DashboardRootController {
         'time_current',
         'web_search',
         'memory_search',
-        'memory_preference_search',
         'memory_fact_search',
-        'memory_routine_search',
-        'memory_project_search',
-        'memory_episode_search',
-        'memory_rule_search',
-        'memory_preference_write',
         'memory_fact_write',
-        'memory_routine_write',
-        'memory_project_write',
-        'memory_episode_write',
-        'memory_rule_write',
         'memory_conversation_search',
         'skill_execute',
       ];
@@ -219,43 +209,17 @@ export class DashboardRootController {
         { group: 'Response', value: 'response.error', description: 'Assistant error response' },
         { group: 'Response', value: 'response.thinking', description: 'Thinking progress update' },
         { group: 'Extract', value: 'memory.extract.started', description: 'Started memory extraction' },
-        { group: 'Extract', value: 'memory.extract.completed', description: 'Completed memory extraction' },
         { group: 'Extract', value: 'memory.extract.failed', description: 'Failed memory extraction' },
-        { group: 'Preference', value: 'memory.preference.added', description: 'Added preference to memory' },
-        { group: 'Preference', value: 'memory.preference.updated', description: 'Updated preference in memory' },
-        { group: 'Preference', value: 'memory.preference.deleted', description: 'Deleted preference from memory' },
-        { group: 'Preference', value: 'memory.preference.readed', description: 'Read preference from memory' },
         { group: 'Fact', value: 'memory.fact.added', description: 'Added fact to memory' },
         { group: 'Fact', value: 'memory.fact.updated', description: 'Updated fact in memory' },
         { group: 'Fact', value: 'memory.fact.deleted', description: 'Deleted fact from memory' },
         { group: 'Fact', value: 'memory.fact.readed', description: 'Read fact from memory' },
-        { group: 'Routine', value: 'memory.routine.added', description: 'Added routine to memory' },
-        { group: 'Routine', value: 'memory.routine.updated', description: 'Updated routine in memory' },
-        { group: 'Routine', value: 'memory.routine.deleted', description: 'Deleted routine from memory' },
-        { group: 'Routine', value: 'memory.routine.readed', description: 'Read routine from memory' },
-        { group: 'Project', value: 'memory.project.added', description: 'Added project to memory' },
-        { group: 'Project', value: 'memory.project.updated', description: 'Updated project in memory' },
-        { group: 'Project', value: 'memory.project.deleted', description: 'Deleted project from memory' },
-        { group: 'Project', value: 'memory.project.readed', description: 'Read project from memory' },
-        { group: 'Episode', value: 'memory.episode.added', description: 'Added episode to memory' },
-        { group: 'Episode', value: 'memory.episode.updated', description: 'Updated episode in memory' },
-        { group: 'Episode', value: 'memory.episode.deleted', description: 'Deleted episode from memory' },
-        { group: 'Episode', value: 'memory.episode.readed', description: 'Read episode from memory' },
-        { group: 'Rule', value: 'memory.rule.added', description: 'Added rule to memory' },
-        { group: 'Rule', value: 'memory.rule.updated', description: 'Updated rule in memory' },
-        { group: 'Rule', value: 'memory.rule.deleted', description: 'Deleted rule from memory' },
-        { group: 'Rule', value: 'memory.rule.readed', description: 'Read rule from memory' },
       ];
       const ASSISTANT_MEMORY_SECTIONS = [
+        { id: 'settings', label: 'Settings' },
         { id: 'profile', label: 'Profile' },
         { id: 'conversations', label: 'Conversations' },
-        { id: 'settings', label: 'Settings' },
-        { id: 'preferences', label: 'Preferences' },
         { id: 'facts', label: 'Facts' },
-        { id: 'routines', label: 'Routines' },
-        { id: 'projects', label: 'Projects' },
-        { id: 'episodes', label: 'Episodes' },
-        { id: 'rules', label: 'Rules' },
       ];
       const state = {
         services: [],
@@ -871,10 +835,6 @@ export class DashboardRootController {
                 ).join('') +
               '</select></label>' +
             '</div>' +
-            '<div class="row">' +
-              '<label>Structured mode (true/false)<input id="assistant-llm-structured-mode" value="' + escapeHtml(String(config.structured_mode ?? true)) + '" /></label>' +
-              '<label>Small model safe mode (true/false)<input id="assistant-llm-small-safe-mode" value="' + escapeHtml(String(config.small_model_safe_mode ?? false)) + '" /></label>' +
-            '</div>' +
             '<div class="actions"><button type="submit">Save Provider</button></div>' +
             '<div id="assistant-llm-provider-status" class="status-line"></div>' +
           '</form>';
@@ -907,8 +867,6 @@ export class DashboardRootController {
           const patch = {
             provider: document.getElementById('assistant-llm-provider').value.trim(),
             model: document.getElementById('assistant-llm-model').value.trim(),
-            structured_mode: document.getElementById('assistant-llm-structured-mode').value.trim().toLowerCase() === 'true',
-            small_model_safe_mode: document.getElementById('assistant-llm-small-safe-mode').value.trim().toLowerCase() === 'true',
           };
           try {
             await saveServiceConfig(service, patch);
@@ -1083,63 +1041,23 @@ export class DashboardRootController {
             const enabledExtracts = Array.isArray(config.enabled_extracts)
               ? config.enabled_extracts
               : [];
-            const extractOptions = [
-              'profile',
-              'preference',
-              'fact',
-              'routine',
-              'project',
-              'episode',
-              'rule',
-            ];
             content.innerHTML =
               '<form id="assistant-memory-settings-form" class="card border-0 shadow-sm">' +
                 '<div class="card-body">' +
                   '<h5 class="card-title mb-2">Conversation Enrichment</h5>' +
-                  '<p class="text-secondary mb-3">Choose which extracts run asynchronously after conversation append.</p>' +
+                  '<p class="text-secondary mb-3">Only fact extraction is enabled. Other extract types were removed.</p>' +
                   '<div class="row g-2">' +
-                    extractOptions.map((extract) =>
-                      '<div class="col-md-6">' +
-                        '<div class="form-check">' +
-                          '<input class="form-check-input memory-extract" type="checkbox" id="memory-extract-' + escapeHtml(extract) + '" value="' + escapeHtml(extract) + '"' +
-                            (enabledExtracts.includes(extract) ? ' checked' : '') +
-                          ' />' +
-                          '<label class="form-check-label fw-semibold" for="memory-extract-' + escapeHtml(extract) + '">' + escapeHtml(extract) + '</label>' +
-                        '</div>' +
-                      '</div>',
-                    ).join('') +
-                  '</div>' +
-                  '<div class="mt-3 d-flex gap-2 align-items-center">' +
-                    '<button type="submit" class="btn btn-dark">Save memory settings</button>' +
-                    '<div id="assistant-memory-settings-status" class="text-secondary"></div>' +
+                    '<div class="col-md-6">' +
+                      '<div class="form-check">' +
+                        '<input class="form-check-input memory-extract" type="checkbox" id="memory-extract-fact" value="fact"' +
+                          (enabledExtracts.includes('fact') ? ' checked' : '') +
+                          ' disabled />' +
+                        '<label class="form-check-label fw-semibold" for="memory-extract-fact">fact</label>' +
+                      '</div>' +
+                    '</div>' +
                   '</div>' +
                 '</div>' +
               '</form>';
-
-            document
-              .getElementById('assistant-memory-settings-form')
-              .addEventListener('submit', async (event) => {
-                event.preventDefault();
-                const status = document.getElementById('assistant-memory-settings-status');
-                status.textContent = 'Saving...';
-                const enabled = Array.from(
-                  content.querySelectorAll('input.memory-extract:checked'),
-                ).map((element) => element.value);
-                try {
-                  const saveResponse = await fetch(buildServiceUrl(service, '/config'), {
-                    method: 'PUT',
-                    headers: { 'content-type': 'application/json' },
-                    body: JSON.stringify({ enabled_extracts: enabled }),
-                  });
-                  if (!saveResponse.ok) {
-                    status.textContent = 'Failed to save';
-                    return;
-                  }
-                  status.textContent = 'Saved';
-                } catch {
-                  status.textContent = 'Failed to save';
-                }
-              });
           } catch {
             content.innerHTML = '<div class="status-line">Failed to load memory settings</div>';
           }
@@ -1155,7 +1073,34 @@ export class DashboardRootController {
               return;
             }
             const payload = await response.json();
-            content.innerHTML = '<pre>' + escapeHtml(JSON.stringify(payload, null, 2)) + '</pre>';
+            content.innerHTML =
+              '<div class="actions" style="margin-bottom:8px">' +
+                '<button id="profile-delete-button" type="button">Delete Profile</button>' +
+                '<span id="profile-delete-status" class="status-line"></span>' +
+              '</div>' +
+              '<pre id="profile-detail">' + escapeHtml(JSON.stringify(payload, null, 2)) + '</pre>';
+
+            const deleteButton = content.querySelector('#profile-delete-button');
+            const deleteStatus = content.querySelector('#profile-delete-status');
+            deleteButton.addEventListener('click', async () => {
+              deleteStatus.textContent = 'Deleting...';
+              deleteButton.disabled = true;
+              try {
+                const deleteResponse = await fetch(buildServiceUrl(service, '/v1/profile'), {
+                  method: 'DELETE',
+                });
+                if (!deleteResponse.ok) {
+                  deleteStatus.textContent = 'Failed to delete profile';
+                  return;
+                }
+                deleteStatus.textContent = 'Profile deleted';
+                await renderAssistantMemorySection(service, 'profile');
+              } catch {
+                deleteStatus.textContent = 'Failed to delete profile';
+              } finally {
+                deleteButton.disabled = false;
+              }
+            });
           } catch {
             content.innerHTML = '<div class="status-line">Failed to load profile</div>';
           }
@@ -1260,12 +1205,7 @@ export class DashboardRootController {
         }
 
         const kindToCollection = {
-          preferences: 'preferences',
           facts: 'facts',
-          routines: 'routines',
-          projects: 'projects',
-          episodes: 'episodes',
-          rules: 'rules',
         };
         const collection = kindToCollection[section];
 
@@ -1302,14 +1242,53 @@ export class DashboardRootController {
                   '</button>',
                 ).join('') +
               '</div>' +
-              '<div><pre id="memory-detail">' + escapeHtml(JSON.stringify(entries[0], null, 2)) + '</pre></div>' +
+              '<div>' +
+                '<div class="actions" style="margin-bottom:8px">' +
+                  '<button id="memory-delete-button" type="button">Delete Fact</button>' +
+                  '<span id="memory-delete-status" class="status-line"></span>' +
+                '</div>' +
+                '<pre id="memory-detail">' + escapeHtml(JSON.stringify(entries[0], null, 2)) + '</pre>' +
+              '</div>' +
             '</div>';
+
+          let selectedMemoryId = entries[0]?.id || null;
+          const deleteButton = content.querySelector('#memory-delete-button');
+          const deleteStatus = content.querySelector('#memory-delete-status');
+          deleteButton.disabled = !selectedMemoryId;
+          deleteButton.addEventListener('click', async () => {
+            if (!selectedMemoryId) {
+              return;
+            }
+            deleteStatus.textContent = 'Deleting...';
+            deleteButton.disabled = true;
+            try {
+              const deleteResponse = await fetch(
+                buildServiceUrl(
+                  service,
+                  '/v1/facts/' + encodeURIComponent(selectedMemoryId) + '/archive',
+                ),
+                { method: 'POST' },
+              );
+              if (!deleteResponse.ok) {
+                deleteStatus.textContent = 'Failed to delete fact';
+                return;
+              }
+              deleteStatus.textContent = 'Fact deleted';
+              await renderAssistantMemorySection(service, section);
+            } catch {
+              deleteStatus.textContent = 'Failed to delete fact';
+            } finally {
+              deleteButton.disabled = false;
+            }
+          });
 
           content.querySelectorAll('button[data-memory-id]').forEach((button) => {
             button.addEventListener('click', async () => {
               const memoryId = button.dataset.memoryId;
               const memoryKind = button.dataset.memoryKind;
               const detail = content.querySelector('#memory-detail');
+              selectedMemoryId = memoryId || null;
+              deleteButton.disabled = !selectedMemoryId;
               detail.textContent = 'Loading...';
               try {
                 const byIdResponse = await fetch(buildServiceUrl(service, '/v1/' + memoryKind + '/' + encodeURIComponent(memoryId)));

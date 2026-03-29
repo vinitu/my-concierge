@@ -6,7 +6,7 @@ export type MemoryKind =
   | "routine"
   | "rule";
 
-export type AssistantMemoryExtractKind = "profile" | MemoryKind;
+export type AssistantMemoryExtractKind = "fact";
 
 export interface AssistantProfile {
   constraints: Record<string, unknown>;
@@ -100,6 +100,12 @@ export interface ProfileUpdateRequest {
 
 export interface ProfileUpdateResponse {
   status: "updated";
+  updatedAt: string;
+  updatedProfile: AssistantProfile;
+}
+
+export interface ProfileDeleteResponse {
+  status: "deleted";
   updatedAt: string;
   updatedProfile: AssistantProfile;
 }

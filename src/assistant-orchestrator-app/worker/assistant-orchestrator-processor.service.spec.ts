@@ -679,7 +679,7 @@ describe("AssistantOrchestratorProcessorService", () => {
           .fn()
           .mockRejectedValue(
             new Error(
-              "Missing MySQL schema table: conversation_threads. Run npm run db:migrate first.",
+              "Missing assistant-memory schema table: conversation_threads. Run npm run db:migrate first.",
             ),
           ),
       } as unknown as AssistantOrchestratorConversationService,
@@ -705,7 +705,7 @@ describe("AssistantOrchestratorProcessorService", () => {
         payload: expect.objectContaining({
           code: "PERSISTENCE_ERROR",
           message: expect.stringContaining(
-            "MySQL conversation storage is not ready",
+            "assistant-memory schema is not ready",
           ),
         }),
       }),

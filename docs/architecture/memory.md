@@ -151,7 +151,7 @@ Examples:
 2. `assistant-orchestrator` appends conversation exchange through `assistant-memory`.
 3. `assistant-memory` persists conversation turns and summary in MySQL.
 4. `assistant-memory` validates and stores explicit memory writes.
-5. `assistant-memory` runs asynchronous enrichment and calls `assistant-llm /v1/generate/extract-memory`.
+5. `assistant-memory` runs asynchronous enrichment and calls typed `assistant-llm /v1/memory/*` endpoints.
 6. `assistant-memory` applies profile patch and typed memory writes from enrichment output.
 
 ## Type Selection Rules

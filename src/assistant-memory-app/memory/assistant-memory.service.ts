@@ -40,6 +40,7 @@ import type {
   MemorySearchResponse,
   MemoryWriteCandidate,
   MemoryWriteResult,
+  ProfileDeleteResponse,
   ProfileUpdateRequest,
   ProfileUpdateResponse,
   TypedMemorySearchRequest,
@@ -115,6 +116,14 @@ export class AssistantMemoryService {
     }
 
     return this.updateProfileInMysql(body);
+  }
+
+  async deleteProfile(): Promise<ProfileDeleteResponse> {
+    if (this.storeDriver() === 'file') {
+      return this.deleteProfileInFile();
+    }
+
+    return this.deleteProfileInMysql();
   }
 
   async search(body: FederatedMemorySearchRequest): Promise<MemorySearchResponse> {
@@ -352,20 +361,18 @@ export class AssistantMemoryService {
       await connection.query(
         `
           INSERT INTO conversation_turns (
-            id, thread_id, run_id, role, message, sequence_no, created_at
+            id, thread_id, role, message, sequence_no, created_at
           )
-          VALUES (?, ?, ?, 'user', ?, ?, ?), (?, ?, ?, 'assistant', ?, ?, ?)
+          VALUES (?, ?, 'user', ?, ?, ?), (?, ?, 'assistant', ?, ?, ?)
         `,
         [
           `turn_${randomUUID()}`,
           message.conversation_id,
-          body.request_id ?? null,
           message.message,
           nextSequence + 1,
           now,
           `turn_${randomUUID()}`,
           message.conversation_id,
-          body.request_id ?? null,
           body.reply.message,
           nextSequence + 2,
           now,
@@ -529,6 +536,46 @@ export class AssistantMemoryService {
       status: 'updated',
       updatedAt,
       updatedProfile,
+    };
+  }
+
+  private async deleteProfileInMysql(): Promise<ProfileDeleteResponse> {
+    await this.assertMysqlSchemaReady();
+    const updatedAt = this.toMysqlDateTime(new Date());
+    const resetProfile: AssistantProfile = {
+      ...EMPTY_PROFILE,
+      updatedAt,
+    };
+    const pool = await this.mysqlService.getPool();
+    await pool.query(
+      `
+        INSERT INTO user_profile (
+          id, language, timezone, home_json, preferences_json, constraints_json, updated_at
+        )
+        VALUES ('default', ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          language = VALUES(language),
+          timezone = VALUES(timezone),
+          home_json = VALUES(home_json),
+          preferences_json = VALUES(preferences_json),
+          constraints_json = VALUES(constraints_json),
+          updated_at = VALUES(updated_at)
+      `,
+      [
+        resetProfile.language,
+        resetProfile.timezone,
+        JSON.stringify(resetProfile.home),
+        JSON.stringify(resetProfile.preferences),
+        JSON.stringify(resetProfile.constraints),
+        updatedAt,
+      ],
+    );
+    this.metricsService.recordProfileUpdate(true);
+
+    return {
+      status: 'deleted',
+      updatedAt,
+      updatedProfile: resetProfile,
     };
   }
 
@@ -1015,6 +1062,27 @@ export class AssistantMemoryService {
       status: 'updated',
       updatedAt,
       updatedProfile,
+    };
+  }
+
+  private async deleteProfileInFile(): Promise<ProfileDeleteResponse> {
+    const store = await this.readStore();
+    const updatedAt = this.toMysqlDateTime(new Date());
+    const resetProfile: AssistantProfile = {
+      ...EMPTY_PROFILE,
+      updatedAt,
+    };
+
+    await this.writeStore({
+      ...store,
+      profile: resetProfile,
+    });
+    this.metricsService.recordProfileUpdate(true);
+
+    return {
+      status: 'deleted',
+      updatedAt,
+      updatedProfile: resetProfile,
     };
   }
 
@@ -1875,7 +1943,9 @@ export class AssistantMemoryService {
       );
 
       if (rows.length === 0) {
-        throw new Error(`Missing MySQL schema table: ${tableName}. Run npm run db:migrate first.`);
+        throw new Error(
+          `Missing assistant-memory schema table: ${tableName}. Run npm run db:migrate first.`,
+        );
       }
     }
 
@@ -1905,7 +1975,9 @@ export class AssistantMemoryService {
       );
 
       if (rows.length === 0) {
-        throw new Error(`Missing MySQL schema table: ${tableName}. Run npm run db:migrate first.`);
+        throw new Error(
+          `Missing assistant-memory schema table: ${tableName}. Run npm run db:migrate first.`,
+        );
       }
     }
 

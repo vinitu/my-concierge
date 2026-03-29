@@ -107,7 +107,8 @@ describe('gateway-email (e2e)', () => {
     expect(inboundResponse.body.accepted).toBe(true);
     expect(assistantApiClient.sendConversation).toHaveBeenCalledWith(
       expect.objectContaining({
-        contact: 'alice@example.com',
+        userId: 'alice@example.com',
+        conversationId: expect.stringMatching(/^email_/),
         mailbox: 'INBOX',
         message: 'Can you help plan dinner?',
       }),

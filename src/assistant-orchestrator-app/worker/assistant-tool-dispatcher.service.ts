@@ -79,12 +79,8 @@ export class AssistantToolDispatcherService {
             tool_name: toolCall.name,
           };
         }
-        case 'memory_preference_search':
         case 'memory_fact_search':
-        case 'memory_routine_search':
-        case 'memory_project_search':
-        case 'memory_episode_search':
-        case 'memory_rule_search': {
+        {
           const query =
             typeof toolCall.arguments.query === 'string' ? toolCall.arguments.query : '';
           const memoryKind = this.kindFromMemoryTool(toolCall.name);
@@ -99,12 +95,8 @@ export class AssistantToolDispatcherService {
             tool_name: toolCall.name,
           };
         }
-        case 'memory_preference_write':
         case 'memory_fact_write':
-        case 'memory_routine_write':
-        case 'memory_project_write':
-        case 'memory_episode_write':
-        case 'memory_rule_write': {
+        {
           const memoryKind = this.kindFromMemoryTool(toolCall.name);
           const entries = this.normalizeTypedWriteEntries(
             memoryKind,
@@ -159,24 +151,9 @@ export class AssistantToolDispatcherService {
 
   private kindFromMemoryTool(toolName: AssistantToolName): MemoryKind {
     switch (toolName) {
-      case 'memory_preference_search':
-      case 'memory_preference_write':
-        return 'preference';
       case 'memory_fact_search':
       case 'memory_fact_write':
         return 'fact';
-      case 'memory_routine_search':
-      case 'memory_routine_write':
-        return 'routine';
-      case 'memory_project_search':
-      case 'memory_project_write':
-        return 'project';
-      case 'memory_episode_search':
-      case 'memory_episode_write':
-        return 'episode';
-      case 'memory_rule_search':
-      case 'memory_rule_write':
-        return 'rule';
       default:
         throw new AssistantRuntimeError(
           'TOOL_ERROR',

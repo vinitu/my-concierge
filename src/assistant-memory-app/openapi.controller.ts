@@ -123,6 +123,10 @@ export class AssistantMemoryOpenApiController {
             responses: { "200": { description: "Profile updated" } },
             summary: "Update canonical assistant profile",
           },
+          delete: {
+            responses: { "200": { description: "Profile reset to empty state" } },
+            summary: "Delete canonical assistant profile",
+          },
         },
         "/v1/search": {
           post: {

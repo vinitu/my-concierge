@@ -5,6 +5,7 @@ import {
   assistantSynthesisOutputParser,
 } from './assistant-llm-output-schema';
 import {
+  type AssistantToolDescriptor,
   type AssistantToolName,
   AssistantToolCatalogService,
 } from './assistant-tool-catalog.service';
@@ -68,6 +69,10 @@ export class AssistantOrchestratorPromptService {
     return JSON.stringify(this.toolCatalogService.listTools(enabledTools), null, 2);
   }
 
+  listAvailableTools(enabledTools?: AssistantToolName[]): AssistantToolDescriptor[] {
+    return this.toolCatalogService.listTools(enabledTools);
+  }
+
   buildRequestSection(
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantOrchestratorRuntimeContext,
@@ -77,7 +82,7 @@ export class AssistantOrchestratorPromptService {
 
     return JSON.stringify(
       {
-        available_tools: this.toolCatalogService.listTools(enabledTools),
+        tools: this.toolCatalogService.listTools(enabledTools),
         conversation_context: this.buildConversationContextSection(input),
         retrieved_memory: input.retrieved_memory,
         system_instructions: systemInstructions,

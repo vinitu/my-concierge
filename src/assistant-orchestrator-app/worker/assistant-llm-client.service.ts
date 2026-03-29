@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
-  AssistantLlmMainGenerateResponse,
+  AssistantLlmAvailableTool,
+  AssistantLlmConversationRespondResponse,
   AssistantLlmMessage,
   AssistantLlmProvider,
   AssistantLlmProviderStatus,
@@ -22,9 +23,15 @@ interface AssistantLlmModelsResponse {
 export class AssistantLlmClientService implements AssistantLlmProviderPort {
   constructor(private readonly configService: ConfigService) {}
 
-  async generateFromMessages(messages: AssistantLlmMessage[]): Promise<string> {
-    const response = await fetch(`${this.baseUrl()}/v1/generate/main`, {
-      body: JSON.stringify({ messages }),
+  async generateFromMessages(
+    messages: AssistantLlmMessage[],
+    availableTools?: AssistantLlmAvailableTool[],
+  ): Promise<AssistantLlmConversationRespondResponse> {
+    const response = await fetch(`${this.baseUrl()}/v1/conversation/respond`, {
+      body: JSON.stringify({
+        messages,
+        tools: availableTools ?? [],
+      }),
       headers: { 'content-type': 'application/json' },
       method: 'POST',
     });
@@ -32,19 +39,18 @@ export class AssistantLlmClientService implements AssistantLlmProviderPort {
     if (!response.ok) {
       const body = await response.text();
       throw new Error(
-        `assistant-llm returned ${String(response.status)} for /v1/generate/main: ${body}`,
+        `assistant-llm returned ${String(response.status)} for /v1/conversation/respond: ${body}`,
       );
     }
 
-    const payload = (await response.json()) as AssistantLlmMainGenerateResponse;
-    return payload.text;
+    return (await response.json()) as AssistantLlmConversationRespondResponse;
   }
 
   async summarizeConversation(
     messages: AssistantLlmMessage[],
     previousContext: string,
   ): Promise<string> {
-    const response = await fetch(`${this.baseUrl()}/v1/generate/summarize`, {
+    const response = await fetch(`${this.baseUrl()}/v1/conversation/summarize`, {
       body: JSON.stringify({
         messages,
         previous_context: previousContext,
@@ -56,7 +62,7 @@ export class AssistantLlmClientService implements AssistantLlmProviderPort {
     if (!response.ok) {
       const body = await response.text();
       throw new Error(
-        `assistant-llm returned ${String(response.status)} for /v1/generate/summarize: ${body}`,
+        `assistant-llm returned ${String(response.status)} for /v1/conversation/summarize: ${body}`,
       );
     }
 

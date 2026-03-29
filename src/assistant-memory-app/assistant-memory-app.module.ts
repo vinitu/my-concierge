@@ -9,6 +9,7 @@ import { AssistantMemoryMetricsService } from "./observability/assistant-memory-
 import { HttpRequestMetricsInterceptor } from "./observability/http-request-metrics.interceptor";
 import { AssistantMemoryController } from "./memory/assistant-memory.controller";
 import { AssistantMemoryEnrichmentService } from "./memory/assistant-memory-enrichment.service";
+import { AssistantMemoryLlmClientService } from "./memory/assistant-memory-llm-client.service";
 import { AssistantMemoryService } from "./memory/assistant-memory.service";
 import { AssistantMemoryOpenApiController } from "./openapi.controller";
 import { AssistantMemoryRunEventPublisherService } from "./run-events/assistant-memory-run-event-publisher.service";
@@ -30,6 +31,7 @@ import { AssistantMemoryStatusController } from "./status.controller";
     AssistantMemoryMetricsService,
     MysqlService,
     AssistantMemoryEnrichmentService,
+    AssistantMemoryLlmClientService,
     AssistantMemoryRunEventPublisherService,
     AssistantMemoryService,
     HttpRequestMetricsInterceptor,

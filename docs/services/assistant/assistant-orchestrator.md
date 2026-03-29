@@ -10,7 +10,7 @@ It consumes jobs from Redis, builds runtime context, calls `assistant-llm` for m
 - Consume accepted jobs from queue
 - Build runtime input from bootstrap rules, conversation window, and retrieved memory
 - Execute runtime loop and tool dispatch
-- Call `assistant-llm` (`/v1/generate/main`, `/v1/generate/summarize`)
+- Call `assistant-llm` (`/v1/conversation/respond`, `/v1/conversation/summarize`)
 - Append final exchange to `assistant-memory` conversation API
 - Publish `run.started`, `run.thinking`, `run.completed`, `run.failed`
 - Expose operational endpoints (`/status`, `/metrics`, `/config`, `/skills`, `/conversations`)
@@ -45,7 +45,7 @@ runtime/
 - `enabled_tools`
 - Brave integration settings (`brave_*`)
 
-LLM settings (`provider`, `model`, `*_api_key`, `*_base_url`, timeouts, `structured_mode`, `small_model_safe_mode`) are configured only in `assistant-llm`.
+LLM settings (`provider`, `model`, `*_api_key`, `*_base_url`, timeouts) are configured only in `assistant-llm`.
 
 ## Tool Surface
 
@@ -54,18 +54,8 @@ Model-callable tools:
 - `time_current`
 - `web_search`
 - `memory_search`
-- `memory_preference_search`
 - `memory_fact_search`
-- `memory_routine_search`
-- `memory_project_search`
-- `memory_episode_search`
-- `memory_rule_search`
-- `memory_preference_write`
 - `memory_fact_write`
-- `memory_routine_write`
-- `memory_project_write`
-- `memory_episode_write`
-- `memory_rule_write`
 - `memory_conversation_search`
 - `skill_execute`
 

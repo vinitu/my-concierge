@@ -6,7 +6,7 @@ import type { AssistantToolName } from './assistant-tool-catalog.service';
 import { AssistantOrchestratorConfigService } from './assistant-orchestrator-config.service';
 
 describe('AssistantOrchestratorConfigService', () => {
-  it('drops unsupported legacy mem_* tool names from enabled_tools', async () => {
+  it('drops unsupported tool names from enabled_tools', async () => {
     const datadir = await mkdtemp(join(tmpdir(), 'assistant-orchestrator-config-'));
     const service = new AssistantOrchestratorConfigService(
       new ConfigService({

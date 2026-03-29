@@ -112,4 +112,32 @@ describe('AssistantMemoryService', () => {
     expect(result.count).toBe(1);
     expect(result.entries[0]?.kind).toBe('rule');
   });
+
+  it('resets profile to empty state on deleteProfile', async () => {
+    const service = await createService();
+
+    await service.updateProfile({
+      constraints: { reply_style: 'concise' },
+      home: { city: 'Warsaw' },
+      language: 'ru',
+      preferences: { tone: 'direct' },
+      source: 'test',
+      timezone: 'Europe/Warsaw',
+    });
+
+    const deleted = await service.deleteProfile();
+    expect(deleted.status).toBe('deleted');
+    expect(deleted.updatedProfile.language).toBeNull();
+    expect(deleted.updatedProfile.timezone).toBeNull();
+    expect(deleted.updatedProfile.home).toEqual({});
+    expect(deleted.updatedProfile.preferences).toEqual({});
+    expect(deleted.updatedProfile.constraints).toEqual({});
+
+    const profile = await service.getProfile();
+    expect(profile.language).toBeNull();
+    expect(profile.timezone).toBeNull();
+    expect(profile.home).toEqual({});
+    expect(profile.preferences).toEqual({});
+    expect(profile.constraints).toEqual({});
+  });
 });

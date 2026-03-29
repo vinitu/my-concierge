@@ -3,7 +3,6 @@ import {
   Get,
   Inject,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { AssistantOrchestratorMetricsService } from './observability/assistant-orchestrator-metrics.service';
 import {
   WORKER_QUEUE_CONSUMER,
@@ -13,7 +12,6 @@ import {
 @Controller()
 export class AssistantOrchestratorStatusController {
   constructor(
-    private readonly configService: ConfigService,
     private readonly metricsService: AssistantOrchestratorMetricsService,
     @Inject(WORKER_QUEUE_CONSUMER) private readonly queueConsumer: QueueConsumer,
   ) {}
@@ -30,10 +28,7 @@ export class AssistantOrchestratorStatusController {
     this.metricsService.recordStatusRequest();
 
     return {
-      conversationStore: this.configService.get<string>(
-        'ASSISTANT_CONVERSATION_STORE_DRIVER',
-        'mysql',
-      ),
+      conversationStore: 'assistant-memory',
       queueAdapter: this.queueConsumer.driverName(),
       ready: true,
       service: 'assistant-orchestrator',

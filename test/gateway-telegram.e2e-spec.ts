@@ -85,7 +85,8 @@ describe('gateway-telegram (e2e)', () => {
     expect(assistantApiClient.sendConversation).toHaveBeenCalledWith(
       expect.objectContaining({
         chat: '12345',
-        contact: 'alice',
+        userId: 'alice',
+        conversationId: 'tg_12345',
         message: 'Can you help plan dinner?',
       }),
     );

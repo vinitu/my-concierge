@@ -1,7 +1,13 @@
-import type { AssistantLlmMessage } from '../contracts/assistant-llm';
+import type {
+  AssistantLlmAvailableTool,
+  AssistantLlmMessage,
+} from '../contracts/assistant-llm';
 
 export interface AssistantLlmProviderPort {
-  generateFromMessages(messages: AssistantLlmMessage[]): Promise<string>;
+  generateFromMessages(
+    messages: AssistantLlmMessage[],
+    availableTools?: AssistantLlmAvailableTool[],
+  ): Promise<string>;
   summarizeConversation(
     messages: AssistantLlmMessage[],
     previousContext: string,

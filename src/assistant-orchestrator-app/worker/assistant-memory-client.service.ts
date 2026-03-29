@@ -155,7 +155,7 @@ export class AssistantMemoryClientService {
 
   private baseUrl(): string {
     return trimTrailingSlash(
-      this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:3002'),
+      this.configService.get<string>('ASSISTANT_MEMORY_URL', 'http://localhost:8086'),
     );
   }
 
@@ -177,18 +177,10 @@ export class AssistantMemoryClientService {
 
   private kindResource(kind: MemoryKind): string {
     switch (kind) {
-      case 'preference':
-        return 'preferences';
       case 'fact':
         return 'facts';
-      case 'routine':
-        return 'routines';
-      case 'project':
-        return 'projects';
-      case 'episode':
-        return 'episodes';
-      case 'rule':
-        return 'rules';
+      default:
+        throw new Error(`Unsupported memory kind for assistant-memory API: ${kind}`);
     }
   }
 }

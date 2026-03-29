@@ -132,12 +132,14 @@ Default `OLLAMA_MODEL` is `gemma3:1b`.
 - App services use internal port `3000`.
 - `mysql` uses internal port `3306`.
 - `dashboard` is exposed on host port `8080`.
-- `gateway-web` is exposed on host port `8079`.
-- `gateway-telegram` is exposed on host port `8081`.
-- `gateway-email` is exposed on host port `8082`.
-- `assistant-api` is exposed on host port `3000`.
-- `assistant-orchestrator` is exposed on host port `3001`.
-- `assistant-llm` is exposed on host port `3003`.
+- `gateway-web` is exposed on host port `8081`.
+- `gateway-telegram` is exposed on host port `8082`.
+- `gateway-email` is exposed on host port `8083`.
+- `assistant-api` is exposed on host port `8084`.
+- `assistant-orchestrator` is exposed on host port `8085`.
+- `assistant-memory` is exposed on host port `8086`.
+- `assistant-llm` is exposed on host port `8087`.
+- `swagger` is exposed on host port `8088`.
 - `assistant-memory` is exposed on host port `3002`.
 - `assistant-scheduler` is not part of the current local Compose stack.
 

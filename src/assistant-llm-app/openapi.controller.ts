@@ -29,20 +29,19 @@ export class AssistantLlmOpenApiController {
             summary: "List provider models",
           },
         },
-        "/v1/generate/main": {
+        "/v1/conversation/respond": {
           post: {
-            summary: "Generate main response from messages",
+            summary: "Generate structured conversation response from messages and tools",
           },
         },
-        "/v1/generate/summarize": {
+        "/v1/conversation/summarize": {
           post: {
             summary: "Generate compact summary for conversation context",
           },
         },
-        "/v1/generate/extract-memory": {
+        "/v1/memory/facts": {
           post: {
-            summary:
-              "Extract one configured memory domain (profile or one typed kind)",
+            summary: "Extract fact candidates from conversation messages",
           },
         },
       },

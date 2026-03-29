@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  AssistantLlmAvailableTool,
+  AssistantLlmConversationRespondResponse,
   AssistantLlmMessage,
   AssistantLlmProvider as AssistantLlmProviderPort,
 } from './assistant-llm-provider';
@@ -11,8 +13,14 @@ export class AssistantLlmProviderService implements AssistantLlmProviderPort {
     private readonly assistantLlmClientService: AssistantLlmClientService,
   ) {}
 
-  async generateFromMessages(messages: AssistantLlmMessage[]): Promise<string> {
-    return this.assistantLlmClientService.generateFromMessages(messages);
+  async generateFromMessages(
+    messages: AssistantLlmMessage[],
+    availableTools?: AssistantLlmAvailableTool[],
+  ): Promise<AssistantLlmConversationRespondResponse> {
+    return this.assistantLlmClientService.generateFromMessages(
+      messages,
+      availableTools,
+    );
   }
 
   async summarizeConversation(

@@ -1,5 +1,7 @@
 import type { MemoryEntry } from '../../contracts/assistant-memory';
 import type {
+  AssistantLlmAvailableTool as SharedAssistantLlmAvailableTool,
+  AssistantLlmConversationRespondResponse as SharedAssistantLlmConversationRespondResponse,
   AssistantLlmMessage as SharedAssistantLlmMessage,
   AssistantLlmProvider as SharedAssistantLlmProvider,
 } from '../../contracts/assistant-llm';
@@ -18,9 +20,15 @@ export interface AssistantLlmGenerateInput {
 }
 
 export type AssistantLlmMessage = SharedAssistantLlmMessage;
+export type AssistantLlmAvailableTool = SharedAssistantLlmAvailableTool;
+export type AssistantLlmConversationRespondResponse =
+  SharedAssistantLlmConversationRespondResponse;
 
 export interface AssistantLlmProvider {
-  generateFromMessages(messages: AssistantLlmMessage[]): Promise<string>;
+  generateFromMessages(
+    messages: AssistantLlmMessage[],
+    availableTools?: AssistantLlmAvailableTool[],
+  ): Promise<AssistantLlmConversationRespondResponse>;
   summarizeConversation(
     messages: AssistantLlmMessage[],
     previousContext: string,

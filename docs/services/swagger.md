@@ -37,13 +37,14 @@ flowchart LR
 
 ## Source Endpoints
 
-- `http://localhost:3000/openapi.json`
-- `http://localhost:3001/openapi.json`
-- `http://localhost:3002/openapi.json`
+- `http://localhost:8084/openapi.json`
+- `http://localhost:8085/openapi.json`
+- `http://localhost:8086/openapi.json`
+- `http://localhost:8087/openapi.json`
 - `http://localhost:8080/openapi.json`
-- `http://localhost:8079/openapi.json`
 - `http://localhost:8081/openapi.json`
 - `http://localhost:8082/openapi.json`
+- `http://localhost:8083/openapi.json`
 
 ## Metrics
 

@@ -20,7 +20,7 @@ export class GatewayEmailAssistantApiClientService {
     userId: string;
   }): Promise<void> {
     const assistantApiUrl = trimTrailingSlash(
-      this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:3000'),
+      this.configService.get<string>('ASSISTANT_API_URL', 'http://localhost:8084'),
     );
     const url = `${assistantApiUrl}/conversation/email/${encodeURIComponent(input.mailbox)}/${encodeURIComponent(input.userId)}`;
 

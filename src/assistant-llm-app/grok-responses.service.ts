@@ -2,7 +2,10 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import type { AssistantLlmMessage } from '../contracts/assistant-llm';
+import type {
+  AssistantLlmAvailableTool,
+  AssistantLlmMessage,
+} from '../contracts/assistant-llm';
 import { AssistantLlmConfigService } from './assistant-llm-config.service';
 import type { AssistantLlmProviderPort } from './assistant-llm-provider-port';
 
@@ -30,7 +33,10 @@ export class GrokResponsesService implements AssistantLlmProviderPort {
 
   constructor(private readonly assistantLlmConfigService: AssistantLlmConfigService) {}
 
-  async generateFromMessages(messages: AssistantLlmMessage[]): Promise<string> {
+  async generateFromMessages(
+    messages: AssistantLlmMessage[],
+    _availableTools?: AssistantLlmAvailableTool[],
+  ): Promise<string> {
     return this.sendResponse(messages);
   }
 

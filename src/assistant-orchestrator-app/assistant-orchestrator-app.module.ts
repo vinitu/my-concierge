@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
-import { MysqlService } from '../persistence/mysql.service';
 import { AssistantOrchestratorMetricsController } from './observability/assistant-orchestrator-metrics.controller';
 import { AssistantOrchestratorMetricsService } from './observability/assistant-orchestrator-metrics.service';
 import { HttpRequestMetricsInterceptor } from './observability/http-request-metrics.interceptor';
@@ -51,7 +50,6 @@ import {
     BraveSearchService,
     AssistantRuntimeService,
     AssistantToolDispatcherService,
-    MysqlService,
     AssistantOrchestratorProcessorService,
     AssistantOrchestratorConfigService,
     AssistantOrchestratorConversationService,

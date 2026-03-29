@@ -29,7 +29,7 @@ export class DashboardServiceRegistryService {
   list(): DashboardServiceDefinition[] {
     const assistantApiPanel = this.url(
       "DASHBOARD_ASSISTANT_API_PANEL_URL",
-      "http://localhost:3000",
+      "http://localhost:8084",
     );
     const assistantApiStatus = this.url(
       "DASHBOARD_ASSISTANT_API_STATUS_URL",
@@ -37,7 +37,7 @@ export class DashboardServiceRegistryService {
     );
     const assistantOrchestratorPanel = this.url(
       "DASHBOARD_ASSISTANT_ORCHESTRATOR_PANEL_URL",
-      "http://localhost:3001",
+      "http://localhost:8085",
     );
     const assistantOrchestratorStatus = this.url(
       "DASHBOARD_ASSISTANT_ORCHESTRATOR_STATUS_URL",
@@ -45,7 +45,7 @@ export class DashboardServiceRegistryService {
     );
     const assistantMemoryPanel = this.url(
       "DASHBOARD_ASSISTANT_MEMORY_PANEL_URL",
-      "http://localhost:3002",
+      "http://localhost:8086",
     );
     const assistantMemoryStatus = this.url(
       "DASHBOARD_ASSISTANT_MEMORY_STATUS_URL",
@@ -53,7 +53,7 @@ export class DashboardServiceRegistryService {
     );
     const assistantLlmPanel = this.url(
       "DASHBOARD_ASSISTANT_LLM_PANEL_URL",
-      "http://localhost:3003",
+      "http://localhost:8087",
     );
     const assistantLlmStatus = this.url(
       "DASHBOARD_ASSISTANT_LLM_STATUS_URL",
@@ -69,7 +69,7 @@ export class DashboardServiceRegistryService {
     );
     const gatewayEmailPanel = this.url(
       "DASHBOARD_GATEWAY_EMAIL_PANEL_URL",
-      "http://localhost:8082",
+      "http://localhost:8083",
     );
     const gatewayEmailStatus = this.url(
       "DASHBOARD_GATEWAY_EMAIL_STATUS_URL",
@@ -77,7 +77,7 @@ export class DashboardServiceRegistryService {
     );
     const gatewayWebPanel = this.url(
       "DASHBOARD_GATEWAY_WEB_PANEL_URL",
-      "http://localhost:8079",
+      "http://localhost:8081",
     );
     const gatewayWebStatus = this.url(
       "DASHBOARD_GATEWAY_WEB_STATUS_URL",

@@ -1,8 +1,4 @@
-import type {
-  AssistantMemoryExtractKind,
-  BaseMemoryWriteCandidate,
-  MemoryKind,
-} from "./assistant-memory";
+import type { AssistantMemoryExtractKind } from "./assistant-memory";
 
 export type { AssistantMemoryExtractKind };
 
@@ -13,6 +9,12 @@ export interface AssistantLlmMessage {
   role: "assistant" | "system" | "user";
 }
 
+export interface AssistantLlmAvailableTool {
+  description: string;
+  name: string;
+  use_when?: string;
+}
+
 export interface AssistantLlmConfig {
   deepseek_api_key: string;
   deepseek_base_url: string;
@@ -21,8 +23,6 @@ export interface AssistantLlmConfig {
   ollama_base_url: string;
   ollama_timeout_ms: number;
   provider: AssistantLlmProvider;
-  small_model_safe_mode: boolean;
-  structured_mode: boolean;
   xai_api_key: string;
   xai_base_url: string;
   xai_timeout_ms: number;
@@ -38,11 +38,23 @@ export interface AssistantLlmProviderStatus {
 }
 
 export interface AssistantLlmMainGenerateRequest {
+  tools?: AssistantLlmAvailableTool[];
   messages: AssistantLlmMessage[];
 }
 
-export interface AssistantLlmMainGenerateResponse {
-  text: string;
+export interface AssistantLlmConversationRespondRequest {
+  messages: AssistantLlmMessage[];
+  tools?: AssistantLlmAvailableTool[];
+}
+
+export interface AssistantLlmConversationRespondResponse {
+  context?: string;
+  memory_writes?: Record<string, unknown>[];
+  message: string;
+  tool_arguments?: Record<string, unknown>;
+  tool_name?: string;
+  tool_observations?: Record<string, unknown>[];
+  type: "error" | "final" | "tool_call";
 }
 
 export interface AssistantLlmSummarizeRequest {
@@ -54,26 +66,11 @@ export interface AssistantLlmSummarizeResponse {
   summary: string;
 }
 
-export interface AssistantLlmExtractMemoryRequest {
-  conversation_id: string;
-  extract: AssistantMemoryExtractKind;
+export interface AssistantLlmMemoryByKindRequest {
+  conversation_id?: string;
   messages: AssistantLlmMessage[];
 }
 
-export interface AssistantLlmExtractMemoryResponse {
-  profile_patch: {
-    constraints?: Record<string, unknown>;
-    home?: Record<string, unknown>;
-    language?: string | null;
-    preferences?: Record<string, unknown>;
-    timezone?: string | null;
-  };
-  typed_writes: {
-    episode: Array<BaseMemoryWriteCandidate & { kind?: MemoryKind }>;
-    fact: Array<BaseMemoryWriteCandidate & { kind?: MemoryKind }>;
-    preference: Array<BaseMemoryWriteCandidate & { kind?: MemoryKind }>;
-    project: Array<BaseMemoryWriteCandidate & { kind?: MemoryKind }>;
-    routine: Array<BaseMemoryWriteCandidate & { kind?: MemoryKind }>;
-    rule: Array<BaseMemoryWriteCandidate & { kind?: MemoryKind }>;
-  };
+export interface AssistantLlmMemoryFactResponse {
+  items: string[];
 }

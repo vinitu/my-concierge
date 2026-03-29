@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { AssistantApiAppModule } from '../src/assistant-api-app/assistant-api-app.module';
+import { RUN_EVENT_QUEUE_CONSUMER } from '../src/assistant-api-app/run-events/run-event-queue';
 
 describe('assistant-api (e2e)', () => {
   let app: NestExpressApplication;
@@ -24,6 +25,11 @@ describe('assistant-api (e2e)', () => {
           QUEUE_ADAPTER: 'file',
         }),
       )
+      .overrideProvider(RUN_EVENT_QUEUE_CONSUMER)
+      .useValue({
+        consumeNext: jest.fn().mockResolvedValue(null),
+        driverName: jest.fn().mockReturnValue('test'),
+      })
       .compile();
 
     app = moduleRef.createNestApplication<NestExpressApplication>();

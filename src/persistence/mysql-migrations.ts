@@ -108,6 +108,20 @@ export const MYSQL_MIGRATIONS: MysqlMigration[] = [
       `,
     ],
   },
+  {
+    name: 'remove_conversation_turns_run_id',
+    version: 3,
+    statements: [
+      `
+        DROP INDEX idx_conversation_turns_run_id
+        ON conversation_turns
+      `,
+      `
+        ALTER TABLE conversation_turns
+        DROP COLUMN run_id
+      `,
+    ],
+  },
 ];
 
 export const REQUIRED_SCHEMA_TABLES = [
