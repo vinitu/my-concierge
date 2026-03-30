@@ -51,6 +51,14 @@ export class DashboardServiceRegistryService {
       "DASHBOARD_ASSISTANT_MEMORY_STATUS_URL",
       "http://assistant-memory:3000/status",
     );
+    const assistantSchedulerPanel = this.url(
+      "DASHBOARD_ASSISTANT_SCHEDULER_PANEL_URL",
+      "http://localhost:8089",
+    );
+    const assistantSchedulerStatus = this.url(
+      "DASHBOARD_ASSISTANT_SCHEDULER_STATUS_URL",
+      "http://assistant-scheduler:3000/status",
+    );
     const assistantLlmPanel = this.url(
       "DASHBOARD_ASSISTANT_LLM_PANEL_URL",
       "http://localhost:8087",
@@ -151,6 +159,21 @@ export class DashboardServiceRegistryService {
         status_url: assistantMemoryStatus,
         config_path: "/config",
         entities: [],
+      },
+      {
+        key: "assistant-scheduler",
+        kind: "application",
+        name: "assistant-scheduler",
+        notes: "Periodic jobs dispatcher to assistant-api",
+        upstream_url: this.url(
+          "DASHBOARD_ASSISTANT_SCHEDULER_UPSTREAM_URL",
+          "http://assistant-scheduler:3000",
+        ),
+        prefix: "/assistant-scheduler",
+        panel_url: assistantSchedulerPanel,
+        status_url: assistantSchedulerStatus,
+        config_path: "/config",
+        entities: [{ id: "jobs", label: "Jobs", path: "/v1/jobs" }],
       },
       {
         key: "gateway-telegram",

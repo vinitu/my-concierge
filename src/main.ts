@@ -10,6 +10,7 @@ import { AssistantApiAppModule } from './assistant-api-app/assistant-api-app.mod
 import { AssistantLlmAppModule } from './assistant-llm-app/assistant-llm-app.module';
 import { AssistantMemoryAppModule } from './assistant-memory-app/assistant-memory-app.module';
 import { AssistantOrchestratorAppModule } from './assistant-orchestrator-app/assistant-orchestrator-app.module';
+import { AssistantSchedulerAppModule } from './assistant-scheduler-app/assistant-scheduler-app.module';
 import { DashboardAppModule } from './dashboard-app/dashboard-app.module';
 import { GatewayEmailAppModule } from './gateway-email-app/gateway-email-app.module';
 import { GatewayTelegramAppModule } from './gateway-telegram-app/gateway-telegram-app.module';
@@ -131,6 +132,8 @@ async function bootstrap(): Promise<void> {
         ? AssistantOrchestratorAppModule
         : appRole === 'assistant-memory'
           ? AssistantMemoryAppModule
+        : appRole === 'assistant-scheduler'
+          ? AssistantSchedulerAppModule
         : appRole === 'gateway-email'
           ? GatewayEmailAppModule
         : appRole === 'gateway-telegram'

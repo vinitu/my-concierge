@@ -124,6 +124,41 @@ services:
     ports:
       - "8086:3000"
 
+  assistant-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: myconcierge-assistant-scheduler:local
+    container_name: myconcierge-assistant-scheduler
+    restart: unless-stopped
+    depends_on:
+      - assistant-api
+    environment:
+      APP_ROLE: assistant-scheduler
+      ASSISTANT_API_URL: http://assistant-api:3000
+      ASSISTANT_SCHEDULER_INTERNAL_LOOP: "false"
+      ASSISTANT_SCHEDULER_RUNTIME_DIR: ${ASSISTANT_SCHEDULER_RUNTIME_DIR:-/app/runtime}
+      NODE_ENV: production
+      PORT: 3000
+    ports:
+      - "8089:3000"
+    volumes:
+      - ./runtime/assistant-scheduler:/app/runtime
+
+  assistant-scheduler-cron:
+    image: alpine:3.20
+    container_name: myconcierge-assistant-scheduler-cron
+    restart: unless-stopped
+    depends_on:
+      - assistant-scheduler
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        apk add --no-cache curl
+        echo "* * * * * curl -fsS -X POST http://assistant-scheduler:3000/v1/dispatch-due >/proc/1/fd/1 2>/proc/1/fd/2" > /etc/crontabs/root
+        crond -f -l 8
+
   gateway-telegram:
     build:
       context: .
@@ -197,6 +232,8 @@ services:
       - assistant-orchestrator
       - assistant-llm
       - assistant-memory
+      - assistant-scheduler
+      - assistant-scheduler-cron
       - gateway-web
       - gateway-telegram
       - gateway-email
@@ -214,6 +251,7 @@ services:
       DASHBOARD_ASSISTANT_ORCHESTRATOR_PANEL_URL: http://localhost:8085
       DASHBOARD_ASSISTANT_MEMORY_PANEL_URL: http://localhost:8086
       DASHBOARD_ASSISTANT_LLM_PANEL_URL: http://localhost:8087
+      DASHBOARD_ASSISTANT_SCHEDULER_PANEL_URL: http://localhost:8089
       DASHBOARD_GATEWAY_WEB_PANEL_URL: http://localhost:8081
       DASHBOARD_GATEWAY_TELEGRAM_PANEL_URL: http://localhost:8082
       DASHBOARD_GATEWAY_EMAIL_PANEL_URL: http://localhost:8083
@@ -230,6 +268,8 @@ services:
       - assistant-orchestrator
       - assistant-llm
       - assistant-memory
+      - assistant-scheduler
+      - assistant-scheduler-cron
       - gateway-telegram
       - gateway-email
       - dashboard
@@ -240,6 +280,7 @@ services:
           { "url": "http://localhost:8085/openapi.json", "name": "assistant-orchestrator" },
           { "url": "http://localhost:8087/openapi.json", "name": "assistant-llm" },
           { "url": "http://localhost:8086/openapi.json", "name": "assistant-memory" },
+          { "url": "http://localhost:8089/openapi.json", "name": "assistant-scheduler" },
           { "url": "http://localhost:8081/openapi.json", "name": "gateway-web" },
           { "url": "http://localhost:8082/openapi.json", "name": "gateway-telegram" },
           { "url": "http://localhost:8083/openapi.json", "name": "gateway-email" },

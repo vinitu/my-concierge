@@ -6,9 +6,9 @@ help:
 	@printf "\nMyConcierge Commands\n\n"
 	@printf "  \033[36m%-10s\033[0m %s\n" "help" "Show available make targets"
 	@printf "  \033[36m%-10s\033[0m %s\n" "env" "Create .env from .env.example if it does not exist"
-	@printf "  \033[36m%-10s\033[0m %s\n" "build" "Build assistant-api, assistant-orchestrator, assistant-llm, assistant-memory, and gateway-web Docker images"
+	@printf "  \033[36m%-10s\033[0m %s\n" "build" "Build assistant-api, assistant-orchestrator, assistant-llm, assistant-memory, assistant-scheduler, and gateway-web Docker images"
 	@printf "  \033[36m%-10s\033[0m %s\n" "migrate" "Run MySQL migrations inside the assistant-orchestrator container"
-	@printf "  \033[36m%-10s\033[0m %s\n" "up" "Start assistant-api, assistant-orchestrator, assistant-llm, assistant-memory, gateway-web, and swagger with Docker Compose"
+	@printf "  \033[36m%-10s\033[0m %s\n" "up" "Start assistant-api, assistant-orchestrator, assistant-llm, assistant-memory, assistant-scheduler (+cron trigger), gateway-web, and swagger with Docker Compose"
 	@printf "  \033[36m%-10s\033[0m %s\n" "down" "Stop Docker Compose services"
 	@printf "\n"
 
@@ -21,14 +21,14 @@ env:
 	fi
 
 build:
-	docker compose build assistant-api assistant-orchestrator assistant-llm assistant-memory gateway-web
+	docker compose build assistant-api assistant-orchestrator assistant-llm assistant-memory assistant-scheduler gateway-web
 
 migrate:
 	docker compose build assistant-orchestrator
 	docker compose run --rm assistant-orchestrator npm run db:migrate
 
 up:
-	docker compose up --build assistant-api assistant-orchestrator assistant-llm assistant-memory gateway-web swagger
+	docker compose up --build assistant-api assistant-orchestrator assistant-llm assistant-memory assistant-scheduler assistant-scheduler-cron gateway-web swagger
 
 down:
 	docker compose down --remove-orphans
