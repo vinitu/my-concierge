@@ -73,6 +73,8 @@ Describe the endpoints of all application services in one place.
   Purpose: run summary generation
 - `POST /v1/memory/facts`
   Purpose: extract fact candidates from conversation messages
+- `POST /v1/memory/profile`
+  Purpose: extract profile patch candidates from conversation messages
 
 ### Notes
 
@@ -258,6 +260,8 @@ Describe the endpoints of all application services in one place.
   Purpose: receive the final assistant response from `assistant-api` and send it to the browser through WebSocket
 - `POST /thinking/:conversationId`
   Purpose: receive transient thinking callbacks from `assistant-api` and show them in the browser for the requested number of seconds
+- `POST /event/:conversationId`
+  Purpose: receive run and memory event callbacks from `assistant-api` and show them in the browser
 - `GET /status`
   Purpose: report `gateway-web` readiness
 - `GET /metrics`

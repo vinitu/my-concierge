@@ -21,6 +21,7 @@ Describe what `assistant-api` sends to callback targets after consuming run even
 - `thinking` callbacks are transient and may happen every `N` seconds while the worker run is in progress.
 - `response` callbacks contain the final assistant message.
 - For `gateway-web`, callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
+- For `gateway-web`, event callbacks are sent to `POST /event/<conversation_id>`.
 - For `gateway-web`, `<conversation_id>` is the stable browser `conversation_id` stored in the `myconcierge_conversation_id` cookie.
 - `gateway-web` should forward `thinking` callbacks to the browser through WebSocket without persisting them.
 - `gateway-web` should forward final `response` callbacks to the browser through WebSocket.
@@ -67,6 +68,37 @@ Describe what `assistant-api` sends to callback targets after consuming run even
   "message": "I received your message: Turn on the kitchen lights"
 }
 ```
+
+## Event Callback Request
+
+### Endpoint
+
+`POST /event/<conversation_id>`
+
+### Body
+
+| Field | Type | Required | Description |
+|---------|---------|---------|-------------|
+| `type` | `string` | yes | Event type (`run.*` or `memory.*`) |
+| `message` | `string` | yes | Human-readable event message |
+
+Example:
+
+```json
+{
+  "type": "memory.profile.updated",
+  "message": "Updated profile in memory"
+}
+```
+
+Typical memory event types:
+- `memory.fact.added`
+- `memory.fact.updated`
+- `memory.fact.deleted`
+- `memory.fact.readed`
+- `memory.fact.failed`
+- `memory.profile.updated`
+- `memory.profile.failed`
 
 ## Callback Response
 

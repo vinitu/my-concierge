@@ -32,18 +32,18 @@ describe("CallbackDeliveryService", () => {
     };
   }
 
-  it("delivers memory extract events", async () => {
+  it("delivers memory profile events", async () => {
     const fetchMock = jest.fn().mockResolvedValue({ ok: true });
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    const delivered = await service().deliver(baseEvent("memory.extract.completed"));
+    const delivered = await service().deliver(baseEvent("memory.profile.updated"));
 
     expect(delivered).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("http://gateway-web:3000/event/conv_1");
     expect(typeof request.body).toBe("string");
-    expect(request.body).toContain('"type":"memory.extract.completed"');
+    expect(request.body).toContain('"type":"memory.profile.updated"');
   });
 
   it("delivers memory updated events", async () => {

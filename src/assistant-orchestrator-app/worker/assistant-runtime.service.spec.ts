@@ -223,7 +223,7 @@ describe("AssistantRuntimeService", () => {
         {
           message: "",
           tool_arguments: {},
-          tool_name: "mem_fact_search",
+          tool_name: "legacy_fact_search",
           type: "tool_call",
         },
       ]),

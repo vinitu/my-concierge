@@ -11,6 +11,7 @@ Provide a simple Web chat UI for the local assistant.
 - Keep a stable browser conversation id in cookies
 - Convert browser messages into `assistant-api` requests
 - Expose `response` and `thinking` callback endpoints for `assistant-api`
+- Expose `event` callback endpoint for `assistant-api`
 - Send final responses and thinking signals back to the browser through WebSocket
 - Read browser chat history from `assistant-memory`
 - Expose `GET /status`
@@ -34,6 +35,7 @@ flowchart LR
 | `WS /ws` | Browser WebSocket transport |
 | `POST /response/:conversationId` | Receive the final assistant response for a browser session |
 | `POST /thinking/:conversationId` | Receive a transient thinking signal for a browser session |
+| `POST /event/:conversationId` | Receive run and memory events for a browser session |
 | `GET /status` | Service readiness |
 | `GET /metrics` | Prometheus metrics |
 | `GET /openapi.json` | OpenAPI schema |
@@ -63,9 +65,10 @@ flowchart LR
 9. `assistant-api` consumes those events and may send `POST /thinking/:conversationId`.
 10. `gateway-web` forwards the thinking state to the active browser session for the requested number of seconds.
 11. `assistant-api` sends the final callback to `POST /response/:conversationId`.
-12. `assistant-orchestrator` appends the user/assistant exchange to canonical conversation state in `assistant-memory`.
-13. `gateway-web` finds the right WebSocket session.
-14. `gateway-web` sends the assistant message back to the browser.
+12. `assistant-api` sends run and memory event callbacks to `POST /event/:conversationId`.
+13. `assistant-orchestrator` appends the user/assistant exchange to canonical conversation state in `assistant-memory`.
+14. `gateway-web` finds the right WebSocket session.
+15. `gateway-web` sends the assistant message and selected events back to the browser.
 
 ## State Rules
 

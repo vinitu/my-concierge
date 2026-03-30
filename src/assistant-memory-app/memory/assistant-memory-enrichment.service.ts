@@ -59,6 +59,7 @@ export class AssistantMemoryEnrichmentService
       },
       Math.max(250, intervalMs),
     );
+    this.timer.unref?.();
   }
 
   async onModuleDestroy(): Promise<void> {

@@ -213,10 +213,7 @@ export class DashboardRootController {
         { group: 'Fact', value: 'memory.fact.deleted', description: 'Deleted fact from memory' },
         { group: 'Fact', value: 'memory.fact.readed', description: 'Read fact from memory' },
         { group: 'Fact', value: 'memory.fact.failed', description: 'Failed fact memory operation' },
-        { group: 'Profile', value: 'memory.profile.added', description: 'Added profile in memory' },
         { group: 'Profile', value: 'memory.profile.updated', description: 'Updated profile in memory' },
-        { group: 'Profile', value: 'memory.profile.deleted', description: 'Deleted profile from memory' },
-        { group: 'Profile', value: 'memory.profile.readed', description: 'Read profile from memory' },
         { group: 'Profile', value: 'memory.profile.failed', description: 'Failed profile memory operation' },
       ];
       const ASSISTANT_MEMORY_SECTIONS = [

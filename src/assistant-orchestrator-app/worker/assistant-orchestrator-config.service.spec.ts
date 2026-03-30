@@ -19,7 +19,7 @@ describe('AssistantOrchestratorConfigService', () => {
       brave_base_url: 'https://api.search.brave.com',
       brave_timeout_ms: 30000,
       enabled_tools: [
-        'mem_fact_search',
+        'legacy_fact_search',
         'memory_fact_search',
       ] as unknown as AssistantToolName[],
       memory_window: 6,

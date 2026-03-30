@@ -45,7 +45,7 @@ describe('assistant-llm-output-schema', () => {
       assistantPlanningOutputParser.parse(
         JSON.stringify({
           tool_arguments: {},
-          tool_name: 'mem_fact_search',
+          tool_name: 'legacy_fact_search',
           type: 'tool_call',
         }),
       ),

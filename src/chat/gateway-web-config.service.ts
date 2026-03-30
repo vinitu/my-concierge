@@ -29,7 +29,6 @@ export const GATEWAY_WEB_INCOMING_MESSAGE_TYPES = [
 
 const MEMORY_EVENT_KINDS = [
   'fact',
-  'profile',
 ] as const;
 
 const MEMORY_EVENT_ACTIONS = [
@@ -44,8 +43,14 @@ const MEMORY_KINDED_EVENTS = MEMORY_EVENT_KINDS.flatMap((kind) =>
   MEMORY_EVENT_ACTIONS.map((action) => `memory.${kind}.${action}`),
 );
 
+const PROFILE_EVENTS = [
+  'memory.profile.updated',
+  'memory.profile.failed',
+] as const;
+
 export const GATEWAY_WEB_EVENT_TYPES = [
   ...MEMORY_KINDED_EVENTS,
+  ...PROFILE_EVENTS,
 ] as const;
 
 export const GATEWAY_WEB_ALLOWED_INCOMING_MESSAGE_TYPES = [

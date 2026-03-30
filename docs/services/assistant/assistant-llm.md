@@ -18,6 +18,7 @@ It owns provider/model configuration and executes model calls for `assistant-orc
 - Execute conversation response generation from `messages[]` and optional `tools[]`
 - Execute conversation summary generation from `messages[]`
 - Execute fact extraction for asynchronous enrichment
+- Execute profile patch extraction for asynchronous enrichment
 - Normalize provider behavior across `ollama`, `deepseek`, and `xai`
 
 ## Endpoints
@@ -30,6 +31,7 @@ It owns provider/model configuration and executes model calls for `assistant-orc
 - `POST /v1/conversation/respond`
 - `POST /v1/conversation/summarize`
 - `POST /v1/memory/facts`
+- `POST /v1/memory/profile`
 - `GET /status`
 - `GET /metrics`
 - `GET /openapi.json`
@@ -108,6 +110,7 @@ Example:
 Active endpoint (used by `assistant-memory` enrichment pipeline):
 
 - `POST /v1/memory/facts`
+- `POST /v1/memory/profile`
 
 Request:
 - `messages`: required message array
@@ -116,12 +119,32 @@ Request:
 Response:
 - `items`: array of durable facts in third person.
 
+For `POST /v1/memory/profile`:
+
+Request:
+- `messages`: required message array
+- `conversation_id`: optional string
+
+Response:
+- `patch`: object with profile fields to update (`language`, `timezone`, `home`, `preferences`, `constraints`)
+
 Example (`/v1/memory/facts`):
 ```json
 {
   "items": [
     "User name is Dmytro."
   ]
+}
+```
+
+Example (`/v1/memory/profile`):
+```json
+{
+  "patch": {
+    "preferences": {
+      "preferred_name": "Dmytro"
+    }
+  }
 }
 ```
 
