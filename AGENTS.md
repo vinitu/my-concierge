@@ -11,6 +11,16 @@ This is a **new project baseline**.
 - Legacy components, legacy endpoints, and legacy configs should be removed, not supported
 - Do not add compatibility aliases, shims, or dual paths unless explicitly requested
 
+## Specification-driven development
+
+This project follows a **strict specification-driven development** approach.
+
+- **Source of Truth**: The files in `docs/specifications/` are the canonical source of truth for all microservices.
+- **Strict Adherence**: You must never deviate from the specifications. If a requested change contradicts the current specification, you **MUST** ask the user for permission to update the specification first.
+- **Pre-change Check**: Before modifying any code, tests, or documentation, you must verify the requirements in the relevant specification files.
+- **Cascading Updates**: If a specification is updated, you must ensure that the implementation of all affected microservices is updated to remain consistent with the new specification.
+- **No Implicit Changes**: Never assume a change is allowed if it's not documented in the specification or explicitly requested by the user after confirming the spec change.
+
 ## Tech stack
 
 - **Runtime**: Node.js + TypeScript (strict mode)
