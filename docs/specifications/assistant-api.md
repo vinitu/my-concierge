@@ -37,6 +37,7 @@
 - Generate `request_id` on accept.
 - Enqueue a canonical queue message through the selected queue adapter.
 - Consume run events from the run-event queue and deliver callbacks to the configured gateway callback URLs.
+- Callback payloads for `run.completed`, `run.failed`, `run.tool`, and `event` deliveries must preserve canonical `request_id` and `sequence` from the originating run event so gateways can render one run in deterministic order.
 - Refresh queue-depth metrics after enqueue and queue processing events.
 
 ## Dependencies

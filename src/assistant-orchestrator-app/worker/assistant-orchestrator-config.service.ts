@@ -16,6 +16,7 @@ export interface AssistantOrchestratorConfig {
   brave_base_url: string;
   brave_timeout_ms: number;
   enabled_tools: AssistantToolName[];
+  max_tool_steps: number;
   memory_window: number;
   run_timeout_seconds: number;
   thinking_interval_seconds: number;
@@ -43,6 +44,7 @@ export class AssistantOrchestratorConfigService {
           this.configService.get<string>('BRAVE_TIMEOUT_MS', '30000'),
         ),
         enabled_tools: this.normalizeEnabledTools(parsed.enabled_tools),
+        max_tool_steps: this.normalizeMaxToolSteps(parsed.max_tool_steps),
         memory_window: this.normalizeMemoryWindow(parsed.memory_window),
         run_timeout_seconds: this.normalizeRunTimeoutSeconds(parsed.run_timeout_seconds),
         thinking_interval_seconds: this.normalizeThinkingIntervalSeconds(
@@ -67,6 +69,7 @@ export class AssistantOrchestratorConfigService {
       brave_base_url: this.normalizeUrl(config.brave_base_url, defaults.brave_base_url),
       brave_timeout_ms: this.normalizeTimeoutMs(config.brave_timeout_ms, defaults.brave_timeout_ms),
       enabled_tools: this.normalizeEnabledTools(config.enabled_tools),
+      max_tool_steps: this.normalizeMaxToolSteps(config.max_tool_steps),
       memory_window: this.normalizeMemoryWindow(config.memory_window),
       run_timeout_seconds: this.normalizeRunTimeoutSeconds(config.run_timeout_seconds),
       thinking_interval_seconds: this.normalizeThinkingIntervalSeconds(
@@ -113,6 +116,7 @@ export class AssistantOrchestratorConfigService {
         30000,
       ),
       enabled_tools: [...SUPPORTED_ASSISTANT_TOOL_NAMES],
+      max_tool_steps: 4,
       memory_window: 6,
       run_timeout_seconds: this.normalizeRunTimeoutSeconds(
         this.configService.get<string>('ASSISTANT_RUN_TIMEOUT_SECONDS', '30'),
@@ -137,6 +141,10 @@ export class AssistantOrchestratorConfigService {
 
   private normalizeMemoryWindow(value: unknown): number {
     return this.normalizeNumber(value, this.defaultConfig().memory_window, 1, 40);
+  }
+
+  private normalizeMaxToolSteps(value: unknown): number {
+    return this.normalizeNumber(value, this.defaultConfig().max_tool_steps, 1, 12);
   }
 
   private normalizeRunTimeoutSeconds(value: unknown): number {

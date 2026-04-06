@@ -51,4 +51,21 @@ describe('assistant-llm-output-schema', () => {
       ),
     ).rejects.toThrow('Invalid enum value');
   });
+
+  it('parses planning output in alternate name and arguments tool-call shape', async () => {
+    await expect(
+      assistantPlanningOutputParser.parse(
+        JSON.stringify({
+          arguments: { path: '.' },
+          name: 'directory_list',
+        }),
+      ),
+    ).resolves.toEqual({
+      final: undefined,
+      tool_call: {
+        arguments: { path: '.' },
+        name: 'directory_list',
+      },
+    });
+  });
 });

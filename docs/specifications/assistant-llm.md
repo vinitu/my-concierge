@@ -8,7 +8,7 @@
 
 - Store and return the active provider/model configuration.
 - Expose provider readiness and model catalog endpoints.
-- Execute conversation planning/synthesis requests for `assistant-orchestrator`.
+- Execute conversation agent-loop step requests for `assistant-orchestrator`.
 - Execute conversation summarization requests.
 - Extract facts and profile patches for `assistant-memory` enrichment.
 - Expose `/status`, `/metrics`, and `/openapi.json`.
@@ -42,7 +42,8 @@
   This endpoint must accept only models from the static tools-capable Ollama catalog.
   After a successful download, `assistant-llm` must refresh the local enabled-model snapshot so `/models` immediately shows the model as enabled.
 - `POST /v1/conversation`
-  Request planning/synthesis output for a conversation.
+  Request one agent-loop step output for a conversation.
+  The response may be either a final answer or a tool call for the next loop step.
 - `POST /v1/conversation/summarize`
   Return a compact conversation summary string.
 - `POST /v1/memory/facts`

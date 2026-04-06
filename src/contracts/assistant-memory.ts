@@ -147,6 +147,7 @@ export interface ConversationReadRequest {
   user_id: string;
   conversation_id: string;
   direction: string;
+  limit?: number;
 }
 
 export type ConversationAppendRequest = ConversationReadRequest & {

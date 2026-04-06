@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { AssistantLlmGenerateInput } from './assistant-llm-provider';
-import {
-  assistantPlanningOutputParser,
-  assistantSynthesisOutputParser,
-} from './assistant-llm-output-schema';
+import { assistantPlanningOutputParser } from './assistant-llm-output-schema';
 import {
   type AssistantToolDescriptor,
   type AssistantToolName,
@@ -77,6 +74,7 @@ export class AssistantOrchestratorPromptService {
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantOrchestratorRuntimeContext,
     enabledTools?: AssistantToolName[],
+    toolObservations?: AssistantToolObservation[],
   ): string {
     const systemInstructions = this.parseInstructions(runtimeContext.agents);
 
@@ -85,6 +83,7 @@ export class AssistantOrchestratorPromptService {
         tools: this.toolCatalogService.listTools(enabledTools),
         conversation_context: this.buildConversationContextSection(input),
         retrieved_memory: input.retrieved_memory,
+        tool_observations: toolObservations ?? [],
         system_instructions: systemInstructions,
         task: [
           'Answer as the assistant inside the dialogue.',
@@ -141,40 +140,21 @@ export class AssistantOrchestratorPromptService {
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantOrchestratorRuntimeContext,
     enabledTools?: AssistantToolName[],
+    toolObservations?: AssistantToolObservation[],
   ): string {
     return [
-      'You are the planning phase of the assistant runtime.',
+      'You are the assistant runtime agent loop.',
       'Follow the structured output schema exactly.',
+      'Tools remain available until you can produce the final answer.',
       'If no tool is needed, return type=final with message/context.',
-      'If one tool is needed, return type=tool_call with tool_name/tool_arguments.',
+      'If another tool is needed, return type=tool_call with tool_name/tool_arguments.',
       'Use type=error only when request cannot be processed safely.',
+      'Use prior tool_observations when they are enough to answer; do not call another tool unnecessarily.',
       'Do not output any explanatory text outside the JSON object.',
       '',
       assistantPlanningOutputParser.getFormatInstructions(),
       '',
-      this.buildRequestSection(input, runtimeContext, enabledTools),
-    ].join('\n');
-  }
-
-  buildSynthesisPrompt(
-    input: AssistantLlmGenerateInput,
-    runtimeContext: AssistantOrchestratorRuntimeContext,
-    observation: AssistantToolObservation,
-    enabledTools?: AssistantToolName[],
-  ): string {
-    return [
-      'You are the synthesis phase of the assistant runtime.',
-      'Follow the structured output schema exactly.',
-      'Use the tool observation when helpful.',
-      'Keep memory_writes empty unless there is stable durable memory to persist.',
-      'Do not output any explanatory text outside the JSON object.',
-      '',
-      assistantSynthesisOutputParser.getFormatInstructions(),
-      '',
-      this.buildRequestSection(input, runtimeContext, enabledTools),
-      '',
-      'tool_observation:',
-      JSON.stringify(observation, null, 2),
+      this.buildRequestSection(input, runtimeContext, enabledTools, toolObservations),
     ].join('\n');
   }
 }

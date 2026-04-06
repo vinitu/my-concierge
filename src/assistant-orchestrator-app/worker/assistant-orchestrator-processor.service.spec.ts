@@ -99,6 +99,7 @@ describe("AssistantOrchestratorProcessorService", () => {
           provider: "xai",
           run_timeout_seconds: 30,
           thinking_interval_seconds: 2,
+          max_tool_steps: 4,
           xai_api_key: "",
           xai_base_url: "https://api.x.ai/v1",
           xai_timeout_ms: 360000,
@@ -149,6 +150,7 @@ describe("AssistantOrchestratorProcessorService", () => {
         }),
       }),
       undefined,
+      4,
     );
   });
 
@@ -236,6 +238,7 @@ describe("AssistantOrchestratorProcessorService", () => {
           provider: "xai",
           run_timeout_seconds: 30,
           thinking_interval_seconds: 2,
+          max_tool_steps: 4,
           xai_api_key: "",
           xai_base_url: "https://api.x.ai/v1",
           xai_timeout_ms: 360000,
@@ -274,6 +277,7 @@ describe("AssistantOrchestratorProcessorService", () => {
         ]),
       }),
       undefined,
+      4,
     );
     expect(runEventPublisher.publish).toHaveBeenCalledTimes(2);
     expect(conversationService.appendExchange).toHaveBeenCalledWith(
@@ -327,6 +331,7 @@ describe("AssistantOrchestratorProcessorService", () => {
           provider: "xai",
           run_timeout_seconds: 30,
           thinking_interval_seconds: 2,
+          max_tool_steps: 4,
           xai_api_key: "",
           xai_base_url: "https://api.x.ai/v1",
           xai_timeout_ms: 360000,
@@ -452,6 +457,7 @@ describe("AssistantOrchestratorProcessorService", () => {
           provider: "xai",
           run_timeout_seconds: 30,
           thinking_interval_seconds: 2,
+          max_tool_steps: 4,
           xai_api_key: "",
           xai_base_url: "https://api.x.ai/v1",
           xai_timeout_ms: 360000,
@@ -550,6 +556,7 @@ describe("AssistantOrchestratorProcessorService", () => {
           provider: "xai",
           run_timeout_seconds: 30,
           thinking_interval_seconds: 2,
+          max_tool_steps: 4,
           xai_api_key: "",
           xai_base_url: "https://api.x.ai/v1",
           xai_timeout_ms: 360000,
@@ -656,6 +663,7 @@ describe("AssistantOrchestratorProcessorService", () => {
           provider: "deepseek",
           run_timeout_seconds: 30,
           thinking_interval_seconds: 2,
+          max_tool_steps: 4,
           xai_api_key: "",
           xai_base_url: "https://api.x.ai/v1",
           xai_timeout_ms: 360000,
@@ -749,6 +757,7 @@ describe("AssistantOrchestratorProcessorService", () => {
           provider: "deepseek",
           run_timeout_seconds: 30,
           thinking_interval_seconds: 2,
+          max_tool_steps: 4,
           xai_api_key: "",
           xai_base_url: "https://api.x.ai/v1",
           xai_timeout_ms: 360000,

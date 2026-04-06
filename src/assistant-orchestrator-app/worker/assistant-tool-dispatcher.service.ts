@@ -27,6 +27,7 @@ export interface AssistantToolCall {
 }
 
 export interface AssistantToolObservation {
+  arguments?: Record<string, unknown>;
   ok: boolean;
   result: unknown;
   tool_name: AssistantToolCall['name'];
@@ -57,6 +58,7 @@ export class AssistantToolDispatcherService {
       switch (toolCall.name) {
         case 'time_current':
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result: {
               iso: new Date().toISOString(),
@@ -73,6 +75,7 @@ export class AssistantToolDispatcherService {
               : undefined;
           const result = await this.braveSearchService.search(query, count);
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -86,6 +89,7 @@ export class AssistantToolDispatcherService {
             conversationId,
           );
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -102,6 +106,7 @@ export class AssistantToolDispatcherService {
             conversationId,
           );
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -119,6 +124,7 @@ export class AssistantToolDispatcherService {
             entries,
           );
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result: result ?? { created: 0, entries: [], updated: 0 },
             tool_name: toolCall.name,
@@ -131,6 +137,7 @@ export class AssistantToolDispatcherService {
               : 8;
           const result = await this.conversationService.searchThread(conversationId, limit);
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -140,6 +147,7 @@ export class AssistantToolDispatcherService {
         {
           const result = await this.executeLocalSkill(toolCall.arguments);
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -148,6 +156,7 @@ export class AssistantToolDispatcherService {
         case 'directory_list': {
           const result = await this.listDirectory(toolCall.arguments.path);
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -156,6 +165,7 @@ export class AssistantToolDispatcherService {
         case 'directory_create': {
           const result = await this.createDirectory(toolCall.arguments.path);
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -164,6 +174,7 @@ export class AssistantToolDispatcherService {
         case 'directory_delete': {
           const result = await this.deleteDirectory(toolCall.arguments.path);
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -172,6 +183,7 @@ export class AssistantToolDispatcherService {
         case 'file_read': {
           const result = await this.readTextFile(toolCall.arguments.path);
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -183,6 +195,7 @@ export class AssistantToolDispatcherService {
             toolCall.arguments.content,
           );
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,
@@ -191,6 +204,7 @@ export class AssistantToolDispatcherService {
         case 'file_delete': {
           const result = await this.deleteFile(toolCall.arguments.path);
           return {
+            arguments: toolCall.arguments,
             ok: true,
             result,
             tool_name: toolCall.name,

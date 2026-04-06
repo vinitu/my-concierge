@@ -33,6 +33,8 @@
 - `POST /v1/reindex`
 - `GET /v1/conversations`
 - `POST /v1/conversations/read`
+- `POST /v1/conversations/read`
+  Accept optional `limit` to return only the latest N messages from one conversation while keeping canonical `context`.
 - `POST /v1/conversations/append`
 - `GET /status`, `GET /metrics`, `GET /openapi.json`
 
@@ -45,6 +47,7 @@
 - Enrichment may call `assistant-llm` to extract facts and profile updates from new conversation state.
 - Summarization may call `assistant-llm` to refresh the rolling conversation context from stored messages.
 - Rolling conversation summary must exclude assistant fallback/error replies and must not preserve internal model failure text as user-facing conversation context.
+- Conversation read must support server-side message window filtering so callers can request only the latest messages they need.
 
 ## Dependencies
 

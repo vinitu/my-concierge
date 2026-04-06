@@ -63,10 +63,14 @@ Describe what `assistant-api` sends to callback targets after consuming run even
 | Field | Type | Required | Description |
 |---------|---------|---------|-------------|
 | `message` | `string` | yes | Final assistant reply text |
+| `request_id` | `string` | yes | Canonical run request id |
+| `sequence` | `integer` | yes | Canonical run-event sequence |
 
 ```json
 {
-  "message": "I received your message: Turn on the kitchen lights"
+  "message": "I received your message: Turn on the kitchen lights",
+  "request_id": "req_123",
+  "sequence": 3
 }
 ```
 
@@ -83,6 +87,8 @@ Describe what `assistant-api` sends to callback targets after consuming run even
 | `tool_name` | `string` | yes | Canonical assistant tool name |
 | `ok` | `boolean` | yes | Whether the tool execution succeeded |
 | `message` | `string` | yes | Human-readable summary of the tool execution |
+| `request_id` | `string` | yes | Canonical run request id |
+| `sequence` | `integer` | yes | Canonical run-event sequence |
 | `payload` | `object` | no | Raw tool observation payload |
 
 ```json
@@ -90,6 +96,8 @@ Describe what `assistant-api` sends to callback targets after consuming run even
   "tool_name": "time_current",
   "ok": true,
   "message": "Tool time_current completed successfully",
+  "request_id": "req_123",
+  "sequence": 2,
   "payload": {
     "iso": "2026-04-06T18:00:00.000Z",
     "timezone": "Europe/Warsaw"
@@ -109,13 +117,17 @@ Describe what `assistant-api` sends to callback targets after consuming run even
 |---------|---------|---------|-------------|
 | `type` | `string` | yes | Event type (`run.*` or `memory.*`) |
 | `message` | `string` | yes | Human-readable event message |
+| `request_id` | `string` | no | Canonical run request id when the event came from one run |
+| `sequence` | `integer` | no | Canonical run-event sequence when the event came from one run |
 
 Example:
 
 ```json
 {
   "type": "memory.profile.updated",
-  "message": "Updated profile in memory"
+  "message": "Updated profile in memory",
+  "request_id": "req_123",
+  "sequence": 4
 }
 ```
 

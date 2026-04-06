@@ -185,7 +185,7 @@ export class AssistantOrchestratorProcessorService
           conversation: effectiveConversation,
           message: item,
           retrieved_memory: memorySearch.entries,
-        }, enabledTools),
+        }, enabledTools, workerConfig.max_tool_steps),
         workerConfig.run_timeout_seconds,
       );
       const result = runtimeResult;
@@ -578,6 +578,11 @@ export class AssistantOrchestratorProcessorService
       return `assistant-orchestrator tried to use a disabled tool: ${toolName}. Enable it in the Tools section or keep only the tools you want the model to use.`;
     }
 
+    if (message.includes('model repeated tool call after successful observation:')) {
+      const toolName = message.split(':').at(-1)?.trim() || 'unknown_tool';
+      return `assistant-orchestrator stopped because the model kept calling ${toolName} after it already succeeded. Try the request again or switch to a different model in the assistant-llm web panel.`;
+    }
+
     if (message.includes('ollama')) {
       return 'assistant-orchestrator could not reach Ollama or the selected local model is unavailable. Check the AI settings in the assistant-llm web panel.';
     }
@@ -637,6 +642,10 @@ export class AssistantOrchestratorProcessorService
       }
 
       observations.push({
+        arguments:
+          typeof entry?.arguments === 'object' && entry.arguments !== null
+            ? (entry.arguments as Record<string, unknown>)
+            : undefined,
         ok: entry.ok,
         result: entry.result,
         tool_name: toolName as AssistantToolObservation['tool_name'],

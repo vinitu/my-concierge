@@ -45,6 +45,20 @@ export class ConversationRegistryService {
     return true;
   }
 
+  sendAssistantMessageWithMeta(
+    conversationId: string,
+    payload: { message: string; request_id?: string; sequence?: number },
+  ): boolean {
+    const client = this.conversations.get(conversationId);
+
+    if (!client) {
+      return false;
+    }
+
+    client.emit('assistant.message', payload);
+    return true;
+  }
+
   sendAssistantThinking(conversationId: string, seconds: number): boolean {
     const client = this.conversations.get(conversationId);
 
@@ -67,9 +81,29 @@ export class ConversationRegistryService {
     return true;
   }
 
+  sendAssistantErrorWithMeta(
+    conversationId: string,
+    payload: { message: string; request_id?: string; sequence?: number },
+  ): boolean {
+    const client = this.conversations.get(conversationId);
+
+    if (!client) {
+      return false;
+    }
+
+    client.emit('assistant.error', payload);
+    return true;
+  }
+
   sendAssistantEvent(
     conversationId: string,
-    event: { message?: string; payload?: unknown; type: string },
+    event: {
+      message?: string;
+      payload?: unknown;
+      request_id?: string;
+      sequence?: number;
+      type: string;
+    },
   ): boolean {
     const client = this.conversations.get(conversationId);
 

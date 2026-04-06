@@ -44,6 +44,8 @@ describe("CallbackDeliveryService", () => {
     expect(url).toBe("http://gateway-web:3000/event/conv_1");
     expect(typeof request.body).toBe("string");
     expect(request.body).toContain('"type":"memory.profile.updated"');
+    expect(request.body).toContain('"request_id":"req_1"');
+    expect(request.body).toContain('"sequence":1');
   });
 
   it("delivers memory updated events", async () => {
@@ -58,6 +60,8 @@ describe("CallbackDeliveryService", () => {
     expect(url).toBe("http://gateway-web:3000/event/conv_1");
     expect(typeof request.body).toBe("string");
     expect(request.body).toContain('"type":"memory.fact.updated"');
+    expect(request.body).toContain('"request_id":"req_1"');
+    expect(request.body).toContain('"sequence":1');
   });
 
   it("delivers tool events", async () => {
@@ -81,5 +85,7 @@ describe("CallbackDeliveryService", () => {
     expect(typeof request.body).toBe("string");
     expect(request.body).toContain('"tool_name":"web_search"');
     expect(request.body).toContain('"ok":true');
+    expect(request.body).toContain('"request_id":"req_1"');
+    expect(request.body).toContain('"sequence":1');
   });
 });

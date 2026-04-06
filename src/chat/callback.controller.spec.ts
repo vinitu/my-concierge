@@ -16,7 +16,7 @@ const allIncomingTypes = [
 describe('CallbackController', () => {
   it('delivers callback messages to a registered conversation', async () => {
     const conversationRegistryService = {
-      sendAssistantMessage: jest.fn().mockReturnValue(true),
+      sendAssistantMessageWithMeta: jest.fn().mockReturnValue(true),
     } as unknown as ConversationRegistryService;
     const metricsService = {
       recordCallback: jest.fn(),
@@ -45,7 +45,7 @@ describe('CallbackController', () => {
 
   it('returns not delivered when the conversation does not exist', async () => {
     const conversationRegistryService = {
-      sendAssistantMessage: jest.fn().mockReturnValue(false),
+      sendAssistantMessageWithMeta: jest.fn().mockReturnValue(false),
     } as unknown as ConversationRegistryService;
     const metricsService = {
       recordCallback: jest.fn(),
@@ -74,8 +74,8 @@ describe('CallbackController', () => {
 
   it('delivers error callback as assistant error event', async () => {
     const conversationRegistryService = {
-      sendAssistantError: jest.fn().mockReturnValue(true),
-      sendAssistantMessage: jest.fn().mockReturnValue(true),
+      sendAssistantErrorWithMeta: jest.fn().mockReturnValue(true),
+      sendAssistantMessageWithMeta: jest.fn().mockReturnValue(true),
     } as unknown as ConversationRegistryService;
     const metricsService = {
       recordCallback: jest.fn(),
@@ -104,9 +104,13 @@ describe('CallbackController', () => {
       response: 'Callback delivered',
     });
 
-    expect(conversationRegistryService.sendAssistantError).toHaveBeenCalledWith(
+    expect(conversationRegistryService.sendAssistantErrorWithMeta).toHaveBeenCalledWith(
       'conversation-1',
-      'The assistant run failed.',
+      {
+        message: 'The assistant run failed.',
+        request_id: undefined,
+        sequence: undefined,
+      },
     );
   });
 
@@ -141,8 +145,8 @@ describe('CallbackController', () => {
 
   it('ignores callback messages by type when disabled in settings', async () => {
     const conversationRegistryService = {
-      sendAssistantError: jest.fn().mockReturnValue(true),
-      sendAssistantMessage: jest.fn().mockReturnValue(true),
+      sendAssistantErrorWithMeta: jest.fn().mockReturnValue(true),
+      sendAssistantMessageWithMeta: jest.fn().mockReturnValue(true),
     } as unknown as ConversationRegistryService;
     const metricsService = {
       recordCallback: jest.fn(),
@@ -171,8 +175,8 @@ describe('CallbackController', () => {
       response: 'Ignored by gateway-web settings',
     });
 
-    expect(conversationRegistryService.sendAssistantError).not.toHaveBeenCalled();
-    expect(conversationRegistryService.sendAssistantMessage).not.toHaveBeenCalled();
+    expect(conversationRegistryService.sendAssistantErrorWithMeta).not.toHaveBeenCalled();
+    expect(conversationRegistryService.sendAssistantMessageWithMeta).not.toHaveBeenCalled();
   });
 
   it('ignores event callbacks by type when event group is disabled', async () => {
@@ -232,6 +236,8 @@ describe('CallbackController', () => {
         message: 'Executed web_search successfully.',
         ok: true,
         payload: { result_count: 3 },
+        request_id: 'req-1',
+        sequence: 2,
         tool_name: 'web_search',
       }),
     ).resolves.toEqual({
@@ -248,6 +254,8 @@ describe('CallbackController', () => {
           payload: { result_count: 3 },
           tool_name: 'web_search',
         },
+        request_id: 'req-1',
+        sequence: 2,
         type: 'tool.web_search.ok',
       },
     );

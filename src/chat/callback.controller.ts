@@ -13,6 +13,8 @@ import { ConversationRegistryService } from './session-registry.service';
 interface CallbackBody {
   message: string;
   error?: boolean;
+  request_id?: string;
+  sequence?: number;
 }
 
 interface ThinkingBody {
@@ -22,6 +24,8 @@ interface ThinkingBody {
 interface EventBody {
   message?: string;
   payload?: unknown;
+  request_id?: string;
+  sequence?: number;
   type?: string;
 }
 
@@ -29,6 +33,8 @@ interface ToolBody {
   message?: string;
   ok?: boolean;
   payload?: unknown;
+  request_id?: string;
+  sequence?: number;
   tool_name?: string;
 }
 
@@ -54,7 +60,13 @@ export class CallbackController {
       )}`,
     );
     const message = body.message?.trim() ?? '';
-    return this.handleResponseDelivery(conversationId, message, body.error === true);
+    return this.handleResponseDelivery(
+      conversationId,
+      message,
+      body.error === true,
+      typeof body.request_id === 'string' ? body.request_id : undefined,
+      typeof body.sequence === 'number' ? body.sequence : undefined,
+    );
   }
 
   @Post('thinking/:conversationId')
@@ -114,6 +126,8 @@ export class CallbackController {
     const delivered = this.conversationRegistryService.sendAssistantEvent(conversationId, {
       message: typeof body.message === 'string' ? body.message : undefined,
       payload: body.payload,
+      request_id: typeof body.request_id === 'string' ? body.request_id : undefined,
+      sequence: typeof body.sequence === 'number' ? body.sequence : undefined,
       type,
     });
 
@@ -149,6 +163,8 @@ export class CallbackController {
         payload: body.payload,
         tool_name: toolName,
       },
+      request_id: typeof body.request_id === 'string' ? body.request_id : undefined,
+      sequence: typeof body.sequence === 'number' ? body.sequence : undefined,
       type: `tool.${toolName}.${body.ok === true ? 'ok' : 'failed'}`,
     });
 
@@ -163,6 +179,8 @@ export class CallbackController {
     conversationId: string,
     message: string,
     error: boolean,
+    requestId?: string,
+    sequence?: number,
   ): Promise<{ delivered: boolean; response: string }> {
     const messageType = error ? 'response.error' : 'response.message';
     if (await this.shouldIgnoreIncomingMessageType(messageType)) {
@@ -176,8 +194,16 @@ export class CallbackController {
     const delivered =
       message.length > 0 &&
       (error
-        ? this.conversationRegistryService.sendAssistantError(conversationId, message)
-        : this.conversationRegistryService.sendAssistantMessage(conversationId, message));
+        ? this.conversationRegistryService.sendAssistantErrorWithMeta(conversationId, {
+            message,
+            request_id: requestId,
+            sequence,
+          })
+        : this.conversationRegistryService.sendAssistantMessageWithMeta(conversationId, {
+            message,
+            request_id: requestId,
+            sequence,
+          }));
 
     this.metricsService.recordCallback(delivered);
 

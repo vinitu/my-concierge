@@ -109,4 +109,25 @@ describe("AssistantLlmController", () => {
       type: "final",
     });
   });
+
+  it("normalizes name and arguments json into tool_call response", async () => {
+    const generateMain = jest.fn().mockResolvedValue(
+      '{"name":"directory_list","arguments":{"path":"."}}',
+    );
+    const controller = new AssistantLlmController({
+      generateMain,
+    } as unknown as AssistantLlmService);
+
+    await expect(
+      controller.conversationRespond({
+        messages: [{ content: "какие у меня есть файлы?", role: "user" }],
+        tools: [],
+      }),
+    ).resolves.toEqual({
+      message: "",
+      tool_arguments: { path: "." },
+      tool_name: "directory_list",
+      type: "tool_call",
+    });
+  });
 });

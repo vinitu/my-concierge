@@ -65,6 +65,8 @@ describe('ConversationRegistryService', () => {
           payload: { result_count: 3 },
           tool_name: 'web_search',
         },
+        request_id: 'req-1',
+        sequence: 2,
         type: 'tool.web_search.ok',
       }),
     ).toBe(true);
@@ -75,6 +77,8 @@ describe('ConversationRegistryService', () => {
         payload: { result_count: 3 },
         tool_name: 'web_search',
       },
+      request_id: 'req-1',
+      sequence: 2,
       type: 'tool.web_search.ok',
     });
   });

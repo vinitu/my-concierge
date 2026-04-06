@@ -14,21 +14,13 @@ export class AssistantOrchestratorPromptTemplateService {
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantOrchestratorRuntimeContext,
     enabledTools?: AssistantToolName[],
+    toolObservations?: AssistantToolObservation[],
   ): Promise<string> {
-    return this.promptService.buildPlanningPrompt(input, runtimeContext, enabledTools);
-  }
-
-  async renderSynthesisPrompt(
-    input: AssistantLlmGenerateInput,
-    runtimeContext: AssistantOrchestratorRuntimeContext,
-    observation: AssistantToolObservation,
-    enabledTools?: AssistantToolName[],
-  ): Promise<string> {
-    return this.promptService.buildSynthesisPrompt(
+    return this.promptService.buildPlanningPrompt(
       input,
       runtimeContext,
-      observation,
       enabledTools,
+      toolObservations,
     );
   }
 

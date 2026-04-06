@@ -58,20 +58,17 @@ export class AssistantOrchestratorConversationService {
       `Conversation read start conversationId=${message.conversation_id} via=assistant-memory`,
     );
     const userId = message.user_id?.trim() || message.contact?.trim() || "default-user";
+    const maxMessages = await this.memoryWindow();
     const response = await this.fetchMemoryEndpoint("/v1/conversations/read", {
       chat: message.chat,
       user_id: userId,
       conversation_id: message.conversation_id,
       direction: message.direction,
+      limit: maxMessages,
     });
 
     const payload = (await response.json()) as ConversationState;
-    const maxMessages = await this.memoryWindow();
-
-    return {
-      ...payload,
-      messages: payload.messages.slice(-maxMessages),
-    };
+    return payload;
   }
 
   async appendExchange(
@@ -93,12 +90,7 @@ export class AssistantOrchestratorConversationService {
     });
 
     const payload = (await response.json()) as ConversationState;
-    const maxMessages = await this.memoryWindow();
-
-    return {
-      ...payload,
-      messages: payload.messages.slice(-maxMessages),
-    };
+    return payload;
   }
 
   async searchThread(

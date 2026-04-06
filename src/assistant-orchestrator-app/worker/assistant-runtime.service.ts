@@ -28,6 +28,7 @@ import type { AssistantConversationMessage } from "./assistant-orchestrator-conv
 export class AssistantRuntimeService {
   private readonly logger = new Logger(AssistantRuntimeService.name);
   private static readonly MAX_DISABLED_TOOL_RETRIES = 1;
+  private static readonly MAX_REPEATED_TOOL_RETRIES = 1;
 
   constructor(
     @Inject(ASSISTANT_LLM_PROVIDER)
@@ -41,113 +42,82 @@ export class AssistantRuntimeService {
   async run(
     input: AssistantLlmGenerateInput,
     enabledTools?: AssistantToolName[],
+    maxToolSteps = 4,
   ): Promise<AssistantLlmGenerateResult> {
     const runtimeContext = await this.runtimeContextService.load();
+    const observations: Array<Record<string, unknown>> = [];
 
     try {
-      this.metricsService.recordRuntimePhase("planning", true);
-      this.logger.log(
-        `Planning started conversationId=${input.message.conversation_id} retrievedMemory=${String(
-          input.retrieved_memory.length,
-        )}`,
-      );
-      const plan = await this.planWithDisabledToolRetry(
-        input,
-        runtimeContext,
-        enabledTools,
-      );
-      this.logger.log(
-        `Planning finished conversationId=${input.message.conversation_id} hasFinal=${String(Boolean(plan.final))} hasToolCall=${String(Boolean(plan.tool_call))}`,
-      );
+      for (let stepIndex = 0; stepIndex <= maxToolSteps; stepIndex += 1) {
+        const phase = stepIndex === 0 ? "planning" : "agent_loop";
+        this.metricsService.recordRuntimePhase(phase, true);
+        this.logger.log(
+          `Agent loop step started conversationId=${input.message.conversation_id} step=${String(
+            stepIndex + 1,
+          )} toolObservations=${String(observations.length)} retrievedMemory=${String(
+            input.retrieved_memory.length,
+          )}`,
+        );
+        const plan = await this.planWithToolRetry(
+          input,
+          runtimeContext,
+          enabledTools,
+          observations,
+          phase,
+        );
+        this.logger.log(
+          `Agent loop step finished conversationId=${input.message.conversation_id} step=${String(
+            stepIndex + 1,
+          )} hasFinal=${String(Boolean(plan.final))} hasToolCall=${String(Boolean(plan.tool_call))}`,
+        );
 
-      if (plan.final) {
-        return {
-          ...plan.final,
-          memory_writes: plan.final.memory_writes ?? [],
-          tool_observations: plan.final.tool_observations ?? [],
-        };
+        if (plan.final) {
+          return {
+            ...plan.final,
+            memory_writes: plan.final.memory_writes ?? [],
+            tool_observations: observations,
+          };
+        }
+
+        if (!plan.tool_call) {
+          throw new AssistantRuntimeError(
+            "PROVIDER_ERROR",
+            "Agent loop step returned neither final answer nor tool call",
+          );
+        }
+
+        if (stepIndex >= maxToolSteps) {
+          throw new AssistantRuntimeError(
+            "TOOL_ERROR",
+            `Assistant exceeded max_tool_steps=${String(maxToolSteps)}`,
+          );
+        }
+
+        const observation = await this.assistantToolDispatcherService.execute(
+          {
+            arguments: plan.tool_call.arguments,
+            name: plan.tool_call.name as AssistantToolName,
+          },
+          input.message.conversation_id,
+          enabledTools,
+        );
+        this.metricsService.recordToolInvocation(
+          observation.tool_name,
+          observation.ok,
+        );
+        this.metricsService.recordRuntimePhase("tool_execution", observation.ok);
+        this.logger.log(
+          `Tool execution conversationId=${input.message.conversation_id} step=${String(
+            stepIndex + 1,
+          )} tool=${observation.tool_name} ok=${String(observation.ok)}`,
+        );
+        observations.push(observation as unknown as Record<string, unknown>);
       }
 
-      if (!plan.tool_call) {
-        throw new AssistantRuntimeError(
-          "PROVIDER_ERROR",
-          "Planning step returned neither final answer nor tool call",
-        );
-      }
-
-      const observation = await this.assistantToolDispatcherService.execute(
-        {
-          arguments: plan.tool_call.arguments,
-          name: plan.tool_call.name as AssistantToolName,
-        },
-        input.message.conversation_id,
-        enabledTools,
+      throw new AssistantRuntimeError(
+        "TOOL_ERROR",
+        `Assistant exceeded max_tool_steps=${String(maxToolSteps)}`,
       );
-      this.metricsService.recordToolInvocation(
-        observation.tool_name,
-        observation.ok,
-      );
-      this.metricsService.recordRuntimePhase("tool_execution", observation.ok);
-      this.logger.log(
-        `Tool execution conversationId=${input.message.conversation_id} tool=${observation.tool_name} ok=${String(observation.ok)}`,
-      );
-
-      const synthesisPrompt = await this.promptTemplateService.renderSynthesisPrompt(
-        input,
-        runtimeContext,
-        observation,
-        enabledTools,
-      );
-      const synthesisMessages = this.buildMessagesForPrompt(
-        input,
-        synthesisPrompt,
-        true,
-      );
-      const synthesisAvailableTools =
-        this.promptTemplateService.listAvailableTools(enabledTools);
-
-      const synthesisStartedAt = Date.now();
-      let synthesisPayload: AssistantLlmConversationRespondResponse;
-      try {
-        synthesisPayload = await this.llmProvider.generateFromMessages(
-          synthesisMessages,
-          synthesisAvailableTools,
-        );
-        this.metricsService.recordLlmMainRequest(true, "synthesis");
-        this.metricsService.recordLlmMainDurationMs(
-          Date.now() - synthesisStartedAt,
-          "synthesis",
-          true,
-        );
-      } catch (error) {
-        this.metricsService.recordLlmMainRequest(false, "synthesis");
-        this.metricsService.recordLlmMainDurationMs(
-          Date.now() - synthesisStartedAt,
-          "synthesis",
-          false,
-        );
-        throw error;
-      }
-
-      const result = this.mapSynthesisResponse(
-        synthesisPayload,
-        input.message.message,
-      );
-      this.metricsService.recordRuntimePhase("synthesis", true);
-      this.logger.log(
-        `Synthesis finished conversationId=${input.message.conversation_id} messageLength=${String(
-          result.message.length,
-        )}`,
-      );
-
-      return {
-        ...result,
-        memory_writes: result.memory_writes ?? [],
-        tool_observations: [
-          ...(result.tool_observations ?? []),
-          observation as unknown as Record<string, unknown>,
-        ],
-      };
     } catch (error) {
       const runtimeError =
         error instanceof AssistantRuntimeError
@@ -169,16 +139,26 @@ export class AssistantRuntimeService {
     }
   }
 
-  private async planWithDisabledToolRetry(
+  private async planWithToolRetry(
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantOrchestratorRuntimeContext,
     enabledTools?: AssistantToolName[],
+    toolObservations?: Array<Record<string, unknown>>,
+    phase = "planning",
   ): Promise<AssistantLlmPlanResult> {
     let disabledToolName: AssistantToolName | null = null;
+    let repeatedToolCall:
+      | {
+          arguments: Record<string, unknown>;
+          name: AssistantToolName;
+        }
+      | null = null;
 
     for (
       let attempt = 0;
-      attempt <= AssistantRuntimeService.MAX_DISABLED_TOOL_RETRIES;
+      attempt <=
+      AssistantRuntimeService.MAX_DISABLED_TOOL_RETRIES +
+        AssistantRuntimeService.MAX_REPEATED_TOOL_RETRIES;
       attempt += 1
     ) {
       const plan = await this.invokePlanningChain(
@@ -186,6 +166,9 @@ export class AssistantRuntimeService {
         runtimeContext,
         enabledTools,
         disabledToolName,
+        repeatedToolCall,
+        toolObservations,
+        phase,
       );
 
       if (
@@ -210,6 +193,36 @@ export class AssistantRuntimeService {
         );
       }
 
+      if (plan.tool_call) {
+        const repeatedToolObservation = this.findRepeatedToolObservation(
+          plan.tool_call.name as AssistantToolName,
+          plan.tool_call.arguments,
+          toolObservations,
+        );
+
+        if (repeatedToolObservation) {
+          this.logger.warn(
+            `Planning repeated tool call conversationId=${input.message.conversation_id} tool=${plan.tool_call.name} attempt=${String(
+              attempt + 1,
+            )}`,
+          );
+
+          if (repeatedToolCall) {
+            throw new AssistantRuntimeError(
+              "TOOL_ERROR",
+              `Model repeated tool call after successful observation: ${plan.tool_call.name}`,
+            );
+          }
+
+          repeatedToolCall = {
+            arguments: plan.tool_call.arguments,
+            name: plan.tool_call.name as AssistantToolName,
+          };
+          disabledToolName = null;
+          continue;
+        }
+      }
+
       return plan;
     }
 
@@ -224,11 +237,20 @@ export class AssistantRuntimeService {
     runtimeContext: AssistantOrchestratorRuntimeContext,
     enabledTools?: AssistantToolName[],
     disabledToolName?: AssistantToolName | null,
+    repeatedToolCall?:
+      | {
+          arguments: Record<string, unknown>;
+          name: AssistantToolName;
+        }
+      | null,
+    toolObservations?: Array<Record<string, unknown>>,
+    phase = "planning",
   ): Promise<AssistantLlmPlanResult> {
     const basePrompt = await this.promptTemplateService.renderPlanningPrompt(
       input,
       runtimeContext,
       enabledTools,
+      toolObservations as never,
     );
     const planningPrompt = !disabledToolName
       ? basePrompt
@@ -239,8 +261,22 @@ export class AssistantRuntimeService {
           `Choose only from enabled tools: ${enabledTools?.join(", ") ?? "none"}.`,
           "Do not return the disabled tool again.",
         ].join("\n");
+    const planningPromptWithFeedback = !repeatedToolCall
+      ? planningPrompt
+      : [
+          planningPrompt,
+          "",
+          `Repeated tool feedback: the tool "${repeatedToolCall.name}" with the same arguments was already executed successfully.`,
+          `Repeated tool arguments: ${JSON.stringify(repeatedToolCall.arguments)}.`,
+          "Use the existing tool_observations to answer, or choose a different tool only if it is strictly necessary.",
+          "Do not return the same tool call again.",
+        ].join("\n");
 
-    const planningMessages = this.buildMessagesForPrompt(input, planningPrompt, true);
+    const planningMessages = this.buildMessagesForPrompt(
+      input,
+      planningPromptWithFeedback,
+      true,
+    );
     const planningAvailableTools =
       this.promptTemplateService.listAvailableTools(enabledTools);
 
@@ -251,17 +287,17 @@ export class AssistantRuntimeService {
         planningMessages,
         planningAvailableTools,
       );
-      this.metricsService.recordLlmMainRequest(true, "planning");
+      this.metricsService.recordLlmMainRequest(true, phase);
       this.metricsService.recordLlmMainDurationMs(
         Date.now() - startedAt,
-        "planning",
+        phase,
         true,
       );
     } catch (error) {
-      this.metricsService.recordLlmMainRequest(false, "planning");
+      this.metricsService.recordLlmMainRequest(false, phase);
       this.metricsService.recordLlmMainDurationMs(
         Date.now() - startedAt,
-        "planning",
+        phase,
         false,
       );
       throw error;
@@ -317,35 +353,6 @@ export class AssistantRuntimeService {
     };
   }
 
-  private mapSynthesisResponse(
-    payload: AssistantLlmConversationRespondResponse,
-    userMessage: string,
-  ): AssistantLlmGenerateResult {
-    if (
-      (payload.type === "final" || payload.type === "error") &&
-      typeof payload.message === "string" &&
-      payload.message.trim().length > 0
-    ) {
-      return {
-        context: payload.context?.trim() ?? "",
-        memory_writes: payload.memory_writes ?? [],
-        message: payload.message.trim(),
-        tool_observations: payload.tool_observations ?? [],
-      };
-    }
-
-    this.metricsService.recordRuntimeFallback("synthesis_parse_failed");
-    return {
-      context: "",
-      fallback_reason: "synthesis_parse_failed",
-      memory_writes: [],
-      message: /[А-Яа-яЁё]/.test(userMessage)
-        ? "Не удалось корректно обработать ответ модели. Попробуйте выбрать другую LLM модель в настройках."
-        : "Could not parse the model response correctly. Try selecting a different LLM model in settings.",
-      tool_observations: [],
-    };
-  }
-
   private buildPlanningFallbackResult(userMessage: string): AssistantLlmGenerateResult {
     const isRussian = /[А-Яа-яЁё]/.test(userMessage);
 
@@ -358,6 +365,53 @@ export class AssistantRuntimeService {
         : "Could not parse the model response correctly. Try selecting a different LLM model in settings.",
       tool_observations: [],
     };
+  }
+
+  private findRepeatedToolObservation(
+    toolName: AssistantToolName,
+    toolArguments: Record<string, unknown>,
+    toolObservations?: Array<Record<string, unknown>>,
+  ): Record<string, unknown> | null {
+    if (!Array.isArray(toolObservations)) {
+      return null;
+    }
+
+    const serializedArguments = this.serializeToolArguments(toolArguments);
+    for (const observation of toolObservations) {
+      if (observation?.tool_name !== toolName || observation?.ok !== true) {
+        continue;
+      }
+
+      const observationArguments =
+        typeof observation.arguments === "object" && observation.arguments !== null
+          ? (observation.arguments as Record<string, unknown>)
+          : {};
+      if (this.serializeToolArguments(observationArguments) === serializedArguments) {
+        return observation;
+      }
+    }
+
+    return null;
+  }
+
+  private serializeToolArguments(value: Record<string, unknown>): string {
+    return JSON.stringify(this.sortUnknown(value));
+  }
+
+  private sortUnknown(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((entry) => this.sortUnknown(entry));
+    }
+
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, nested]) => [key, this.sortUnknown(nested)]),
+      );
+    }
+
+    return value;
   }
 
   private buildMessagesForPrompt(

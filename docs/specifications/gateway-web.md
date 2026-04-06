@@ -39,6 +39,7 @@
 - Create or restore a conversation cookie on page load.
 - Forward chat messages to `assistant-api` with canonical `conversation_id` and `user_id`.
 - Fan callback deliveries back to the active WebSocket session for the matching conversation.
+- Preserve `request_id` and `sequence` from callback payloads and use them to render tool activity and final response in deterministic run order.
 - Render run, memory, and tool activity in one browser event stream alongside normal chat messages.
 - Persist lightweight local runtime conversation artifacts under `runtime/gateway-web/`.
 

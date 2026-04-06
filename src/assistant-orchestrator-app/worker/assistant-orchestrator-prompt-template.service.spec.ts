@@ -82,7 +82,7 @@ describe("AssistantOrchestratorPromptTemplateService", () => {
         runtimeContext,
       ),
     ).resolves.toContain(
-      "You are the planning phase of the assistant runtime.",
+      "You are the assistant runtime agent loop.",
     );
   });
 });

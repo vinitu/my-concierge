@@ -9,7 +9,7 @@
 - Poll the execution queue and reserve one job at a time.
 - Read canonical conversation state from `assistant-memory`.
 - Retrieve federated memory before the main run.
-- Call `assistant-llm` for planning and synthesis.
+- Call `assistant-llm` for the multi-step agent loop.
 - Execute supported tools: `time_current`, `web_search`, `memory_search`, `memory_fact_search`, `memory_fact_write`, `memory_conversation_search`, `skill_execute`, `directory_list`, `directory_create`, `directory_delete`, `file_delete`, `file_write`, and `file_read`.
 - Publish `run.started`, `run.thinking`, `run.tool`, `run.completed`, and `run.failed`.
 - Expose `/config`, `/provider`, `/models`, `/skills`, `/conversations`, `/status`, `/metrics`, and `/openapi.json`.
@@ -25,7 +25,7 @@
 ## API Contract
 
 - `GET /config`, `PUT /config`
-  Runtime config for memory window, timeout, thinking interval, enabled tools, and Brave settings.
+  Runtime config for memory window, timeout, thinking interval, max tool steps, enabled tools, and Brave settings.
 - `GET /provider`
   Proxy provider readiness from `assistant-llm`.
 - `GET /models`
@@ -40,10 +40,14 @@
 ## Internal Flows
 
 - Read runtime bootstrap from `runtime/assistant-orchestrator/SYSTEM.js` and runtime config.
+- Use `memory_window` as the `limit` in the `assistant-memory` conversation-read request instead of trimming messages locally after fetch.
 - Expand recent conversation context when history reference signals require it.
-- Run planning through `assistant-llm`; if a tool call is returned, execute the tool, then run synthesis.
+- Run a multi-step agent loop through `assistant-llm`.
+- On each loop step, `assistant-llm` may return either `final`, `error`, or `tool_call`.
+- If a `tool_call` is returned, execute the tool, append the tool observation to the loop state, and call `assistant-llm` again with tools still available.
+- If `assistant-llm` repeats the same successful tool call with the same arguments after that observation is already present in the loop state, `assistant-orchestrator` must reject the repeated call, send one corrective retry to `assistant-llm`, and fail the run if the model repeats it again.
+- Stop the loop only when `assistant-llm` returns `final` or `error`, or when `max_tool_steps` is exceeded.
 - After each tool execution, publish one `run.tool` event with tool name, success flag, and human-readable message.
-- Summarize the conversation after the final assistant message.
 - Append the final exchange to `assistant-memory`.
 - Read previous conversation messages and rolling context from `assistant-memory` on every run.
 - Publish ordered run events with sequence numbers.
@@ -66,4 +70,4 @@
 - Queue depth and processed job counters.
 - Runtime phase counters.
 - Tool invocation counters by tool name and status.
-- LLM request/duration metrics for planning and synthesis stages.
+- LLM request/duration metrics for agent-loop stages.

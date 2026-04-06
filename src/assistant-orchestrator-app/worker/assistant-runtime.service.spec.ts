@@ -55,15 +55,12 @@ describe("AssistantRuntimeService", () => {
 
   function promptTemplateStub(overrides?: {
     renderPlanningPrompt?: jest.Mock;
-    renderSynthesisPrompt?: jest.Mock;
   }): AssistantOrchestratorPromptTemplateService {
     return {
       listAvailableTools: jest.fn().mockReturnValue([{ name: "time_current" }]),
       renderPlanningPrompt:
         overrides?.renderPlanningPrompt ??
         jest.fn().mockResolvedValue("planning prompt"),
-      renderSynthesisPrompt:
-        overrides?.renderSynthesisPrompt ?? jest.fn().mockResolvedValue("synthesis prompt"),
     } as unknown as AssistantOrchestratorPromptTemplateService;
   }
 
@@ -82,9 +79,7 @@ describe("AssistantRuntimeService", () => {
         execute: jest.fn(),
       } as unknown as AssistantToolDispatcherService,
       new AssistantOrchestratorMetricsService(),
-      promptTemplateStub({
-        renderSynthesisPrompt: jest.fn(),
-      }),
+      promptTemplateStub(),
       {
         load: jest.fn().mockResolvedValue(runtimeContext),
       } as unknown as AssistantOrchestratorRuntimeContextService,
@@ -117,6 +112,7 @@ describe("AssistantRuntimeService", () => {
       ]),
       {
         execute: jest.fn().mockResolvedValue({
+          arguments: {},
           ok: true,
           result: {
             iso: "2026-03-27T10:00:00.000Z",
@@ -138,6 +134,7 @@ describe("AssistantRuntimeService", () => {
       message: "It is dinner time.",
       tool_observations: [
         {
+          arguments: {},
           ok: true,
           result: {
             iso: "2026-03-27T10:00:00.000Z",
@@ -184,6 +181,75 @@ describe("AssistantRuntimeService", () => {
     });
   });
 
+  it("ignores synthesis-provided tool_observations and keeps only the executed tool", async () => {
+    const service = new AssistantRuntimeService(
+      providerStub([
+        {
+          message: "",
+          tool_arguments: {},
+          tool_name: "time_current",
+          type: "tool_call",
+        },
+        {
+          context: "Current dinner planning is active.",
+          memory_writes: [],
+          message: "It is dinner time.",
+          tool_observations: [
+            {
+              ok: true,
+              result: {
+                iso: "2026-03-27T10:00:00.000Z",
+                timezone: "Europe/Warsaw",
+              },
+              tool_name: "time_current",
+            },
+            {
+              ok: true,
+              result: {
+                duplicate: true,
+              },
+              tool_name: "time_current",
+            },
+          ],
+          type: "final",
+        },
+      ]),
+      {
+        execute: jest.fn().mockResolvedValue({
+          arguments: {},
+          ok: true,
+          result: {
+            iso: "2026-03-27T10:00:00.000Z",
+            timezone: "Europe/Warsaw",
+          },
+          tool_name: "time_current",
+        }),
+      } as unknown as AssistantToolDispatcherService,
+      new AssistantOrchestratorMetricsService(),
+      promptTemplateStub(),
+      {
+        load: jest.fn().mockResolvedValue(runtimeContext),
+      } as unknown as AssistantOrchestratorRuntimeContextService,
+    );
+
+    await expect(service.run(input)).resolves.toEqual({
+      context: "Current dinner planning is active.",
+      memory_writes: [],
+      message: "It is dinner time.",
+      tool_observations: [
+        {
+          arguments: {},
+          ok: true,
+          result: {
+            iso: "2026-03-27T10:00:00.000Z",
+            timezone: "Europe/Warsaw",
+          },
+          tool_name: "time_current",
+        },
+      ],
+    });
+  });
+
   it("returns user-friendly fallback when planning output is invalid", async () => {
     const service = new AssistantRuntimeService(
       providerStub([
@@ -196,9 +262,7 @@ describe("AssistantRuntimeService", () => {
         execute: jest.fn(),
       } as unknown as AssistantToolDispatcherService,
       new AssistantOrchestratorMetricsService(),
-      promptTemplateStub({
-        renderSynthesisPrompt: jest.fn(),
-      }),
+      promptTemplateStub(),
       {
         load: jest.fn().mockResolvedValue(runtimeContext),
       } as unknown as AssistantOrchestratorRuntimeContextService,
@@ -213,6 +277,189 @@ describe("AssistantRuntimeService", () => {
         "Could not parse the model response correctly. Try selecting a different LLM model in settings.",
       tool_observations: [],
     });
+  });
+
+  it("supports multiple tool calls before the final response", async () => {
+    const execute = jest
+      .fn()
+      .mockResolvedValueOnce({
+        arguments: {},
+        ok: true,
+        result: { iso: "2026-03-27T10:00:00.000Z" },
+        tool_name: "time_current",
+      })
+      .mockResolvedValueOnce({
+        arguments: { path: "." },
+        ok: true,
+        result: { entries: ["notes.txt"] },
+        tool_name: "directory_list",
+      });
+
+    const service = new AssistantRuntimeService(
+      providerStub([
+        {
+          message: "",
+          tool_arguments: {},
+          tool_name: "time_current",
+          type: "tool_call",
+        },
+        {
+          message: "",
+          tool_arguments: { path: "." },
+          tool_name: "directory_list",
+          type: "tool_call",
+        },
+        {
+          context: "The user asked about time and local files.",
+          memory_writes: [],
+          message: "It is 10:00 and the sandbox contains notes.txt.",
+          tool_observations: [],
+          type: "final",
+        },
+      ]),
+      {
+        execute,
+      } as unknown as AssistantToolDispatcherService,
+      new AssistantOrchestratorMetricsService(),
+      promptTemplateStub(),
+      {
+        load: jest.fn().mockResolvedValue(runtimeContext),
+      } as unknown as AssistantOrchestratorRuntimeContextService,
+    );
+
+    await expect(service.run(input, undefined, 4)).resolves.toEqual({
+      context: "The user asked about time and local files.",
+      memory_writes: [],
+      message: "It is 10:00 and the sandbox contains notes.txt.",
+      tool_observations: [
+        {
+          arguments: {},
+          ok: true,
+          result: { iso: "2026-03-27T10:00:00.000Z" },
+          tool_name: "time_current",
+        },
+        {
+          arguments: { path: "." },
+          ok: true,
+          result: { entries: ["notes.txt"] },
+          tool_name: "directory_list",
+        },
+      ],
+    });
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries once when the model repeats the same successful tool call", async () => {
+    const llmProvider = providerStub([
+      {
+        message: "",
+        tool_arguments: {},
+        tool_name: "time_current",
+        type: "tool_call",
+      },
+      {
+        message: "",
+        tool_arguments: {},
+        tool_name: "time_current",
+        type: "tool_call",
+      },
+      {
+        context: "The current time was provided.",
+        memory_writes: [],
+        message: "It is 10:00.",
+        tool_observations: [],
+        type: "final",
+      },
+    ]);
+    const dispatcher = {
+      execute: jest.fn().mockResolvedValue({
+        arguments: {},
+        ok: true,
+        result: {
+          iso: "2026-03-27T10:00:00.000Z",
+          timezone: "Europe/Warsaw",
+        },
+        tool_name: "time_current",
+      }),
+    } as unknown as AssistantToolDispatcherService;
+    const promptTemplate = promptTemplateStub();
+    const service = new AssistantRuntimeService(
+      llmProvider,
+      dispatcher,
+      new AssistantOrchestratorMetricsService(),
+      promptTemplate,
+      {
+        load: jest.fn().mockResolvedValue(runtimeContext),
+      } as unknown as AssistantOrchestratorRuntimeContextService,
+    );
+
+    await expect(service.run(input)).resolves.toEqual({
+      context: "The current time was provided.",
+      memory_writes: [],
+      message: "It is 10:00.",
+      tool_observations: [
+        {
+          arguments: {},
+          ok: true,
+          result: {
+            iso: "2026-03-27T10:00:00.000Z",
+            timezone: "Europe/Warsaw",
+          },
+          tool_name: "time_current",
+        },
+      ],
+    });
+    expect(dispatcher.execute).toHaveBeenCalledTimes(1);
+    expect(llmProvider.generateFromMessages).toHaveBeenCalledTimes(3);
+    expect(promptTemplate.renderPlanningPrompt).toHaveBeenCalledTimes(3);
+  });
+
+  it("fails when the model repeats the same successful tool call after corrective retry", async () => {
+    const dispatcher = {
+      execute: jest.fn().mockResolvedValue({
+        arguments: {},
+        ok: true,
+        result: {
+          iso: "2026-03-27T10:00:00.000Z",
+          timezone: "Europe/Warsaw",
+        },
+        tool_name: "time_current",
+      }),
+    } as unknown as AssistantToolDispatcherService;
+    const service = new AssistantRuntimeService(
+      providerStub([
+        {
+          message: "",
+          tool_arguments: {},
+          tool_name: "time_current",
+          type: "tool_call",
+        },
+        {
+          message: "",
+          tool_arguments: {},
+          tool_name: "time_current",
+          type: "tool_call",
+        },
+        {
+          message: "",
+          tool_arguments: {},
+          tool_name: "time_current",
+          type: "tool_call",
+        },
+      ]),
+      dispatcher,
+      new AssistantOrchestratorMetricsService(),
+      promptTemplateStub(),
+      {
+        load: jest.fn().mockResolvedValue(runtimeContext),
+      } as unknown as AssistantOrchestratorRuntimeContextService,
+    );
+
+    await expect(service.run(input)).rejects.toMatchObject({
+      code: "TOOL_ERROR",
+      message: "Model repeated tool call after successful observation: time_current",
+    });
+    expect(dispatcher.execute).toHaveBeenCalledTimes(1);
   });
 
   it("records unknown_tool_name fallback metric for unsupported tool outputs", async () => {
@@ -230,9 +477,7 @@ describe("AssistantRuntimeService", () => {
         execute: jest.fn(),
       } as unknown as AssistantToolDispatcherService,
       metricsService,
-      promptTemplateStub({
-        renderSynthesisPrompt: jest.fn(),
-      }),
+      promptTemplateStub(),
       {
         load: jest.fn().mockResolvedValue(runtimeContext),
       } as unknown as AssistantOrchestratorRuntimeContextService,

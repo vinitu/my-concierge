@@ -22,6 +22,7 @@ describe('AssistantOrchestratorConfigService', () => {
         'legacy_fact_search',
         'memory_fact_search',
       ] as unknown as AssistantToolName[],
+      max_tool_steps: 4,
       memory_window: 6,
       run_timeout_seconds: 30,
       thinking_interval_seconds: 2,
@@ -29,5 +30,6 @@ describe('AssistantOrchestratorConfigService', () => {
 
     const config = await service.read();
     expect(config.enabled_tools).toEqual(['memory_fact_search']);
+    expect(config.max_tool_steps).toBe(4);
   });
 });

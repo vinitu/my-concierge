@@ -9,14 +9,13 @@ describe("AssistantOrchestratorConversationService", () => {
     jest.restoreAllMocks();
   });
 
-  it("reads conversation via assistant-memory and applies memory window", async () => {
+  it("reads conversation via assistant-memory using memory_window as request limit", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       json: async () => ({
         chat: "direct",
         context: "ctx",
         direction: "api",
         messages: [
-          { content: "a", created_at: "2026-03-01T10:00:00.000Z", role: "user" },
           {
             content: "b",
             created_at: "2026-03-01T10:00:01.000Z",
@@ -53,7 +52,10 @@ describe("AssistantOrchestratorConversationService", () => {
     expect(result.messages[0]?.content).toBe("b");
     expect(global.fetch).toHaveBeenCalledWith(
       "http://assistant-memory:3000/v1/conversations/read",
-      expect.objectContaining({ method: "POST" }),
+      expect.objectContaining({
+        body: expect.stringContaining('"limit":2'),
+        method: "POST",
+      }),
     );
   });
 

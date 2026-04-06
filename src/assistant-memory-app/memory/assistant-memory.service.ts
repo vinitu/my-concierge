@@ -264,6 +264,7 @@ export class AssistantMemoryService {
       user_id: userId,
       conversation_id: body.conversation_id,
       direction: body.direction,
+      limit: this.normalizeConversationLimit(body.limit),
       message: '',
     };
 
@@ -392,7 +393,10 @@ export class AssistantMemoryService {
       connection.release();
     }
 
-    return this.readConversationFromMysql(message);
+    return this.readConversationFromMysql({
+      ...message,
+      limit: 20,
+    });
   }
 
   async updateConversationSummary(
@@ -1719,6 +1723,7 @@ export class AssistantMemoryService {
     user_id: string;
     conversation_id: string;
     direction: string;
+    limit: number;
     message: string;
   }): Promise<ConversationState> {
     const stored = await this.readConversationFileState(message.conversation_id);
@@ -1731,7 +1736,7 @@ export class AssistantMemoryService {
       user_id: stored.user_id,
       context: stored.context,
       direction: stored.direction,
-      messages: stored.messages,
+      messages: stored.messages.slice(-message.limit),
       updated_at: stored.updated_at,
     };
   }
@@ -1744,6 +1749,7 @@ export class AssistantMemoryService {
       user_id: body.user_id,
       conversation_id: body.conversation_id,
       direction: body.direction,
+      limit: 20,
       message: body.message,
     });
     const nowIso = new Date().toISOString();
@@ -1862,6 +1868,7 @@ export class AssistantMemoryService {
       user_id: string;
       conversation_id: string;
       direction: string;
+      limit: number;
       message: string;
     },
     connectionOverride?: MysqlQueryable,
@@ -1914,9 +1921,9 @@ export class AssistantMemoryService {
         FROM conversation_turns
         WHERE thread_id = ?
         ORDER BY sequence_no DESC
-        LIMIT 20
+        LIMIT ?
       `,
-      [message.conversation_id],
+      [message.conversation_id, message.limit],
     );
 
     return {
@@ -1949,6 +1956,19 @@ export class AssistantMemoryService {
       messages: [],
       updated_at: null,
     };
+  }
+
+  private normalizeConversationLimit(value: unknown): number {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.max(1, Math.min(100, Math.floor(value)));
+    }
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number.parseInt(value.trim(), 10);
+      if (Number.isFinite(parsed)) {
+        return Math.max(1, Math.min(100, parsed));
+      }
+    }
+    return 20;
   }
 
   private async assertMysqlSchemaReady(): Promise<void> {

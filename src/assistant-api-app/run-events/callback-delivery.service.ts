@@ -24,6 +24,8 @@ export class CallbackDeliveryService {
           direction: event.direction,
           message: this.messageForMemoryEvent(event),
           payload: event.payload,
+          request_id: event.requestId,
+          sequence: event.sequence,
           type: event.eventType,
           user_id: event.userId,
         },
@@ -50,6 +52,8 @@ export class CallbackDeliveryService {
           typeof event.payload.message === "string" ? event.payload.message : "",
         ok: event.payload.ok === true,
         payload: event.payload.payload,
+        request_id: event.requestId,
+        sequence: event.sequence,
         tool_name:
           typeof event.payload.tool_name === "string"
             ? event.payload.tool_name
@@ -73,6 +77,8 @@ export class CallbackDeliveryService {
         direction: event.direction,
         error: event.eventType === "run.failed",
         message,
+        request_id: event.requestId,
+        sequence: event.sequence,
         user_id: event.userId,
       },
     );

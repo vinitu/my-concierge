@@ -81,7 +81,7 @@ Describe the endpoints of all application services in one place.
 ### Notes
 
 - `assistant-llm` is internal-only.
-- `assistant-orchestrator` calls `assistant-llm` for planning and synthesis.
+- `assistant-orchestrator` calls `assistant-llm` for a multi-step agent loop with repeated tool use until final response.
 - `assistant-memory` calls `assistant-llm` for asynchronous summary and enrichment.
 
 ## `assistant-memory`

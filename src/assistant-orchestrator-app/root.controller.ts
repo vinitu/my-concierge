@@ -27,6 +27,7 @@ interface UpdateOrchestratorConfigBody {
   brave_base_url?: string;
   brave_timeout_ms?: number | string;
   enabled_tools?: string[];
+  max_tool_steps?: number | string;
   memory_window?: number | string;
   run_timeout_seconds?: number | string;
   thinking_interval_seconds?: number | string;
@@ -66,6 +67,7 @@ export class AssistantOrchestratorRootController {
     <p>Runtime orchestration service (queue, tools, callbacks).</p>
     <p><strong>Provider status:</strong> ${this.escapeHtml(providerStatus.status)}</p>
     <p><strong>Memory window:</strong> ${String(config.memory_window)}</p>
+    <p><strong>Max tool steps:</strong> ${String(config.max_tool_steps)}</p>
     <p><strong>Enabled tools:</strong> ${this.escapeHtml(config.enabled_tools.join(', '))}</p>
     <h3>Endpoints</h3>
     <ul>
@@ -104,6 +106,12 @@ export class AssistantOrchestratorRootController {
             ? Number.parseInt(body.brave_timeout_ms, 10)
             : 30000,
       enabled_tools: this.normalizeEnabledTools(body.enabled_tools),
+      max_tool_steps:
+        typeof body.max_tool_steps === 'number'
+          ? body.max_tool_steps
+          : typeof body.max_tool_steps === 'string'
+            ? Number.parseInt(body.max_tool_steps, 10)
+            : 4,
       memory_window:
         typeof body.memory_window === 'number'
           ? body.memory_window

@@ -266,6 +266,20 @@ export class AssistantLlmController {
       };
     }
 
+    if (typeof parsed.name === "string" && parsed.name.trim().length > 0) {
+      return {
+        message: "",
+        tool_arguments:
+          typeof parsed.arguments === "object" &&
+          parsed.arguments !== null &&
+          !Array.isArray(parsed.arguments)
+            ? (parsed.arguments as Record<string, unknown>)
+            : {},
+        tool_name: parsed.name,
+        type: "tool_call",
+      };
+    }
+
     const messageCandidates = [
       parsed.message,
       parsed.response,

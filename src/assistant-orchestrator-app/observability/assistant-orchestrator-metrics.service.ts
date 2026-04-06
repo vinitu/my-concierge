@@ -113,7 +113,7 @@ export class AssistantOrchestratorMetricsService {
     });
   }
 
-  recordLlmMainRequest(success: boolean, phase: 'planning' | 'synthesis'): void {
+  recordLlmMainRequest(success: boolean, phase: string): void {
     this.llmMainRequestCounter.inc({
       phase,
       service: 'assistant-orchestrator',
@@ -123,7 +123,7 @@ export class AssistantOrchestratorMetricsService {
 
   recordLlmMainDurationMs(
     durationMs: number,
-    phase: 'planning' | 'synthesis',
+    phase: string,
     success = true,
   ): void {
     this.llmDurationHistogram.observe(

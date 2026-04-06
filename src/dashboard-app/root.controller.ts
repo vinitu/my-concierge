@@ -569,7 +569,7 @@ export class DashboardRootController {
 
       function editableConfigKeys(serviceKey, config) {
         if (serviceKey === 'assistant-orchestrator') {
-          return ['memory_window', 'run_timeout_seconds', 'thinking_interval_seconds']
+          return ['memory_window', 'max_tool_steps', 'run_timeout_seconds', 'thinking_interval_seconds']
             .filter((key) => Object.prototype.hasOwnProperty.call(config, key));
         }
         return Object.keys(config);

@@ -88,19 +88,25 @@ const assistantResultInputSchema = z
 
 const planningUnifiedSchema = z
   .object({
+    arguments: z.record(z.string(), z.unknown()).optional(),
     context: z.string().optional().default(''),
     fallback_reason: z.string().optional(),
     memory_writes: objectArraySchema,
     message: z.string().optional(),
+    name: toolNameSchema.optional(),
     tool_arguments: z.record(z.string(), z.unknown()).optional().default({}),
     tool_name: toolNameSchema.optional(),
     tool_observations: objectArraySchema,
-    type: z.enum(['final', 'tool_call', 'error']),
+    type: z.enum(['final', 'tool_call', 'error']).optional(),
   })
   .passthrough()
   .superRefine((value, ctx) => {
-    if (value.type === 'tool_call') {
-      if (!value.tool_name) {
+    const effectiveType =
+      value.type ??
+      (value.tool_name || value.name ? 'tool_call' : undefined);
+
+    if (effectiveType === 'tool_call') {
+      if (!value.tool_name && !value.name) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'tool_name is required when type=tool_call.',
@@ -119,12 +125,20 @@ const planningUnifiedSchema = z
     }
   })
   .transform((value): AssistantLlmPlanResult => {
-    if (value.type === 'tool_call') {
+    const effectiveType =
+      value.type ??
+      (value.tool_name || value.name ? 'tool_call' : 'final');
+
+    if (effectiveType === 'tool_call') {
+      const toolArguments =
+        value.tool_arguments && Object.keys(value.tool_arguments).length > 0
+          ? value.tool_arguments
+          : value.arguments ?? {};
       return {
         final: undefined,
         tool_call: {
-          arguments: value.tool_arguments ?? {},
-          name: value.tool_name!,
+          arguments: toolArguments,
+          name: value.tool_name ?? value.name!,
         },
       };
     }

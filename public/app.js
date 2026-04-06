@@ -21,6 +21,9 @@ const conversationIdLabel = document.getElementById('conversation-id-label');
 const maxComposerHeight = 180;
 let thinkingTimer = null;
 let thinkingMessage = null;
+let lastToolEventSignature = null;
+const pendingRunFrames = new Map();
+const RUN_FLUSH_DELAY_MS = 60;
 
 function resizeInput() {
   input.style.height = 'auto';
@@ -60,6 +63,20 @@ function appendMessage(role, text) {
   return article;
 }
 
+function appendToolEventMessage(text) {
+  const normalized = String(text ?? '').trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (lastToolEventSignature === normalized) {
+    return null;
+  }
+
+  lastToolEventSignature = normalized;
+  return appendMessage('system', normalized);
+}
+
 function isFailureMessage(text) {
   const normalized = String(text ?? '').toLowerCase();
   return (
@@ -85,8 +102,47 @@ function clearThinking() {
 
 function clearMessages() {
   clearThinking();
+  lastToolEventSignature = null;
+  pendingRunFrames.clear();
   messages.innerHTML = '';
   scrollMessagesToBottom();
+}
+
+function flushPendingRun(requestId) {
+  const frame = pendingRunFrames.get(requestId);
+  if (!frame) {
+    return;
+  }
+
+  pendingRunFrames.delete(requestId);
+  const items = frame.items.slice().sort((left, right) => left.sequence - right.sequence);
+  for (const item of items) {
+    item.render();
+  }
+}
+
+function queueRunRender(requestId, sequence, render) {
+  if (typeof requestId !== 'string' || !requestId.trim() || !Number.isFinite(sequence)) {
+    render();
+    return;
+  }
+
+  const normalizedRequestId = requestId.trim();
+  const normalizedSequence = Math.floor(sequence);
+  const current = pendingRunFrames.get(normalizedRequestId) ?? { items: [], timer: null };
+
+  if (current.timer !== null) {
+    window.clearTimeout(current.timer);
+  }
+
+  current.items.push({
+    render,
+    sequence: normalizedSequence,
+  });
+  current.timer = window.setTimeout(() => {
+    flushPendingRun(normalizedRequestId);
+  }, RUN_FLUSH_DELAY_MS);
+  pendingRunFrames.set(normalizedRequestId, current);
 }
 
 function setConnectionStatus(status) {
@@ -152,11 +208,14 @@ function connectSocket() {
 
   socket.on('assistant.message', (payload) => {
     clearThinking();
-    if (isFailureMessage(payload?.message)) {
-      appendMessage('error', payload.message);
-      return;
-    }
-    appendMessage('assistant', payload.message);
+    lastToolEventSignature = null;
+    queueRunRender(payload?.request_id, payload?.sequence, () => {
+      if (isFailureMessage(payload?.message)) {
+        appendMessage('error', payload.message);
+        return;
+      }
+      appendMessage('assistant', payload.message);
+    });
   });
 
   socket.on('assistant.thinking', (payload) => {
@@ -165,15 +224,14 @@ function connectSocket() {
 
   socket.on('assistant.error', (payload) => {
     clearThinking();
-    appendMessage('error', payload.message);
+    lastToolEventSignature = null;
+    queueRunRender(payload?.request_id, payload?.sequence, () => {
+      appendMessage('error', payload.message);
+    });
   });
 
   socket.on('assistant.event', (payload) => {
     const type = typeof payload?.type === 'string' ? payload.type : 'assistant.event';
-    let message =
-      typeof payload?.message === 'string' && payload.message.trim().length > 0
-        ? payload.message
-        : JSON.stringify(payload?.payload ?? {});
 
     if (type.startsWith('tool.')) {
       const toolPayload =
@@ -182,10 +240,25 @@ function connectSocket() {
         typeof toolPayload.tool_name === 'string' && toolPayload.tool_name.trim().length > 0
           ? toolPayload.tool_name
           : type.split('.')[1] || 'unknown_tool';
-      const status = type.endsWith('.ok') ? 'ok' : type.endsWith('.failed') ? 'failed' : 'event';
-      message = `[tool:${toolName} ${status}] ${message}`;
+      const message =
+        typeof payload?.message === 'string' && payload.message.trim().length > 0
+          ? payload.message.trim()
+          : type.endsWith('.ok')
+            ? `Executed ${toolName}.`
+            : type.endsWith('.failed')
+              ? `Failed ${toolName}.`
+              : `Tool event: ${toolName}.`;
+      queueRunRender(payload?.request_id, payload?.sequence, () => {
+        appendToolEventMessage(message);
+      });
+      return;
     }
 
+    lastToolEventSignature = null;
+    const message =
+      typeof payload?.message === 'string' && payload.message.trim().length > 0
+        ? payload.message
+        : JSON.stringify(payload?.payload ?? {});
     appendMessage('system', `[${type}] ${message}`);
   });
 }

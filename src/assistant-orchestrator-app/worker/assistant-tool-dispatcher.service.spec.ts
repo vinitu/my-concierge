@@ -36,6 +36,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { query: 'dinner' },
       ok: true,
       result: {
         count: 1,
@@ -73,6 +74,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { query: 'birth date' },
       ok: true,
       result: {
         count: 1,
@@ -111,6 +113,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { limit: 5 },
       ok: true,
       result: {
         messages: [],
@@ -149,6 +152,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { count: 3, query: 'latest nestjs release' },
       ok: true,
       result: {
         query: 'latest nestjs release',
@@ -222,6 +226,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { skill_name: 'shopping' },
       ok: true,
       result: {
         content: '# Shopping\n\nUse this skill for shopping tasks.',
@@ -266,6 +271,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { path: 'notes' },
       ok: true,
       result: {
         created: true,
@@ -283,6 +289,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { content: 'hello', path: 'notes/today.txt' },
       ok: true,
       result: {
         bytes: 5,
@@ -301,6 +308,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { path: 'notes/today.txt' },
       ok: true,
       result: {
         content: 'hello',
@@ -318,6 +326,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { path: 'notes' },
       ok: true,
       result: {
         entries: [
@@ -341,6 +350,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { path: 'notes/today.txt' },
       ok: true,
       result: {
         deleted: true,
@@ -360,6 +370,7 @@ describe('AssistantToolDispatcherService', () => {
         'thread_1',
       ),
     ).resolves.toEqual({
+      arguments: { path: 'notes' },
       ok: true,
       result: {
         deleted: true,

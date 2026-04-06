@@ -65,11 +65,13 @@ export class AssistantOrchestratorOpenApiController {
                           ],
                         },
                       },
+                      max_tool_steps: { type: 'integer', minimum: 1, maximum: 12 },
                       memory_window: { type: 'integer', minimum: 1, maximum: 20 },
                       run_timeout_seconds: { type: 'integer', minimum: 5, maximum: 600 },
                       thinking_interval_seconds: { type: 'integer', minimum: 1, maximum: 30 },
                     },
                     required: [
+                      'max_tool_steps',
                       'memory_window',
                       'run_timeout_seconds',
                       'thinking_interval_seconds',
