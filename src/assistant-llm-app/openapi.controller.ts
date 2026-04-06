@@ -17,6 +17,22 @@ export class AssistantLlmOpenApiController {
           },
           put: {
             summary: "Update LLM config",
+            requestBody: {
+              content: {
+                "application/json": {
+                  schema: {
+                    properties: {
+                      response_repair_attempts: {
+                        maximum: 5,
+                        minimum: 0,
+                        type: "integer",
+                      },
+                    },
+                    type: "object",
+                  },
+                },
+              },
+            },
           },
         },
         "/provider": {

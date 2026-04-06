@@ -50,6 +50,10 @@ export class AssistantLlmConfigService {
           this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
         ),
         provider,
+        response_repair_attempts: this.normalizeRepairAttempts(
+          parsed.response_repair_attempts,
+          this.configService.get<string>('LLM_RESPONSE_REPAIR_ATTEMPTS', '1'),
+        ),
         xai_api_key: this.normalizeSecret(
           parsed.xai_api_key,
           this.configService.get<string>('XAI_API_KEY', ''),
@@ -91,6 +95,10 @@ export class AssistantLlmConfigService {
         defaults.ollama_timeout_ms,
       ),
       provider,
+      response_repair_attempts: this.normalizeRepairAttempts(
+        config.response_repair_attempts,
+        defaults.response_repair_attempts,
+      ),
       xai_api_key: this.normalizeSecret(config.xai_api_key, defaults.xai_api_key),
       xai_base_url: this.normalizeUrl(config.xai_base_url, defaults.xai_base_url),
       xai_timeout_ms: this.normalizeTimeoutMs(config.xai_timeout_ms, defaults.xai_timeout_ms),
@@ -122,6 +130,10 @@ export class AssistantLlmConfigService {
         this.configService.get<string>('OLLAMA_TIMEOUT_MS', '360000'),
       ),
       provider: this.normalizeProvider(this.configService.get<string>('LLM_PROVIDER', 'ollama')),
+      response_repair_attempts: this.normalizeRepairAttempts(
+        undefined,
+        this.configService.get<string>('LLM_RESPONSE_REPAIR_ATTEMPTS', '1'),
+      ),
       xai_api_key: this.configService.get<string>('XAI_API_KEY', ''),
       xai_base_url: this.normalizeUrl(
         this.configService.get<string>('XAI_BASE_URL', 'https://api.x.ai/v1'),
@@ -184,6 +196,23 @@ export class AssistantLlmConfigService {
     }
 
     return Math.min(3600000, Math.max(1000, Math.floor(parsed)));
+  }
+
+  private normalizeRepairAttempts(value: unknown, fallback: string | number): number {
+    const parsed =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string'
+          ? Number.parseInt(value, 10)
+          : typeof fallback === 'number'
+            ? fallback
+            : Number.parseInt(fallback, 10);
+
+    if (!Number.isFinite(parsed)) {
+      return 1;
+    }
+
+    return Math.min(5, Math.max(0, Math.floor(parsed)));
   }
 
   private normalizeSecret(value: unknown, fallback: string): string {

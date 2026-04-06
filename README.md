@@ -252,6 +252,7 @@ For `xai`:
 For local Ollama:
 - `OLLAMA_BASE_URL=http://host.docker.internal:11434`
 - `OLLAMA_MODEL=qwen3:1.7b`
+- `LLM_RESPONSE_REPAIR_ATTEMPTS=1`
 
 4. To switch provider or model, open [http://localhost:3003/](http://localhost:3003/) (or the dashboard) and update `assistant-llm` settings.
 

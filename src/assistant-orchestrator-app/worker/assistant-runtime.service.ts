@@ -28,7 +28,6 @@ import type { AssistantConversationMessage } from "./assistant-orchestrator-conv
 export class AssistantRuntimeService {
   private readonly logger = new Logger(AssistantRuntimeService.name);
   private static readonly MAX_DISABLED_TOOL_RETRIES = 1;
-  private static readonly MAX_REPEATED_TOOL_RETRIES = 1;
 
   constructor(
     @Inject(ASSISTANT_LLM_PROVIDER)
@@ -147,18 +146,10 @@ export class AssistantRuntimeService {
     phase = "planning",
   ): Promise<AssistantLlmPlanResult> {
     let disabledToolName: AssistantToolName | null = null;
-    let repeatedToolCall:
-      | {
-          arguments: Record<string, unknown>;
-          name: AssistantToolName;
-        }
-      | null = null;
 
     for (
       let attempt = 0;
-      attempt <=
-      AssistantRuntimeService.MAX_DISABLED_TOOL_RETRIES +
-        AssistantRuntimeService.MAX_REPEATED_TOOL_RETRIES;
+      attempt <= AssistantRuntimeService.MAX_DISABLED_TOOL_RETRIES;
       attempt += 1
     ) {
       const plan = await this.invokePlanningChain(
@@ -166,7 +157,6 @@ export class AssistantRuntimeService {
         runtimeContext,
         enabledTools,
         disabledToolName,
-        repeatedToolCall,
         toolObservations,
         phase,
       );
@@ -207,19 +197,22 @@ export class AssistantRuntimeService {
             )}`,
           );
 
-          if (repeatedToolCall) {
-            throw new AssistantRuntimeError(
-              "TOOL_ERROR",
-              `Model repeated tool call after successful observation: ${plan.tool_call.name}`,
-            );
+          const repaired = await this.invokeRepeatedToolRepair(
+            input,
+            {
+              arguments: plan.tool_call.arguments,
+              name: plan.tool_call.name as AssistantToolName,
+            },
+            repeatedToolObservation,
+          );
+          if (repaired.final) {
+            return repaired;
           }
 
-          repeatedToolCall = {
-            arguments: plan.tool_call.arguments,
-            name: plan.tool_call.name as AssistantToolName,
-          };
-          disabledToolName = null;
-          continue;
+          throw new AssistantRuntimeError(
+            "TOOL_ERROR",
+            `Model repeated tool call after successful observation: ${plan.tool_call.name}`,
+          );
         }
       }
 
@@ -237,12 +230,6 @@ export class AssistantRuntimeService {
     runtimeContext: AssistantOrchestratorRuntimeContext,
     enabledTools?: AssistantToolName[],
     disabledToolName?: AssistantToolName | null,
-    repeatedToolCall?:
-      | {
-          arguments: Record<string, unknown>;
-          name: AssistantToolName;
-        }
-      | null,
     toolObservations?: Array<Record<string, unknown>>,
     phase = "planning",
   ): Promise<AssistantLlmPlanResult> {
@@ -261,20 +248,9 @@ export class AssistantRuntimeService {
           `Choose only from enabled tools: ${enabledTools?.join(", ") ?? "none"}.`,
           "Do not return the disabled tool again.",
         ].join("\n");
-    const planningPromptWithFeedback = !repeatedToolCall
-      ? planningPrompt
-      : [
-          planningPrompt,
-          "",
-          `Repeated tool feedback: the tool "${repeatedToolCall.name}" with the same arguments was already executed successfully.`,
-          `Repeated tool arguments: ${JSON.stringify(repeatedToolCall.arguments)}.`,
-          "Use the existing tool_observations to answer, or choose a different tool only if it is strictly necessary.",
-          "Do not return the same tool call again.",
-        ].join("\n");
-
     const planningMessages = this.buildMessagesForPrompt(
       input,
-      planningPromptWithFeedback,
+      planningPrompt,
       true,
     );
     const planningAvailableTools =
@@ -304,6 +280,57 @@ export class AssistantRuntimeService {
     }
 
     return this.mapPlanningResponse(responsePayload, input.message.message);
+  }
+
+  private async invokeRepeatedToolRepair(
+    input: AssistantLlmGenerateInput,
+    repeatedToolCall: {
+      arguments: Record<string, unknown>;
+      name: AssistantToolName;
+    },
+    repeatedToolObservation: Record<string, unknown>,
+  ): Promise<AssistantLlmPlanResult> {
+    const repairPrompt =
+      await this.promptTemplateService.renderRepeatedToolRepairPrompt(
+        input,
+        repeatedToolCall,
+        repeatedToolObservation as never,
+      );
+    const repairMessages: AssistantLlmMessage[] = [
+      {
+        content: repairPrompt,
+        role: "system",
+      },
+    ];
+
+    const startedAt = Date.now();
+    let responsePayload: AssistantLlmConversationRespondResponse;
+    try {
+      responsePayload = await this.llmProvider.generateFromMessages(
+        repairMessages,
+      );
+      this.metricsService.recordLlmMainRequest(true, "planning_repair");
+      this.metricsService.recordLlmMainDurationMs(
+        Date.now() - startedAt,
+        "planning_repair",
+        true,
+      );
+    } catch (error) {
+      this.metricsService.recordLlmMainRequest(false, "planning_repair");
+      this.metricsService.recordLlmMainDurationMs(
+        Date.now() - startedAt,
+        "planning_repair",
+        false,
+      );
+      throw error;
+    }
+
+    const repaired = this.mapPlanningResponse(responsePayload, input.message.message);
+    if (repaired.final) {
+      return repaired;
+    }
+
+    return { final: undefined, tool_call: repaired.tool_call };
   }
 
   private mapPlanningResponse(

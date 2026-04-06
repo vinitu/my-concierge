@@ -21,6 +21,7 @@ describe('AssistantLlmConfigService', () => {
       ollama_base_url: 'http://ollama.local',
       ollama_timeout_ms: 360000,
       provider: 'ollama',
+      response_repair_attempts: 99,
       xai_api_key: '',
       xai_base_url: 'https://api.x.ai/v1',
       xai_timeout_ms: 360000,
@@ -29,5 +30,6 @@ describe('AssistantLlmConfigService', () => {
     const config = await service.read();
     expect(config.provider).toBe('ollama');
     expect(config.model).toBe('qwen3:1.7b');
+    expect(config.response_repair_attempts).toBe(5);
   });
 });

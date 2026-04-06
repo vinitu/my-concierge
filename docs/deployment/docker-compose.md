@@ -134,6 +134,7 @@ http://host.docker.internal:11434
 
 This lets the `assistant-llm` container reach the Ollama process running on the host machine in Docker Desktop.
 Default `OLLAMA_MODEL` is `qwen3:1.7b`.
+Default `LLM_RESPONSE_REPAIR_ATTEMPTS` is `1`.
 
 ## Port Model
 

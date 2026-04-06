@@ -22,7 +22,7 @@
 ## API Contract
 
 - `GET /config`, `PUT /config`
-  Read and update provider, model, API keys, base URLs, and timeouts.
+  Read and update provider, model, API keys, base URLs, timeouts, and response-repair attempts.
 - `GET /provider`
   Return provider/model selection, enabled flag, and status string.
   `status` must be `ok` when the provider/model is usable, otherwise it must contain a human-readable reason string.
@@ -61,6 +61,7 @@
 {
   "provider": "ollama",
   "model": "qwen3:1.7b",
+  "response_repair_attempts": 1,
   "ollama_base_url": "http://ollama:11434",
   "ollama_timeout_ms": 360000,
   "deepseek_api_key": "",
@@ -225,7 +226,11 @@ Response:
 - Treat every non-tools Ollama model as disabled at startup, even if it is installed locally.
 - For `POST /models/ollama/:model/download`, call Ollama `POST /api/pull` with `stream=false`, then refresh the enabled-model snapshot.
 - Route requests to the configured provider adapter (`deepseek`, `xai`, or `ollama`).
-- Parse planning-like JSON output and fall back to plain message mode when parsing fails.
+- Parse planning-like JSON output into a typed response envelope.
+- For `POST /v1/conversation`, if the first provider response cannot be parsed into a typed response envelope, make up to `response_repair_attempts` additional provider calls to repair the malformed output into valid JSON.
+- Repair calls must use a minimized prompt that focuses only on fixing the malformed response shape, not rerunning the full task.
+- Repair calls must omit native tool definitions and may include only the malformed output, the latest user message, and the allowed tool names.
+- If parsing still fails after all configured repair attempts, fall back to plain message mode.
 - Normalize fact extraction into unique third-person statements.
 
 ## Dependencies

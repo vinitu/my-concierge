@@ -60,9 +60,9 @@ Describe the endpoints of all application services in one place.
 - `GET /openapi.json`
   Purpose: return the `assistant-llm` OpenAPI schema
 - `GET /config`
-  Purpose: read LLM provider/model settings
+  Purpose: read LLM provider/model settings and response-repair settings
 - `PUT /config`
-  Purpose: update LLM provider/model settings
+  Purpose: update LLM provider/model settings and response-repair settings
 - `GET /provider`
   Purpose: verify provider reachability and key configuration
 - `GET /models`
@@ -82,6 +82,7 @@ Describe the endpoints of all application services in one place.
 
 - `assistant-llm` is internal-only.
 - `assistant-orchestrator` calls `assistant-llm` for a multi-step agent loop with repeated tool use until final response.
+- `assistant-llm` may issue internal repair calls when a provider response for `POST /v1/conversation` cannot be parsed into the typed response envelope.
 - `assistant-memory` calls `assistant-llm` for asynchronous summary and enrichment.
 
 ## `assistant-memory`

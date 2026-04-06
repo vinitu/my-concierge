@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type {
   AssistantLlmAvailableTool,
   AssistantLlmConfig,
+  AssistantLlmConversationRespondResponse,
   AssistantLlmModelCatalogEntry,
   AssistantLlmMessage,
   AssistantLlmOllamaModelDownloadResponse,
@@ -90,6 +91,40 @@ export class AssistantLlmService {
   ): Promise<string> {
     const config = await this.assistantLlmConfigService.read();
     return this.selectTextProvider(config).generateFromMessages(messages, tools);
+  }
+
+  async generateConversationResponse(
+    messages: AssistantLlmMessage[],
+    tools?: AssistantLlmAvailableTool[],
+  ): Promise<AssistantLlmConversationRespondResponse> {
+    const config = await this.assistantLlmConfigService.read();
+    const provider = this.selectTextProvider(config);
+    let responseText = await provider.generateFromMessages(messages, tools);
+    let normalized = this.normalizeConversationResponse(responseText);
+
+    for (
+      let attempt = 0;
+      !normalized && attempt < config.response_repair_attempts;
+      attempt += 1
+    ) {
+      this.logger.warn(
+        `conversation-repair attempt=${String(attempt + 1)} model=${config.model} provider=${config.provider}`,
+      );
+      responseText = await provider.generateFromMessages(
+        this.buildResponseRepairMessages(responseText, messages, tools),
+      );
+      normalized = this.normalizeConversationResponse(responseText);
+    }
+
+    if (normalized) {
+      return normalized;
+    }
+
+    const message = responseText.trim();
+    return {
+      message: message.length > 0 ? message : "No response from model",
+      type: "final",
+    };
   }
 
   async summarize(
@@ -260,6 +295,210 @@ export class AssistantLlmService {
       "- If no profile update is present, return {\"patch\":{}}.",
       `conversation_id=${conversationId}`,
     ].join("\n");
+  }
+
+  private buildResponseRepairMessages(
+    malformedOutput: string,
+    messages: AssistantLlmMessage[],
+    tools?: AssistantLlmAvailableTool[],
+  ): AssistantLlmMessage[] {
+    const latestUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === "user");
+    const allowedToolNames = Array.from(
+      new Set(
+        (tools ?? [])
+          .map((tool) => (typeof tool.name === "string" ? tool.name.trim() : ""))
+          .filter((name) => name.length > 0),
+      ),
+    );
+
+    const repairPrompt = [
+      "Repair the malformed assistant response into valid JSON.",
+      "Do not explain the error and do not add markdown fences.",
+      "Return one JSON object only.",
+      'Required shape: {"type":"final|tool_call|error","message":"...","tool_name":"optional","tool_arguments":{},"context":"...","memory_writes":[],"tool_observations":[]}.',
+      "If the malformed response clearly intended a tool call, return type=tool_call.",
+      "If it clearly intended a final or error response, preserve that intent.",
+      "Use only allowed tool names when returning type=tool_call.",
+      `Allowed tool names: ${allowedToolNames.length > 0 ? allowedToolNames.join(", ") : "(none)"}.`,
+      "Use the malformed response as the primary source of truth.",
+      "Use the latest user message only as minimal context when the malformed response is incomplete.",
+    ].join("\n");
+
+    return [
+      { content: repairPrompt, role: "system" },
+      {
+        content: [
+          "Malformed assistant response:",
+          malformedOutput.trim() || "(empty)",
+          "",
+          "Latest user message:",
+          latestUserMessage?.content?.trim() || "(none)",
+        ].join("\n"),
+        role: "user",
+      },
+    ];
+  }
+
+  private normalizeConversationResponse(
+    responseText: string,
+  ): AssistantLlmConversationRespondResponse | null {
+    const parsed = this.extractJsonObject(responseText);
+    const normalized = this.normalizePlanningLikeObject(parsed);
+    if (normalized) {
+      return normalized;
+    }
+
+    return null;
+  }
+
+  private extractJsonObject(value: string): Record<string, unknown> | null {
+    const trimmed = value.trim();
+    const unwrapped =
+      trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)?.[1] ?? trimmed;
+    const start = unwrapped.indexOf("{");
+    const end = unwrapped.lastIndexOf("}");
+    const candidate =
+      start >= 0 && end >= start ? unwrapped.slice(start, end + 1) : unwrapped;
+
+    try {
+      const parsed = JSON.parse(candidate);
+      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  private normalizePlanningLikeObject(
+    parsed: Record<string, unknown> | null,
+  ): AssistantLlmConversationRespondResponse | null {
+    if (!parsed) {
+      return null;
+    }
+
+    const typeRaw = parsed.type;
+    if (
+      (typeRaw === "final" || typeRaw === "tool_call" || typeRaw === "error") &&
+      (typeof parsed.message === "string" || typeRaw === "tool_call")
+    ) {
+      return {
+        context: typeof parsed.context === "string" ? parsed.context : undefined,
+        memory_writes: Array.isArray(parsed.memory_writes)
+          ? (parsed.memory_writes as Record<string, unknown>[])
+          : undefined,
+        message:
+          typeof parsed.message === "string"
+            ? parsed.message
+            : typeRaw === "tool_call"
+              ? ""
+              : "No response from model",
+        tool_arguments:
+          typeof parsed.tool_arguments === "object" &&
+          parsed.tool_arguments !== null &&
+          !Array.isArray(parsed.tool_arguments)
+            ? (parsed.tool_arguments as Record<string, unknown>)
+            : undefined,
+        tool_name: typeof parsed.tool_name === "string" ? parsed.tool_name : undefined,
+        tool_observations: Array.isArray(parsed.tool_observations)
+          ? (parsed.tool_observations as Record<string, unknown>[])
+          : undefined,
+        type: typeRaw,
+      };
+    }
+
+    if (typeof parsed.name === "string" && parsed.name.trim().length > 0) {
+      return {
+        message: "",
+        tool_arguments:
+          typeof parsed.arguments === "object" &&
+          parsed.arguments !== null &&
+          !Array.isArray(parsed.arguments)
+            ? (parsed.arguments as Record<string, unknown>)
+            : {},
+        tool_name: parsed.name,
+        type: "tool_call",
+      };
+    }
+
+    const messageCandidates = [
+      parsed.message,
+      parsed.response,
+      parsed.reply,
+      parsed.answer,
+      parsed.text,
+      parsed.content,
+    ];
+    const directMessage =
+      messageCandidates.find(
+        (entry): entry is string =>
+          typeof entry === "string" && entry.trim().length > 0,
+      ) ?? null;
+    if (directMessage) {
+      return {
+        context: typeof parsed.context === "string" ? parsed.context : undefined,
+        memory_writes: Array.isArray(parsed.memory_writes)
+          ? (parsed.memory_writes as Record<string, unknown>[])
+          : undefined,
+        message: directMessage.trim(),
+        tool_observations: Array.isArray(parsed.tool_observations)
+          ? (parsed.tool_observations as Record<string, unknown>[])
+          : undefined,
+        type: "final",
+      };
+    }
+
+    const finalRaw = parsed.final;
+    if (typeof finalRaw === "object" && finalRaw !== null && !Array.isArray(finalRaw)) {
+      const final = finalRaw as Record<string, unknown>;
+      const nestedMessageCandidates = [
+        final.message,
+        final.response,
+        final.reply,
+        final.answer,
+        final.text,
+        final.content,
+      ];
+      const message =
+        nestedMessageCandidates.find((entry): entry is string => typeof entry === "string") ??
+        "No response from model";
+      return {
+        context: typeof final.context === "string" ? final.context : undefined,
+        memory_writes: Array.isArray(final.memory_writes)
+          ? (final.memory_writes as Record<string, unknown>[])
+          : undefined,
+        message,
+        tool_observations: Array.isArray(final.tool_observations)
+          ? (final.tool_observations as Record<string, unknown>[])
+          : undefined,
+        type: "final",
+      };
+    }
+
+    const toolCallRaw = parsed.tool_call;
+    if (
+      typeof toolCallRaw === "object" &&
+      toolCallRaw !== null &&
+      !Array.isArray(toolCallRaw)
+    ) {
+      const toolCall = toolCallRaw as Record<string, unknown>;
+      return {
+        message: "",
+        tool_arguments:
+          typeof toolCall.arguments === "object" &&
+          toolCall.arguments !== null &&
+          !Array.isArray(toolCall.arguments)
+            ? (toolCall.arguments as Record<string, unknown>)
+            : {},
+        tool_name: typeof toolCall.name === "string" ? toolCall.name : undefined,
+        type: "tool_call",
+      };
+    }
+
+    return null;
   }
 
   private parseFactsFromResponse(responseText: string): string[] {

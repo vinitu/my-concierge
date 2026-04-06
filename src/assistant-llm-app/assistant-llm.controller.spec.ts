@@ -68,11 +68,17 @@ describe("AssistantLlmController", () => {
   });
 
   it("normalizes root synthesis json into final response", async () => {
-    const generateMain = jest.fn().mockResolvedValue(
-      '{"message":"Сейчас время 20:52.","context":"Привет. который час?","memory_writes":[],"tool_observations":[]}',
+    const generateConversationResponse = jest.fn().mockResolvedValue(
+      {
+        context: "Привет. который час?",
+        memory_writes: [],
+        message: "Сейчас время 20:52.",
+        tool_observations: [],
+        type: "final",
+      },
     );
     const controller = new AssistantLlmController({
-      generateMain,
+      generateConversationResponse,
     } as unknown as AssistantLlmService);
 
     await expect(
@@ -90,11 +96,17 @@ describe("AssistantLlmController", () => {
   });
 
   it("normalizes root synthesis json with response field into final response", async () => {
-    const generateMain = jest.fn().mockResolvedValue(
-      '{"response":"Готово.","context":"Контекст","memory_writes":[],"tool_observations":[]}',
+    const generateConversationResponse = jest.fn().mockResolvedValue(
+      {
+        context: "Контекст",
+        memory_writes: [],
+        message: "Готово.",
+        tool_observations: [],
+        type: "final",
+      },
     );
     const controller = new AssistantLlmController({
-      generateMain,
+      generateConversationResponse,
     } as unknown as AssistantLlmService);
 
     await expect(
@@ -111,11 +123,16 @@ describe("AssistantLlmController", () => {
   });
 
   it("normalizes name and arguments json into tool_call response", async () => {
-    const generateMain = jest.fn().mockResolvedValue(
-      '{"name":"directory_list","arguments":{"path":"."}}',
+    const generateConversationResponse = jest.fn().mockResolvedValue(
+      {
+        message: "",
+        tool_arguments: { path: "." },
+        tool_name: "directory_list",
+        type: "tool_call",
+      },
     );
     const controller = new AssistantLlmController({
-      generateMain,
+      generateConversationResponse,
     } as unknown as AssistantLlmService);
 
     await expect(

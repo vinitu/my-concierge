@@ -157,4 +157,36 @@ export class AssistantOrchestratorPromptService {
       this.buildRequestSection(input, runtimeContext, enabledTools, toolObservations),
     ].join('\n');
   }
+
+  buildRepeatedToolRepairPrompt(
+    input: AssistantLlmGenerateInput,
+    repeatedToolCall: {
+      arguments: Record<string, unknown>;
+      name: AssistantToolName;
+    },
+    repeatedToolObservation: AssistantToolObservation,
+  ): string {
+    return [
+      'You are repairing an invalid assistant runtime step.',
+      'The previous assistant output repeated a tool call that has already succeeded.',
+      'Do not return the same tool call again.',
+      'Do not request any tool in this repair step.',
+      'Return JSON only.',
+      'For this repair step, return only type=final or type=error.',
+      'message must be non-empty.',
+      'context may be empty.',
+      'memory_writes and tool_observations must be arrays when present.',
+      '',
+      JSON.stringify(
+        {
+          conversation_context: this.buildConversationContextSection(input),
+          latest_user_message: input.message.message,
+          repeated_tool_call: repeatedToolCall,
+          successful_tool_observation: repeatedToolObservation,
+        },
+        null,
+        2,
+      ),
+    ].join('\n');
+  }
 }

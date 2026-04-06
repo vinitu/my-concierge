@@ -55,12 +55,16 @@ describe("AssistantRuntimeService", () => {
 
   function promptTemplateStub(overrides?: {
     renderPlanningPrompt?: jest.Mock;
+    renderRepeatedToolRepairPrompt?: jest.Mock;
   }): AssistantOrchestratorPromptTemplateService {
     return {
       listAvailableTools: jest.fn().mockReturnValue([{ name: "time_current" }]),
       renderPlanningPrompt:
         overrides?.renderPlanningPrompt ??
         jest.fn().mockResolvedValue("planning prompt"),
+      renderRepeatedToolRepairPrompt:
+        overrides?.renderRepeatedToolRepairPrompt ??
+        jest.fn().mockResolvedValue("repair prompt"),
     } as unknown as AssistantOrchestratorPromptTemplateService;
   }
 
@@ -349,7 +353,7 @@ describe("AssistantRuntimeService", () => {
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
-  it("retries once when the model repeats the same successful tool call", async () => {
+  it("uses repair flow when the model repeats the same successful tool call", async () => {
     const llmProvider = providerStub([
       {
         message: "",
@@ -411,10 +415,11 @@ describe("AssistantRuntimeService", () => {
     });
     expect(dispatcher.execute).toHaveBeenCalledTimes(1);
     expect(llmProvider.generateFromMessages).toHaveBeenCalledTimes(3);
-    expect(promptTemplate.renderPlanningPrompt).toHaveBeenCalledTimes(3);
+    expect(promptTemplate.renderPlanningPrompt).toHaveBeenCalledTimes(2);
+    expect(promptTemplate.renderRepeatedToolRepairPrompt).toHaveBeenCalledTimes(1);
   });
 
-  it("fails when the model repeats the same successful tool call after corrective retry", async () => {
+  it("fails when repeated tool repair still returns a repeated tool call", async () => {
     const dispatcher = {
       execute: jest.fn().mockResolvedValue({
         arguments: {},

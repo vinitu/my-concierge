@@ -27,4 +27,19 @@ export class AssistantOrchestratorPromptTemplateService {
   listAvailableTools(enabledTools?: AssistantToolName[]): AssistantLlmAvailableTool[] {
     return this.promptService.listAvailableTools(enabledTools);
   }
+
+  async renderRepeatedToolRepairPrompt(
+    input: AssistantLlmGenerateInput,
+    repeatedToolCall: {
+      arguments: Record<string, unknown>;
+      name: AssistantToolName;
+    },
+    repeatedToolObservation: AssistantToolObservation,
+  ): Promise<string> {
+    return this.promptService.buildRepeatedToolRepairPrompt(
+      input,
+      repeatedToolCall,
+      repeatedToolObservation,
+    );
+  }
 }

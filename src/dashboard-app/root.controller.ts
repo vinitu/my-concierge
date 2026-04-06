@@ -277,7 +277,7 @@ export class DashboardRootController {
           return ['settings', 'tools', 'skills', 'integrations'];
         }
         if (serviceKey === 'assistant-llm') {
-          return ['provider', 'llms'];
+          return ['settings', 'llms'];
         }
         if (serviceKey === 'assistant-memory') {
           return ASSISTANT_MEMORY_SECTIONS.map((item) => item.id);
@@ -375,7 +375,7 @@ export class DashboardRootController {
           }
           if (service.key === 'assistant-llm' && service.key === state.selectedService) {
             const subItems = [
-              { id: 'provider', label: 'Provider' },
+              { id: 'settings', label: 'Settings' },
               { id: 'llms', label: 'LLMs' },
             ];
             const submenu = '<div class="submenu">' + subItems.map((item) => {
@@ -421,7 +421,7 @@ export class DashboardRootController {
 
       function defaultSectionForService(serviceKey) {
         if (serviceKey === 'assistant-orchestrator') return 'settings';
-        if (serviceKey === 'assistant-llm') return 'provider';
+        if (serviceKey === 'assistant-llm') return 'settings';
         if (serviceKey === 'assistant-memory') return 'profile';
         if (serviceKey === 'gateway-web') return 'settings';
         return 'general';
@@ -474,7 +474,7 @@ export class DashboardRootController {
           return;
         }
 
-        if (service.key === 'assistant-llm' && state.selectedSection === 'provider') {
+        if (service.key === 'assistant-llm' && state.selectedSection === 'settings') {
           await renderAssistantLlmProvider(service);
           return;
         }
@@ -722,7 +722,7 @@ export class DashboardRootController {
                 '</div>' +
               '</div>' +
             '</div>' +
-            '<div class="actions"><button type="submit">Save gateway-email settings</button></div>' +
+            '<div class="actions"><button type="submit">Save settings</button></div>' +
             '<div id="gateway-email-settings-status" class="status-line"></div>' +
           '</form>';
 
@@ -763,9 +763,11 @@ export class DashboardRootController {
       async function renderAssistantLlmGeneral(service) {
         const content = document.getElementById('service-content');
         content.innerHTML = '<div class="status-line">Loading assistant-llm status...</div>';
+        let config = null;
         let providerStatus = null;
         let models = null;
         try {
+          config = await ensureServiceConfig(service);
           const statusResponse = await fetch(buildServiceUrl(service, '/provider'));
           if (statusResponse.ok) {
             providerStatus = await statusResponse.json();
@@ -783,10 +785,11 @@ export class DashboardRootController {
           '<div class="list">' +
             '<div class="item"><strong>Prefix:</strong> <code>' + escapeHtml(service.prefix || '-') + '</code></div>' +
             '<div class="item"><strong>Status endpoint:</strong> <code>' + escapeHtml(service.status_url || 'not exposed') + '</code></div>' +
-            '<div class="item"><strong>Menu:</strong> General, Provider, LLMs (Ollama/DeepSeek/XAI)</div>' +
+            '<div class="item"><strong>Menu:</strong> General, Settings, LLMs (Ollama/DeepSeek/XAI)</div>' +
             '<div class="item"><strong>Provider status:</strong> ' + escapeHtml(providerStatus?.status || 'unknown') + '</div>' +
             '<div class="item"><strong>Enabled:</strong> ' + escapeHtml(String(providerStatus?.enabled ?? false)) + '</div>' +
             '<div class="item"><strong>Current provider/model:</strong> ' + escapeHtml((providerStatus?.provider || '-') + ' / ' + (providerStatus?.model || '-')) + '</div>' +
+            '<div class="item"><strong>Response repair attempts:</strong> ' + escapeHtml(String(config?.response_repair_attempts ?? 1)) + '</div>' +
             '<div class="actions"><a href="' + escapeHtml(service.prefix || '/') + '">Open service panel via dashboard prefix</a></div>' +
           '</div>' +
           '<div class="list" style="margin-top:10px">' +
@@ -844,7 +847,8 @@ export class DashboardRootController {
                 ).join('') +
               '</select></label>' +
             '</div>' +
-            '<div class="actions"><button type="submit">Save Provider</button></div>' +
+            '<label>Response repair attempts<input id="assistant-llm-response-repair-attempts" type="number" min="0" max="5" value="' + escapeHtml(String(config.response_repair_attempts ?? 1)) + '" /></label>' +
+            '<div class="actions"><button type="submit">Save settings</button></div>' +
             '<div id="assistant-llm-provider-status" class="status-line"></div>' +
           '</form>';
 
@@ -883,6 +887,7 @@ export class DashboardRootController {
           const patch = {
             provider: document.getElementById('assistant-llm-provider').value.trim(),
             model: document.getElementById('assistant-llm-model').value.trim(),
+            response_repair_attempts: Number.parseInt(document.getElementById('assistant-llm-response-repair-attempts').value, 10),
           };
           try {
             await saveServiceConfig(service, patch);
@@ -965,7 +970,7 @@ export class DashboardRootController {
             apiKeyInput +
             '<label>Base URL<input id="assistant-llm-base-url" value="' + escapeHtml(config[spec.base_url_key] || '') + '" /></label>' +
             '<label>Timeout (ms)<input id="assistant-llm-timeout" type="number" value="' + escapeHtml(String(config[spec.timeout_key] ?? '')) + '" /></label>' +
-            '<div class="actions"><button type="submit">Save ' + escapeHtml(spec.title) + '</button></div>' +
+            '<div class="actions"><button type="submit">Save settings</button></div>' +
             '<div id="assistant-llm-connections-status" class="status-line"></div>' +
           '</form>' +
           '<div class="list" style="margin-top:10px">' +
@@ -1081,7 +1086,7 @@ export class DashboardRootController {
               '<p class="text-secondary mb-3">Choose which callback message types are delivered to web chat.</p>' +
               incomingTypeControls +
               '<div class="mt-3 d-flex gap-2 align-items-center">' +
-                '<button type="submit" class="btn btn-dark">Save gateway-web settings</button>' +
+                '<button type="submit" class="btn btn-dark">Save settings</button>' +
                 '<div id="gateway-web-settings-status" class="text-secondary"></div>' +
               '</div>' +
             '</div>' +
@@ -1145,7 +1150,7 @@ export class DashboardRootController {
                     '</div>' +
                   '</div>' +
                   '<div class="mt-3 d-flex gap-2 align-items-center">' +
-                    '<button type="submit" class="btn btn-dark">Save memory settings</button>' +
+                    '<button type="submit" class="btn btn-dark">Save settings</button>' +
                     '<div id="assistant-memory-settings-status" class="text-secondary"></div>' +
                   '</div>' +
                 '</div>' +

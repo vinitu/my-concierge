@@ -23,6 +23,7 @@ export interface AssistantLlmConfig {
   ollama_base_url: string;
   ollama_timeout_ms: number;
   provider: AssistantLlmProvider;
+  response_repair_attempts: number;
   xai_api_key: string;
   xai_base_url: string;
   xai_timeout_ms: number;

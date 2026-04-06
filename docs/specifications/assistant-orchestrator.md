@@ -45,7 +45,10 @@
 - Run a multi-step agent loop through `assistant-llm`.
 - On each loop step, `assistant-llm` may return either `final`, `error`, or `tool_call`.
 - If a `tool_call` is returned, execute the tool, append the tool observation to the loop state, and call `assistant-llm` again with tools still available.
-- If `assistant-llm` repeats the same successful tool call with the same arguments after that observation is already present in the loop state, `assistant-orchestrator` must reject the repeated call, send one corrective retry to `assistant-llm`, and fail the run if the model repeats it again.
+- If `assistant-llm` repeats the same successful tool call with the same arguments after that observation is already present in the loop state, `assistant-orchestrator` must not execute the tool again.
+- In that case, `assistant-orchestrator` must run a repair LLM call with minimized context that asks for a corrected next step based on the latest user message and the existing successful tool observation.
+- The repeated-tool repair call must not expose tools and must require `type=final` or `type=error`.
+- If the repair call still fails to produce a corrected final or error response, the run must fail.
 - Stop the loop only when `assistant-llm` returns `final` or `error`, or when `max_tool_steps` is exceeded.
 - After each tool execution, publish one `run.tool` event with tool name, success flag, and human-readable message.
 - Append the final exchange to `assistant-memory`.
