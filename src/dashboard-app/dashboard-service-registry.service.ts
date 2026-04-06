@@ -138,9 +138,9 @@ export class DashboardServiceRegistryService {
         config_path: "/config",
         entities: [
           {
-            id: "provider-status",
+            id: "provider",
             label: "Provider status",
-            path: "/provider-status",
+            path: "/provider",
           },
           { id: "models", label: "Models", path: "/models" },
         ],

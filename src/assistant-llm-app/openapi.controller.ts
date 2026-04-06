@@ -19,7 +19,7 @@ export class AssistantLlmOpenApiController {
             summary: "Update LLM config",
           },
         },
-        "/provider-status": {
+        "/provider": {
           get: {
             summary: "Provider health and credentials status",
           },
@@ -29,7 +29,12 @@ export class AssistantLlmOpenApiController {
             summary: "List provider models",
           },
         },
-        "/v1/conversation/respond": {
+        "/models/ollama/{model}/download": {
+          post: {
+            summary: "Download one static Ollama model and refresh local availability",
+          },
+        },
+        "/v1/conversation": {
           post: {
             summary: "Generate structured conversation response from messages and tools",
           },

@@ -22,6 +22,11 @@ interface ThinkingBody {
   seconds: number;
 }
 
+interface ToolBody {
+  ok?: boolean;
+  tool_name?: string;
+}
+
 @Controller()
 export class GatewayEmailController {
   constructor(
@@ -156,6 +161,26 @@ export class GatewayEmailController {
       delivered: true,
       response: 'Thinking callback acknowledged for email',
       seconds,
+    };
+  }
+
+  @Post('tool/:conversationId')
+  @HttpCode(200)
+  deliverAssistantTool(
+    @Param('conversationId') conversationId: string,
+    @Body() body: ToolBody,
+  ): { conversation_id: string; delivered: boolean; response: string; tool_name: string } {
+    this.metricsService.recordEndpointRequest('/tool/:conversationId');
+    this.metricsService.recordCallback(true);
+
+    return {
+      conversation_id: conversationId,
+      delivered: true,
+      response: body.ok === true ? 'Tool callback acknowledged for email' : 'Tool failure callback acknowledged for email',
+      tool_name:
+        typeof body.tool_name === 'string' && body.tool_name.trim().length > 0
+          ? body.tool_name.trim()
+          : 'unknown_tool',
     };
   }
 }

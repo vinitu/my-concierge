@@ -13,7 +13,7 @@ import type {
 import {
   defaultModelForProvider,
   STATIC_PROVIDER_MODELS,
-} from './assistant-llm-model-catalog';
+} from '../contracts/assistant-llm-model-catalog';
 
 const SUPPORTED_PROVIDERS: AssistantLlmProvider[] = ['xai', 'ollama', 'deepseek'];
 
@@ -162,9 +162,6 @@ export class AssistantLlmConfigService {
   private normalizeModel(provider: AssistantLlmProvider, value: unknown): string {
     if (typeof value === 'string' && value.trim()) {
       const normalized = value.trim();
-      if (provider === 'ollama') {
-        return normalized;
-      }
       if (STATIC_PROVIDER_MODELS[provider].includes(normalized)) {
         return normalized;
       }

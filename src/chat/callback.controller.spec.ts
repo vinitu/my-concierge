@@ -7,6 +7,7 @@ const allIncomingTypes = [
   'response.message',
   'response.error',
   'response.thinking',
+  'response.tool',
   'event.run',
   'event.memory',
   'event.other',
@@ -205,5 +206,50 @@ describe('CallbackController', () => {
     });
 
     expect(conversationRegistryService.sendAssistantEvent).not.toHaveBeenCalled();
+  });
+
+  it('delivers tool callbacks to a registered conversation', async () => {
+    const conversationRegistryService = {
+      sendAssistantEvent: jest.fn().mockReturnValue(true),
+    } as unknown as ConversationRegistryService;
+    const metricsService = {
+      recordCallback: jest.fn(),
+    } as unknown as MetricsService;
+    const gatewayWebConfigService = {
+      read: jest.fn().mockResolvedValue({
+        allowed_incoming_message_types: allIncomingTypes,
+      }),
+    } as unknown as GatewayWebConfigService;
+
+    const controller = new CallbackController(
+      conversationRegistryService,
+      metricsService,
+      gatewayWebConfigService,
+    );
+
+    await expect(
+      controller.deliverAssistantTool('conversation-1', {
+        message: 'Executed web_search successfully.',
+        ok: true,
+        payload: { result_count: 3 },
+        tool_name: 'web_search',
+      }),
+    ).resolves.toEqual({
+      delivered: true,
+      response: 'Tool callback delivered',
+    });
+
+    expect(conversationRegistryService.sendAssistantEvent).toHaveBeenCalledWith(
+      'conversation-1',
+      {
+        message: 'Executed web_search successfully.',
+        payload: {
+          ok: true,
+          payload: { result_count: 3 },
+          tool_name: 'web_search',
+        },
+        type: 'tool.web_search.ok',
+      },
+    );
   });
 });

@@ -29,12 +29,27 @@ export interface AssistantLlmConfig {
 }
 
 export interface AssistantLlmProviderStatus {
-  apiKeyConfigured: boolean | null;
-  message: string;
+  enabled: boolean;
   model: string;
   provider: AssistantLlmProvider;
-  reachable: boolean;
-  status: "error" | "missing_key" | "ready";
+  status: string;
+}
+
+export interface AssistantLlmModelCatalogEntry {
+  enabled: boolean;
+  name: string;
+  status: string | null;
+}
+
+export interface AssistantLlmModelsResponse {
+  models: Record<AssistantLlmProvider, AssistantLlmModelCatalogEntry[]>;
+}
+
+export interface AssistantLlmOllamaModelDownloadResponse {
+  enabled: boolean;
+  model: string;
+  provider: "ollama";
+  status: string;
 }
 
 export interface AssistantLlmMainGenerateRequest {

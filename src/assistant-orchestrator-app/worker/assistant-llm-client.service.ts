@@ -4,19 +4,16 @@ import type {
   AssistantLlmAvailableTool,
   AssistantLlmConversationRespondResponse,
   AssistantLlmMessage,
+  AssistantLlmModelCatalogEntry,
+  AssistantLlmModelsResponse,
   AssistantLlmProvider,
   AssistantLlmProviderStatus,
-  AssistantLlmSummarizeResponse,
 } from '../../contracts/assistant-llm';
-import { STATIC_PROVIDER_MODELS } from './assistant-llm-model-catalog';
+import { STATIC_PROVIDER_MODELS } from '../../contracts/assistant-llm-model-catalog';
 import type { AssistantLlmProvider as AssistantLlmProviderPort } from './assistant-llm-provider';
 
 function trimTrailingSlash(value: string): string {
   return value.endsWith('/') ? value.slice(0, -1) : value;
-}
-
-interface AssistantLlmModelsResponse {
-  models: Record<AssistantLlmProvider, string[]>;
 }
 
 @Injectable()
@@ -27,7 +24,7 @@ export class AssistantLlmClientService implements AssistantLlmProviderPort {
     messages: AssistantLlmMessage[],
     availableTools?: AssistantLlmAvailableTool[],
   ): Promise<AssistantLlmConversationRespondResponse> {
-    const response = await fetch(`${this.baseUrl()}/v1/conversation/respond`, {
+    const response = await fetch(`${this.baseUrl()}/v1/conversation`, {
       body: JSON.stringify({
         messages,
         tools: availableTools ?? [],
@@ -39,58 +36,46 @@ export class AssistantLlmClientService implements AssistantLlmProviderPort {
     if (!response.ok) {
       const body = await response.text();
       throw new Error(
-        `assistant-llm returned ${String(response.status)} for /v1/conversation/respond: ${body}`,
+        `assistant-llm returned ${String(response.status)} for /v1/conversation: ${body}`,
       );
     }
 
     return (await response.json()) as AssistantLlmConversationRespondResponse;
   }
 
-  async summarizeConversation(
-    messages: AssistantLlmMessage[],
-    previousContext: string,
-  ): Promise<string> {
-    const response = await fetch(`${this.baseUrl()}/v1/conversation/summarize`, {
-      body: JSON.stringify({
-        messages,
-        previous_context: previousContext,
-      }),
-      headers: { 'content-type': 'application/json' },
-      method: 'POST',
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `assistant-llm returned ${String(response.status)} for /v1/conversation/summarize: ${body}`,
-      );
-    }
-
-    const payload = (await response.json()) as AssistantLlmSummarizeResponse;
-    return payload.summary;
-  }
-
   async providerStatus(): Promise<AssistantLlmProviderStatus> {
-    const response = await fetch(`${this.baseUrl()}/provider-status`);
+    const response = await fetch(`${this.baseUrl()}/provider`);
 
     if (!response.ok) {
       const body = await response.text();
       throw new Error(
-        `assistant-llm returned ${String(response.status)} for /provider-status: ${body}`,
+        `assistant-llm returned ${String(response.status)} for /provider: ${body}`,
       );
     }
 
     return (await response.json()) as AssistantLlmProviderStatus;
   }
 
-  async models(): Promise<Record<AssistantLlmProvider, string[]>> {
+  async models(): Promise<Record<AssistantLlmProvider, AssistantLlmModelCatalogEntry[]>> {
     const response = await fetch(`${this.baseUrl()}/models`);
 
     if (!response.ok) {
       return {
-        deepseek: [...STATIC_PROVIDER_MODELS.deepseek],
-        ollama: [...STATIC_PROVIDER_MODELS.ollama],
-        xai: [...STATIC_PROVIDER_MODELS.xai],
+        deepseek: STATIC_PROVIDER_MODELS.deepseek.map((name) => ({
+          enabled: true,
+          name,
+          status: null,
+        })),
+        ollama: STATIC_PROVIDER_MODELS.ollama.map((name) => ({
+          enabled: true,
+          name,
+          status: null,
+        })),
+        xai: STATIC_PROVIDER_MODELS.xai.map((name) => ({
+          enabled: true,
+          name,
+          status: null,
+        })),
       };
     }
 

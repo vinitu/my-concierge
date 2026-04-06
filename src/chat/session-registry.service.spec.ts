@@ -50,4 +50,32 @@ describe('ConversationRegistryService', () => {
     expect(service.sendAssistantError('conversation-1', 'run failed')).toBe(true);
     expect(client.emit).toHaveBeenCalledWith('assistant.error', { message: 'run failed' });
   });
+
+  it('sends tool notifications through the shared assistant event channel', () => {
+    const service = new ConversationRegistryService();
+    const client: SocketEmitter = { emit: jest.fn() };
+
+    service.register('conversation-1', client);
+
+    expect(
+      service.sendAssistantEvent('conversation-1', {
+        message: 'Executed web_search successfully.',
+        payload: {
+          ok: true,
+          payload: { result_count: 3 },
+          tool_name: 'web_search',
+        },
+        type: 'tool.web_search.ok',
+      }),
+    ).toBe(true);
+    expect(client.emit).toHaveBeenCalledWith('assistant.event', {
+      message: 'Executed web_search successfully.',
+      payload: {
+        ok: true,
+        payload: { result_count: 3 },
+        tool_name: 'web_search',
+      },
+      type: 'tool.web_search.ok',
+    });
+  });
 });

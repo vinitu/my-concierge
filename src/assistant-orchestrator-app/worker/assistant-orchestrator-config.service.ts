@@ -83,6 +83,13 @@ export class AssistantOrchestratorConfigService {
     return join(this.datadir(), 'config', 'orchestrator.json');
   }
 
+  homePath(): string {
+    return this.configService.get<string>(
+      'ASSISTANT_ORCHESTRATOR_HOME',
+      join(this.datadir(), 'data'),
+    );
+  }
+
   private configDirectory(): string {
     return join(this.datadir(), 'config');
   }

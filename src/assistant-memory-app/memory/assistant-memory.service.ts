@@ -295,9 +295,6 @@ export class AssistantMemoryService {
     try {
       await connection.beginTransaction();
       const now = this.toMysqlDateTime(new Date());
-      const currentState = await this.readConversationFromMysql(message, connection);
-      const nextContext = body.reply.context.trim();
-      const summary = nextContext || currentState.context;
       await connection.query(
         `
           INSERT IGNORE INTO conversation_threads (
@@ -378,26 +375,12 @@ export class AssistantMemoryService {
           now,
         ],
       );
-      await connection.query(
-        `
-          INSERT INTO conversation_summaries (
-            thread_id, summary, summary_version, updated_at
-          )
-          VALUES (?, ?, 1, ?)
-          ON DUPLICATE KEY UPDATE
-            summary = VALUES(summary),
-            summary_version = summary_version + 1,
-            updated_at = VALUES(updated_at)
-        `,
-        [message.conversation_id, summary, now],
-      );
       await connection.commit();
       this.logger.debug(
         [
           'Conversation append committed',
           `conversation_id=${message.conversation_id}`,
           `request_id=${body.request_id ?? '(none)'}`,
-          `summary_len=${summary.length}`,
           `user_msg_len=${message.message.length}`,
           `assistant_msg_len=${body.reply.message.length}`,
         ].join(' '),
@@ -410,6 +393,56 @@ export class AssistantMemoryService {
     }
 
     return this.readConversationFromMysql(message);
+  }
+
+  async updateConversationSummary(
+    conversationId: string,
+    summary: string,
+  ): Promise<void> {
+    const normalizedSummary = summary.trim();
+
+    if (normalizedSummary.length === 0) {
+      return;
+    }
+
+    if (this.storeDriver() === 'file') {
+      const current = await this.readConversationFileState(conversationId);
+
+      if (!current) {
+        return;
+      }
+
+      const nextState: StoredConversationState = {
+        ...current,
+        context: normalizedSummary,
+        updated_at: current.updated_at ?? new Date().toISOString(),
+      };
+
+      await mkdir(this.conversationsDirectory(), { recursive: true });
+      await writeFile(
+        this.conversationPath(conversationId),
+        `${JSON.stringify(nextState, null, 2)}\n`,
+        'utf8',
+      );
+      return;
+    }
+
+    await this.assertConversationMysqlSchemaReady();
+    const pool = await this.mysqlService.getPool();
+    const now = this.toMysqlDateTime(new Date());
+    await pool.query(
+      `
+        INSERT INTO conversation_summaries (
+          thread_id, summary, summary_version, updated_at
+        )
+        VALUES (?, ?, 1, ?)
+        ON DUPLICATE KEY UPDATE
+          summary = VALUES(summary),
+          summary_version = summary_version + 1,
+          updated_at = VALUES(updated_at)
+      `,
+      [conversationId, normalizedSummary, now],
+    );
   }
 
   async searchConversation(
@@ -1714,7 +1747,6 @@ export class AssistantMemoryService {
       message: body.message,
     });
     const nowIso = new Date().toISOString();
-    const nextContext = body.reply.context.trim();
     const nextMessages: ConversationMessage[] = [
       ...current.messages,
       {
@@ -1731,7 +1763,7 @@ export class AssistantMemoryService {
     const nextState: StoredConversationState = {
       chat: body.chat,
       user_id: body.user_id,
-      context: nextContext.length > 0 ? nextContext : current.context,
+      context: current.context,
       direction: body.direction,
       messages: nextMessages,
       updated_at: nowIso,

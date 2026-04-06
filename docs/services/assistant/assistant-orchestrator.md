@@ -10,7 +10,7 @@ It consumes jobs from Redis, builds runtime context, calls `assistant-llm` for m
 - Consume accepted jobs from queue
 - Build runtime input from bootstrap rules, conversation window, and retrieved memory
 - Execute runtime loop and tool dispatch
-- Call `assistant-llm` (`/v1/conversation/respond`, `/v1/conversation/summarize`)
+- Call `assistant-llm` (`/v1/conversation`, `/v1/conversation/summarize`)
 - Append final exchange to `assistant-memory` conversation API
 - Publish `run.started`, `run.thinking`, `run.completed`, `run.failed`
 - Expose operational endpoints (`/status`, `/metrics`, `/config`, `/skills`, `/conversations`)
@@ -58,6 +58,12 @@ Model-callable tools:
 - `memory_fact_write`
 - `memory_conversation_search`
 - `skill_execute`
+- `directory_list`
+- `directory_create`
+- `directory_delete`
+- `file_delete`
+- `file_write`
+- `file_read`
 
 ## Processing Flow
 

@@ -52,12 +52,6 @@ export class AssistantOrchestratorMetricsService {
     labelNames: ['phase', 'service', 'status'] as const,
     registers: [this.registry],
   });
-  private readonly llmSummaryRequestCounter = new Counter({
-    name: 'llm_summary_request_total',
-    help: 'Total number of summary LLM requests',
-    labelNames: ['service', 'status'] as const,
-    registers: [this.registry],
-  });
   private readonly runtimeFallbackCounter = new Counter({
     name: 'runtime_fallback_total',
     help: 'Total number of deterministic runtime fallbacks',
@@ -127,13 +121,6 @@ export class AssistantOrchestratorMetricsService {
     });
   }
 
-  recordLlmSummaryRequest(success: boolean): void {
-    this.llmSummaryRequestCounter.inc({
-      service: 'assistant-orchestrator',
-      status: success ? 'success' : 'error',
-    });
-  }
-
   recordLlmMainDurationMs(
     durationMs: number,
     phase: 'planning' | 'synthesis',
@@ -142,17 +129,6 @@ export class AssistantOrchestratorMetricsService {
     this.llmDurationHistogram.observe(
       {
         phase,
-        service: 'assistant-orchestrator',
-        status: success ? 'success' : 'error',
-      },
-      durationMs,
-    );
-  }
-
-  recordLlmSummaryDurationMs(durationMs: number, success = true): void {
-    this.llmDurationHistogram.observe(
-      {
-        phase: 'summary',
         service: 'assistant-orchestrator',
         status: success ? 'success' : 'error',
       },

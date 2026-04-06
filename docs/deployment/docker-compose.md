@@ -35,6 +35,7 @@ Describe the default local runtime.
 - `assistant-orchestrator` and `assistant-memory` use MySQL connection settings that point to the `mysql` container
 - `assistant-llm` can use DeepSeek, xAI, or local Ollama
 - `assistant-orchestrator` mounts `./runtime/assistant-orchestrator` into the container as `/app/runtime`
+- `assistant-orchestrator` uses `ASSISTANT_ORCHESTRATOR_HOME=/app/runtime/data` for sandboxed filesystem tools
 - `assistant-llm` mounts `./runtime/assistant-llm` into the container as `/app/runtime`
 - `gateway-web` mounts `./runtime/gateway-web` into the container as `/app/runtime`
 - `gateway-telegram` mounts `./runtime/gateway-telegram` into the container as `/app/runtime`
@@ -44,7 +45,7 @@ Describe the default local runtime.
 - Docker Compose reads local values from `.env`
 - the schema must be prepared with `npm run db:migrate` before `assistant-orchestrator` and `assistant-memory` can use MySQL successfully
 - `make build` builds the local runtime images
-- `make up` starts the local example stack
+- `make up` starts the local example stack and removes orphan containers from older service layouts
 - `make down` stops it
 
 ## Required Environment
@@ -84,6 +85,7 @@ Available variables in `.env.example`:
 - `OLLAMA_MODEL`
 - `OLLAMA_TIMEOUT_MS`
 - `ASSISTANT_DATADIR`
+- `ASSISTANT_ORCHESTRATOR_HOME`
 - `GATEWAY_WEB_RUNTIME_DIR`
 - `GATEWAY_TELEGRAM_RUNTIME_DIR`
 - `GATEWAY_EMAIL_RUNTIME_DIR`
@@ -94,6 +96,12 @@ Default `ASSISTANT_DATADIR` in the local Docker Compose setup:
 
 ```text
 /app/runtime
+```
+
+Default `ASSISTANT_ORCHESTRATOR_HOME` in the local Docker Compose setup:
+
+```text
+/app/runtime/data
 ```
 
 Default `GATEWAY_WEB_RUNTIME_DIR` in the local Docker Compose setup:
@@ -125,7 +133,7 @@ http://host.docker.internal:11434
 ```
 
 This lets the `assistant-llm` container reach the Ollama process running on the host machine in Docker Desktop.
-Default `OLLAMA_MODEL` is `gemma3:1b`.
+Default `OLLAMA_MODEL` is `qwen3:1.7b`.
 
 ## Port Model
 

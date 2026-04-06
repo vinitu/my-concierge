@@ -87,7 +87,6 @@ export class AssistantOrchestratorConversationService {
       direction: message.direction,
       message: message.message,
       reply: {
-        context: reply.context,
         message: reply.message,
       },
       request_id: requestId,

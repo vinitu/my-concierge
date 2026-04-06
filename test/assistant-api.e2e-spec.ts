@@ -10,6 +10,7 @@ import { RUN_EVENT_QUEUE_CONSUMER } from '../src/assistant-api-app/run-events/ru
 
 describe('assistant-api (e2e)', () => {
   let app: NestExpressApplication;
+  let httpApp: Parameters<typeof request>[0];
   let queueDir: string;
 
   beforeAll(async () => {
@@ -34,6 +35,7 @@ describe('assistant-api (e2e)', () => {
 
     app = moduleRef.createNestApplication<NestExpressApplication>();
     await app.init();
+    httpApp = app.getHttpAdapter().getInstance();
   });
 
   afterAll(async () => {
@@ -41,7 +43,7 @@ describe('assistant-api (e2e)', () => {
   });
 
   it('returns the service root endpoint', async () => {
-    const response = await request(app.getHttpServer()).get('/');
+    const response = await request(httpApp).get('/');
 
     expect(response.status).toBe(200);
     expect(response.text).toContain('assistant-api');
@@ -52,7 +54,7 @@ describe('assistant-api (e2e)', () => {
   });
 
   it('accepts a conversation and writes it into the file queue', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpApp)
       .post('/conversation/web/direct/alex')
       .send({
         conversation_id: 'alex',
@@ -68,7 +70,7 @@ describe('assistant-api (e2e)', () => {
   });
 
   it('rejects a request without message', async () => {
-    const response = await request(app.getHttpServer())
+    const response = await request(httpApp)
       .post('/conversation/web/direct/alex')
       .send({
         conversation_id: 'alex',
@@ -79,7 +81,7 @@ describe('assistant-api (e2e)', () => {
   });
 
   it('returns status with the selected queue adapter', async () => {
-    const response = await request(app.getHttpServer()).get('/status');
+    const response = await request(httpApp).get('/status');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
@@ -92,9 +94,9 @@ describe('assistant-api (e2e)', () => {
   });
 
   it('returns metrics including queue depth', async () => {
-    await request(app.getHttpServer()).get('/status');
+    await request(httpApp).get('/status');
 
-    const response = await request(app.getHttpServer()).get('/metrics');
+    const response = await request(httpApp).get('/metrics');
 
     expect(response.status).toBe(200);
     expect(response.text).toContain('http_request_time_ms');
@@ -104,7 +106,7 @@ describe('assistant-api (e2e)', () => {
   });
 
   it('returns the assistant-api OpenAPI schema', async () => {
-    const response = await request(app.getHttpServer()).get('/openapi.json');
+    const response = await request(httpApp).get('/openapi.json');
 
     expect(response.status).toBe(200);
     expect(response.body.info.title).toBe('assistant-api');

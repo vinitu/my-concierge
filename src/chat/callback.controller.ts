@@ -25,6 +25,13 @@ interface EventBody {
   type?: string;
 }
 
+interface ToolBody {
+  message?: string;
+  ok?: boolean;
+  payload?: unknown;
+  tool_name?: string;
+}
+
 @Controller()
 export class CallbackController {
   private readonly logger = new Logger(CallbackController.name);
@@ -114,6 +121,41 @@ export class CallbackController {
     return {
       delivered,
       response: delivered ? 'Event callback delivered' : 'WebSocket conversation not found',
+    };
+  }
+
+  @Post('tool/:conversationId')
+  @HttpCode(200)
+  async deliverAssistantTool(
+    @Param('conversationId') conversationId: string,
+    @Body() body: ToolBody,
+  ): Promise<{ delivered: boolean; response: string }> {
+    const toolName = body.tool_name?.trim() || 'unknown_tool';
+    this.logger.log(
+      `Incoming tool callback conversationId=${conversationId} tool=${toolName} ok=${String(body.ok === true)}`,
+    );
+    if (await this.shouldIgnoreIncomingMessageType('response.tool')) {
+      this.metricsService.recordCallback(false);
+      return {
+        delivered: false,
+        response: 'Ignored by gateway-web settings',
+      };
+    }
+
+    const delivered = this.conversationRegistryService.sendAssistantEvent(conversationId, {
+      message: typeof body.message === 'string' ? body.message : undefined,
+      payload: {
+        ok: body.ok === true,
+        payload: body.payload,
+        tool_name: toolName,
+      },
+      type: `tool.${toolName}.${body.ok === true ? 'ok' : 'failed'}`,
+    });
+
+    this.metricsService.recordCallback(delivered);
+    return {
+      delivered,
+      response: delivered ? 'Tool callback delivered' : 'WebSocket conversation not found',
     };
   }
 

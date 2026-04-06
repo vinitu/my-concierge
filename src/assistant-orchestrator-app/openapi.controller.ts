@@ -56,6 +56,12 @@ export class AssistantOrchestratorOpenApiController {
                             'memory_fact_write',
                             'memory_conversation_search',
                             'skill_execute',
+                            'directory_list',
+                            'directory_create',
+                            'directory_delete',
+                            'file_delete',
+                            'file_write',
+                            'file_read',
                           ],
                         },
                       },
@@ -83,7 +89,7 @@ export class AssistantOrchestratorOpenApiController {
             },
           },
         },
-        '/provider-status': {
+        '/provider': {
           get: {
             summary: 'Get current LLM provider status',
             responses: {

@@ -50,7 +50,6 @@ describe("AssistantRuntimeService", () => {
 
     return {
       generateFromMessages,
-      summarizeConversation: jest.fn().mockResolvedValue("summary"),
     };
   }
 
@@ -243,33 +242,5 @@ describe("AssistantRuntimeService", () => {
     await expect(metricsService.render()).resolves.toContain(
       'runtime_fallback_total{reason="unknown_tool_name",service="assistant-orchestrator"} 1',
     );
-  });
-
-  it("summarizes conversation in separate call", async () => {
-    const summarizeConversation = jest
-      .fn()
-      .mockResolvedValue("updated summary");
-    const service = new AssistantRuntimeService(
-      {
-        generateFromMessages: jest.fn().mockResolvedValue({
-          message: "unused",
-          type: "final",
-        }),
-        summarizeConversation,
-      } as unknown as AssistantLlmProvider,
-      {
-        execute: jest.fn(),
-      } as unknown as AssistantToolDispatcherService,
-      new AssistantOrchestratorMetricsService(),
-      promptTemplateStub(),
-      {
-        load: jest.fn().mockResolvedValue(runtimeContext),
-      } as unknown as AssistantOrchestratorRuntimeContextService,
-    );
-
-    await expect(
-      service.summarizeConversation(input, "Assistant reply"),
-    ).resolves.toBe("updated summary");
-    expect(summarizeConversation).toHaveBeenCalledTimes(1);
   });
 });

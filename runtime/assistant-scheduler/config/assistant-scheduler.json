@@ -1,0 +1,4 @@
+{
+  "assistant_api_url": "http://assistant-api:3000",
+  "poll_interval_ms": 1000
+}

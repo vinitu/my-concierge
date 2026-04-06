@@ -170,10 +170,22 @@ function connectSocket() {
 
   socket.on('assistant.event', (payload) => {
     const type = typeof payload?.type === 'string' ? payload.type : 'assistant.event';
-    const message =
+    let message =
       typeof payload?.message === 'string' && payload.message.trim().length > 0
         ? payload.message
         : JSON.stringify(payload?.payload ?? {});
+
+    if (type.startsWith('tool.')) {
+      const toolPayload =
+        typeof payload?.payload === 'object' && payload.payload !== null ? payload.payload : {};
+      const toolName =
+        typeof toolPayload.tool_name === 'string' && toolPayload.tool_name.trim().length > 0
+          ? toolPayload.tool_name
+          : type.split('.')[1] || 'unknown_tool';
+      const status = type.endsWith('.ok') ? 'ok' : type.endsWith('.failed') ? 'failed' : 'event';
+      message = `[tool:${toolName} ${status}] ${message}`;
+    }
+
     appendMessage('system', `[${type}] ${message}`);
   });
 }

@@ -22,11 +22,4 @@ export class AssistantLlmProviderService implements AssistantLlmProviderPort {
       availableTools,
     );
   }
-
-  async summarizeConversation(
-    messages: AssistantLlmMessage[],
-    previousContext: string,
-  ): Promise<string> {
-    return this.assistantLlmClientService.summarizeConversation(messages, previousContext);
-  }
 }

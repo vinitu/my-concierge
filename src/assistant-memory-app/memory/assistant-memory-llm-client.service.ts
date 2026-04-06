@@ -4,6 +4,7 @@ import type {
   AssistantLlmMemoryFactResponse,
   AssistantLlmMemoryProfileResponse,
   AssistantLlmMessage,
+  AssistantLlmSummarizeResponse,
 } from "../../contracts/assistant-llm";
 
 function trimTrailingSlash(value: string): string {
@@ -102,6 +103,41 @@ export class AssistantMemoryLlmClientService {
       ).join(",") || "none"} payload=${JSON.stringify(payload)}`,
     );
     return patch;
+  }
+
+  async summarizeConversation(
+    conversationId: string,
+    messages: AssistantLlmMessage[],
+    previousContext: string,
+  ): Promise<string> {
+    const endpoint = "/v1/conversation/summarize";
+    this.logger.debug(
+      `assistant-llm request endpoint=${endpoint} conversation_id=${conversationId} messages=${messages.length}`,
+    );
+
+    const response = await fetch(`${this.baseUrl()}${endpoint}`, {
+      body: JSON.stringify({
+        messages,
+        previous_context: previousContext,
+      }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+      signal: AbortSignal.timeout(this.timeoutMs()),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `assistant-llm returned ${String(response.status)} for ${endpoint}: ${body}`,
+      );
+    }
+
+    const payload = (await response.json()) as AssistantLlmSummarizeResponse;
+    const summary = typeof payload.summary === "string" ? payload.summary.trim() : "";
+    this.logger.debug(
+      `assistant-llm response endpoint=${endpoint} conversation_id=${conversationId} summary_len=${summary.length}`,
+    );
+    return summary;
   }
 
   private baseUrl(): string {

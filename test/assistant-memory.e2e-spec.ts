@@ -70,6 +70,7 @@ class DeterministicEnrichmentService {
 
 describe('assistant-memory (e2e)', () => {
   let app: NestExpressApplication;
+  let httpApp: Parameters<typeof request>[0];
 
   beforeAll(async () => {
     const datadir = await mkdtemp(join(tmpdir(), 'assistant-memory-'));
@@ -87,6 +88,7 @@ describe('assistant-memory (e2e)', () => {
 
     app = moduleRef.createNestApplication<NestExpressApplication>();
     await app.init();
+    httpApp = app.getHttpAdapter().getInstance();
   });
 
   afterAll(async () => {
@@ -94,13 +96,13 @@ describe('assistant-memory (e2e)', () => {
   });
 
   it('returns service root and status', async () => {
-    const rootResponse = await request(app.getHttpServer()).get('/');
+    const rootResponse = await request(httpApp).get('/');
     expect(rootResponse.status).toBe(200);
     expect(rootResponse.text).toContain('assistant-memory');
     expect(rootResponse.text).toContain('Durable memory service');
     expect(rootResponse.text).toContain('/v1/profile');
 
-    const statusResponse = await request(app.getHttpServer()).get('/status');
+    const statusResponse = await request(httpApp).get('/status');
     expect(statusResponse.status).toBe(200);
     expect(statusResponse.body).toEqual({
       ready: true,
@@ -111,7 +113,7 @@ describe('assistant-memory (e2e)', () => {
   });
 
   it('stores profile and typed memory entries and supports federated search/archive', async () => {
-    const profileResponse = await request(app.getHttpServer())
+    const profileResponse = await request(httpApp)
       .put('/v1/profile')
       .send({
         language: 'en',
@@ -125,7 +127,7 @@ describe('assistant-memory (e2e)', () => {
     expect(profileResponse.status).toBe(200);
     expect(profileResponse.body.updatedProfile.language).toBe('en');
 
-    const preferenceWriteResponse = await request(app.getHttpServer())
+    const preferenceWriteResponse = await request(httpApp)
       .post('/v1/preferences/write')
       .set('Idempotency-Key', 'memory-write-1')
       .send({
@@ -145,7 +147,7 @@ describe('assistant-memory (e2e)', () => {
     expect(preferenceWriteResponse.body.created).toBe(1);
     const preferenceId = preferenceWriteResponse.body.entries[0]?.id as string;
 
-    const episodeWriteResponse = await request(app.getHttpServer())
+    const episodeWriteResponse = await request(httpApp)
       .post('/v1/episodes/write')
       .set('Idempotency-Key', 'memory-write-2')
       .send({
@@ -164,7 +166,7 @@ describe('assistant-memory (e2e)', () => {
     expect(episodeWriteResponse.status).toBe(200);
     expect(episodeWriteResponse.body.created).toBe(1);
 
-    const typedSearchResponse = await request(app.getHttpServer())
+    const typedSearchResponse = await request(httpApp)
       .post('/v1/preferences/search')
       .send({
         conversationThreadId: 'thread_1',
@@ -176,7 +178,7 @@ describe('assistant-memory (e2e)', () => {
     expect(typedSearchResponse.body.entries[0]?.content).toBe('Alex prefers concise replies.');
     expect(typedSearchResponse.body.entries[0]?.kind).toBe('preference');
 
-    const federatedSearchResponse = await request(app.getHttpServer())
+    const federatedSearchResponse = await request(httpApp)
       .post('/v1/search')
       .send({
         conversationThreadId: 'thread_1',
@@ -192,11 +194,11 @@ describe('assistant-memory (e2e)', () => {
       ),
     ).toBe(true);
 
-    const getResponse = await request(app.getHttpServer()).get(`/v1/preferences/${preferenceId}`);
+    const getResponse = await request(httpApp).get(`/v1/preferences/${preferenceId}`);
     expect(getResponse.status).toBe(200);
     expect(getResponse.body.id).toBe(preferenceId);
 
-    const archiveResponse = await request(app.getHttpServer()).post(
+    const archiveResponse = await request(httpApp).post(
       `/v1/preferences/${preferenceId}/archive`,
     );
     expect(archiveResponse.status).toBe(200);
@@ -207,6 +209,7 @@ describe('assistant-memory (e2e)', () => {
 
 describe('assistant-memory fact extraction from conversation (e2e)', () => {
   let app: NestExpressApplication;
+  let httpApp: Parameters<typeof request>[0];
 
   beforeAll(async () => {
     const datadir = await mkdtemp(join(tmpdir(), 'assistant-memory-conversation-facts-'));
@@ -226,6 +229,7 @@ describe('assistant-memory fact extraction from conversation (e2e)', () => {
 
     app = moduleRef.createNestApplication<NestExpressApplication>();
     await app.init();
+    httpApp = app.getHttpAdapter().getInstance();
   });
 
   afterAll(async () => {
@@ -234,7 +238,7 @@ describe('assistant-memory fact extraction from conversation (e2e)', () => {
 
   it('extracts fact from conversation append when request_id is provided', async () => {
     const conversationId = 'thread_fact_extract_1';
-    const appendResponse = await request(app.getHttpServer())
+    const appendResponse = await request(httpApp)
       .post('/v1/conversations/append')
       .send({
         chat: 'web',
@@ -252,7 +256,7 @@ describe('assistant-memory fact extraction from conversation (e2e)', () => {
     expect(appendResponse.status).toBe(200);
     expect(appendResponse.body.messages).toHaveLength(2);
 
-    const factsResponse = await request(app.getHttpServer())
+    const factsResponse = await request(httpApp)
       .post('/v1/facts/search')
       .send({
         conversationThreadId: conversationId,
@@ -271,14 +275,14 @@ describe('assistant-memory fact extraction from conversation (e2e)', () => {
       ),
     ).toBe(true);
 
-    const profileResponse = await request(app.getHttpServer()).get('/v1/profile');
+    const profileResponse = await request(httpApp).get('/v1/profile');
     expect(profileResponse.status).toBe(200);
     expect(profileResponse.body.preferences?.preferred_name).toBe('Дмитрий');
   });
 
   it('extracts fact from conversation append even without request_id', async () => {
     const conversationId = 'thread_fact_extract_2';
-    const appendResponse = await request(app.getHttpServer())
+    const appendResponse = await request(httpApp)
       .post('/v1/conversations/append')
       .send({
         chat: 'web',
@@ -294,7 +298,7 @@ describe('assistant-memory fact extraction from conversation (e2e)', () => {
 
     expect(appendResponse.status).toBe(200);
 
-    const factsResponse = await request(app.getHttpServer())
+    const factsResponse = await request(httpApp)
       .post('/v1/facts/search')
       .send({
         conversationThreadId: conversationId,

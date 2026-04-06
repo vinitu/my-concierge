@@ -63,11 +63,13 @@ Describe the endpoints of all application services in one place.
   Purpose: read LLM provider/model settings
 - `PUT /config`
   Purpose: update LLM provider/model settings
-- `GET /provider-status`
+- `GET /provider`
   Purpose: verify provider reachability and key configuration
 - `GET /models`
   Purpose: list available models by provider
-- `POST /v1/conversation/respond`
+- `POST /models/ollama/:model/download`
+  Purpose: download one static Ollama model into the local Ollama instance and refresh model availability
+- `POST /v1/conversation`
   Purpose: run main generation from `messages[]` and optional `tools[]`
 - `POST /v1/conversation/summarize`
   Purpose: run summary generation
@@ -79,7 +81,8 @@ Describe the endpoints of all application services in one place.
 ### Notes
 
 - `assistant-llm` is internal-only.
-- `assistant-orchestrator` and `assistant-memory` enrichment call `assistant-llm`.
+- `assistant-orchestrator` calls `assistant-llm` for planning and synthesis.
+- `assistant-memory` calls `assistant-llm` for asynchronous summary and enrichment.
 
 ## `assistant-memory`
 
@@ -149,11 +152,20 @@ Describe the endpoints of all application services in one place.
   Purpose: compact and deduplicate memory
 - `POST /v1/reindex`
   Purpose: rebuild retrieval metadata
+- `GET /v1/conversations`
+  Purpose: list canonical conversation threads
+- `POST /v1/conversations/read`
+  Purpose: read canonical conversation messages and rolling context
+- `POST /v1/conversations/append`
+  Purpose: append one raw user/assistant exchange and trigger asynchronous summary/enrichment
+- `POST /v1/conversations/search`
+  Purpose: read one conversation thread window and current summary
 
 ### Notes
 
 - `assistant-memory` is an internal service.
-- `assistant-orchestrator` calls `assistant-memory` for durable memory operations.
+- `assistant-orchestrator` calls `assistant-memory` for durable conversation and memory operations.
+- `assistant-memory` owns asynchronous conversation summarization after append.
 
 ## `gateway-telegram`
 
@@ -175,6 +187,8 @@ Describe the endpoints of all application services in one place.
   Purpose: receive the final assistant response from `assistant-api` and send it as a Telegram reply
 - `POST /thinking/:conversationId`
   Purpose: receive a transient thinking callback for a Telegram thread and acknowledge it
+- `POST /tool/:conversationId`
+  Purpose: receive tool activity callbacks from `assistant-api` and acknowledge them for a Telegram thread
 - `GET /status`
   Purpose: report `gateway-telegram` readiness
 - `GET /metrics`
@@ -211,6 +225,8 @@ Describe the endpoints of all application services in one place.
   Purpose: receive the final assistant response from `assistant-api` and send it as an email reply
 - `POST /thinking/:conversationId`
   Purpose: receive a transient thinking callback for an email thread and acknowledge it
+- `POST /tool/:conversationId`
+  Purpose: receive tool activity callbacks from `assistant-api` and acknowledge them for an email thread
 - `GET /status`
   Purpose: report `gateway-email` readiness
 - `GET /metrics`
@@ -260,6 +276,8 @@ Describe the endpoints of all application services in one place.
   Purpose: receive the final assistant response from `assistant-api` and send it to the browser through WebSocket
 - `POST /thinking/:conversationId`
   Purpose: receive transient thinking callbacks from `assistant-api` and show them in the browser for the requested number of seconds
+- `POST /tool/:conversationId`
+  Purpose: receive tool activity callbacks from `assistant-api` and show them in the browser event stream
 - `POST /event/:conversationId`
   Purpose: receive run and memory event callbacks from `assistant-api` and show them in the browser
 - `GET /status`

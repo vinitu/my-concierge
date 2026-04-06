@@ -26,9 +26,10 @@ It owns provider/model configuration and executes model calls for `assistant-orc
 - `GET /`
 - `GET /config`
 - `PUT /config`
-- `GET /provider-status`
+- `GET /provider`
 - `GET /models`
-- `POST /v1/conversation/respond`
+- `POST /models/ollama/:model/download`
+- `POST /v1/conversation`
 - `POST /v1/conversation/summarize`
 - `POST /v1/memory/facts`
 - `POST /v1/memory/profile`
@@ -38,7 +39,7 @@ It owns provider/model configuration and executes model calls for `assistant-orc
 
 ## Canonical API
 
-### `POST /v1/conversation/respond`
+### `POST /v1/conversation`
 
 Purpose:
 - Generate assistant response from conversation messages.
@@ -191,7 +192,7 @@ Request example:
 Response:
 - Updated config object.
 
-### `GET /provider-status`
+### `GET /provider`
 
 Purpose:
 - Check provider health and credentials state.
@@ -201,8 +202,9 @@ Response example:
 ```json
 {
   "provider": "ollama",
-  "status": "ready",
-  "reachable": true
+  "model": "qwen3:1.7b",
+  "enabled": true,
+  "status": "ok"
 }
 ```
 
@@ -216,10 +218,40 @@ Response example:
 ```json
 {
   "models": {
-    "ollama": ["qwen3:1.7b", "gemma3:1b"],
-    "deepseek": ["deepseek-chat", "deepseek-reasoner"],
-    "xai": ["grok-4", "grok-4-latest"]
+    "ollama": [
+      { "name": "qwen3:1.7b", "enabled": true, "status": null },
+      { "name": "llama3.2:3b", "enabled": false, "status": "Model is not available locally" },
+      { "name": "hermes3:3b", "enabled": false, "status": "Model is not available locally" }
+    ],
+    "deepseek": [
+      { "name": "deepseek-chat", "enabled": false, "status": "API key is missing" },
+      { "name": "deepseek-reasoner", "enabled": false, "status": "API key is missing" }
+    ],
+    "xai": [
+      { "name": "grok-4", "enabled": false, "status": "API key is missing" },
+      { "name": "grok-4-latest", "enabled": false, "status": "API key is missing" }
+    ]
   }
+}
+```
+
+### `POST /models/ollama/:model/download`
+
+Purpose:
+- Download one tools-capable Ollama model into the local Ollama instance.
+
+Rules:
+- Only models from the static Ollama catalog are accepted.
+- After a successful download, `/models` must show that model as enabled.
+
+Response example:
+
+```json
+{
+  "provider": "ollama",
+  "model": "qwen3:1.7b",
+  "enabled": true,
+  "status": "ok"
 }
 ```
 
@@ -273,7 +305,7 @@ Typical statuses:
 Conversation respond:
 
 ```bash
-curl -sS http://localhost:8087/v1/conversation/respond \
+curl -sS http://localhost:8087/v1/conversation \
   -H 'content-type: application/json' \
   -d '{
     "tools": [

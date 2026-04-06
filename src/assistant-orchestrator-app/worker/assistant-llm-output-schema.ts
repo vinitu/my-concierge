@@ -17,6 +17,12 @@ export interface AssistantLlmPlanResult {
 }
 
 const toolNameSchema = z.enum([
+  'directory_create',
+  'directory_delete',
+  'directory_list',
+  'file_delete',
+  'file_read',
+  'file_write',
   'memory_conversation_search',
   'memory_search',
   'memory_fact_search',

@@ -20,12 +20,13 @@ interface EnrichmentJob {
   chat: string;
   conversation_id: string;
   direction: string;
-  extract: AssistantMemoryExtractKind;
+  extract: EnrichmentJobExtract;
   message_text?: string;
   request_id: string;
   user_id: string;
 }
 
+type EnrichmentJobExtract = AssistantMemoryExtractKind | "summary";
 type EnrichmentEnqueueInput = Omit<EnrichmentJob, "extract">;
 
 @Injectable()
@@ -76,10 +77,16 @@ export class AssistantMemoryEnrichmentService
   async enqueue(job: EnrichmentEnqueueInput): Promise<void> {
     const client = await this.getClient();
     const config = await this.assistantMemoryConfigService.read();
-    const jobs = config.enabled_extracts.map((extract) => ({
-      ...job,
-      extract,
-    }));
+    const jobs: EnrichmentJob[] = [
+      {
+        ...job,
+        extract: "summary",
+      },
+      ...config.enabled_extracts.map((extract) => ({
+        ...job,
+        extract,
+      })),
+    ];
 
     for (const nextJob of jobs) {
       await client.rPush(this.queueName(), JSON.stringify(nextJob));
@@ -152,6 +159,23 @@ export class AssistantMemoryEnrichmentService
     this.logger.debug(
       `Enrichment history loaded request_id=${job.request_id} conversation_id=${job.conversation_id} extract=${job.extract} messages=${history.messages.length}`,
     );
+
+    if (job.extract === "summary") {
+      const summary = await this.summarizeConversation(
+        job.conversation_id,
+        history.messages,
+        history.summary,
+      );
+      await this.assistantMemoryService.updateConversationSummary(
+        job.conversation_id,
+        summary,
+      );
+      this.logger.debug(
+        `Enrichment summary applied request_id=${job.request_id} conversation_id=${job.conversation_id} extract=summary summary_len=${summary.trim().length}`,
+      );
+      return;
+    }
+
     const messages = history.messages
       .filter((message) => message.role === "user")
       .map((message) => this.mapConversationMessage(message))
@@ -273,6 +297,50 @@ export class AssistantMemoryEnrichmentService
     return patch;
   }
 
+  private async summarizeConversation(
+    conversationId: string,
+    messages: ConversationMessage[],
+    previousSummary: string,
+  ): Promise<string> {
+    const filteredMessages = messages.filter(
+      (message) =>
+        message.role !== "assistant" ||
+        !this.isFallbackAssistantMessage(message.content),
+    );
+    const sanitizedPreviousSummary = this.isFallbackAssistantMessage(previousSummary)
+      ? ""
+      : previousSummary.trim();
+
+    if (filteredMessages.length === 0) {
+      return sanitizedPreviousSummary;
+    }
+
+    const summary = await this.assistantMemoryLlmClientService.summarizeConversation(
+      conversationId,
+      filteredMessages.map((message) => this.mapConversationMessage(message)),
+      sanitizedPreviousSummary,
+    );
+    this.logger.debug(
+      `Enrichment extract response conversation_id=${conversationId} extract=summary summary_len=${summary.trim().length}`,
+    );
+    return summary.trim() || sanitizedPreviousSummary;
+  }
+
+  private isFallbackAssistantMessage(content: string): boolean {
+    const normalized = content.trim().toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+
+    return [
+      "не удалось корректно обработать ответ модели. попробуйте выбрать другую llm модель в настройках.",
+      "could not parse the model response correctly. try selecting a different llm model in settings.",
+      "llm planning output was invalid and fallback response was used.",
+      "не удалось обработать вопрос о файлах. попробуйте выбрать другую модель в настройках.",
+      "could not process the question about files. try selecting a different model in settings.",
+    ].includes(normalized);
+  }
+
   private async applyProfile(
     job: EnrichmentJob,
     patch: {
@@ -362,7 +430,7 @@ export class AssistantMemoryEnrichmentService
 
   private requestKey(
     requestId: string,
-    extract: AssistantMemoryExtractKind,
+    extract: EnrichmentJobExtract,
   ): string {
     return `assistant:memory:enrichment:request:${requestId}:${extract}`;
   }

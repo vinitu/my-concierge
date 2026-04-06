@@ -28,7 +28,7 @@ migrate:
 	docker compose run --rm assistant-orchestrator npm run db:migrate
 
 up:
-	docker compose up --build assistant-api assistant-orchestrator assistant-llm assistant-memory assistant-scheduler assistant-scheduler-cron gateway-web swagger
+	docker compose up --build --remove-orphans assistant-api assistant-orchestrator assistant-llm assistant-memory assistant-scheduler assistant-scheduler-cron gateway-web swagger
 
 down:
 	docker compose down --remove-orphans

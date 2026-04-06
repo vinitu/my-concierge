@@ -11,6 +11,7 @@ import { GATEWAY_TELEGRAM_TRANSPORT } from '../src/gateway-telegram-app/gateway-
 
 describe('gateway-telegram (e2e)', () => {
   let app: NestExpressApplication;
+  let httpApp: Parameters<typeof request>[0];
   const assistantApiClient = {
     sendConversation: jest.fn().mockResolvedValue(undefined),
   };
@@ -40,6 +41,7 @@ describe('gateway-telegram (e2e)', () => {
 
     app = moduleRef.createNestApplication<NestExpressApplication>();
     await app.init();
+    httpApp = app.getHttpAdapter().getInstance();
   });
 
   afterAll(async () => {
@@ -51,24 +53,24 @@ describe('gateway-telegram (e2e)', () => {
   });
 
   it('returns root page and status', async () => {
-    const root = await request(app.getHttpServer()).get('/');
+    const root = await request(httpApp).get('/');
     expect(root.status).toBe(200);
     expect(root.text).toContain('gateway-telegram');
     expect(root.text).toContain('Bot token');
 
-    const status = await request(app.getHttpServer()).get('/status');
+    const status = await request(httpApp).get('/status');
     expect(status.status).toBe(200);
     expect(status.body.service).toBe('gateway-telegram');
   });
 
   it('stores config, accepts inbound telegram, and replies through the callback path', async () => {
-    const configResponse = await request(app.getHttpServer()).put('/config').send({
+    const configResponse = await request(httpApp).put('/config').send({
       bot_token: '123456:ABCDEF',
     });
     expect(configResponse.status).toBe(200);
     expect(configResponse.body.bot_token).toBe('123456:ABCDEF');
 
-    const inboundResponse = await request(app.getHttpServer())
+    const inboundResponse = await request(httpApp)
       .post('/inbound/telegram')
       .send({
         chat_id: '12345',
@@ -92,7 +94,7 @@ describe('gateway-telegram (e2e)', () => {
     );
 
     const conversationId = inboundResponse.body.conversation_id as string;
-    const callbackResponse = await request(app.getHttpServer())
+    const callbackResponse = await request(httpApp)
       .post(`/response/${conversationId}`)
       .send({ message: 'Yes, let us make pasta.' });
 
@@ -109,7 +111,7 @@ describe('gateway-telegram (e2e)', () => {
       }),
     );
 
-    const threadResponse = await request(app.getHttpServer()).get(
+    const threadResponse = await request(httpApp).get(
       `/threads/${conversationId}`,
     );
     expect(threadResponse.status).toBe(200);
@@ -118,14 +120,14 @@ describe('gateway-telegram (e2e)', () => {
   });
 
   it('returns gateway-telegram metrics', async () => {
-    const metricsResponse = await request(app.getHttpServer()).get('/metrics');
+    const metricsResponse = await request(httpApp).get('/metrics');
     expect(metricsResponse.status).toBe(200);
     expect(metricsResponse.text).toContain('incoming_messages_total');
     expect(metricsResponse.text).toContain('telegram_threads_total');
   });
 
   it('returns gateway-telegram OpenAPI schema', async () => {
-    const response = await request(app.getHttpServer()).get('/openapi.json');
+    const response = await request(httpApp).get('/openapi.json');
     expect(response.status).toBe(200);
     expect(response.body.info.title).toBe('gateway-telegram');
     expect(response.body.paths['/inbound/telegram']).toBeDefined();

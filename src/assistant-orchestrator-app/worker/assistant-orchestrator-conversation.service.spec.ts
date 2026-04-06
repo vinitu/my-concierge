@@ -115,5 +115,11 @@ describe("AssistantOrchestratorConversationService", () => {
         method: "POST",
       }),
     );
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://assistant-memory:3000/v1/conversations/append",
+      expect.objectContaining({
+        body: expect.not.stringContaining('"context"'),
+      }),
+    );
   });
 });

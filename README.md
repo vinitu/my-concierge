@@ -150,12 +150,14 @@ Expected runtime files and folders:
 - `runtime/assistant-orchestrator/SYSTEM.js`
 - `runtime/assistant-orchestrator/skills/`
 - `runtime/assistant-orchestrator/config/`
+- `runtime/assistant-orchestrator/data/`
 - `runtime/gateway-web/conversations/`
 - `runtime/gateway-telegram/conversations/`
 - `runtime/gateway-email/conversations/`
 
 The runtime directory is not baked into the Docker image.
 The repository already includes a starter runtime directory in [runtime](./runtime) with placeholder instruction files.
+Filesystem tools in `assistant-orchestrator` are sandboxed to `ASSISTANT_ORCHESTRATOR_HOME`, which defaults to `runtime/assistant-orchestrator/data` in Docker Compose.
 
 ### assistant-api
 
@@ -249,7 +251,7 @@ For `xai`:
 
 For local Ollama:
 - `OLLAMA_BASE_URL=http://host.docker.internal:11434`
-- `OLLAMA_MODEL=gemma3:1b`
+- `OLLAMA_MODEL=qwen3:1.7b`
 
 4. To switch provider or model, open [http://localhost:3003/](http://localhost:3003/) (or the dashboard) and update `assistant-llm` settings.
 
@@ -283,7 +285,7 @@ make down
 
 - `make env`: create `.env` from `.env.example` if it does not exist
 - `make build`: build local Docker images for the stack
-- `make up`: start local Docker Compose stack
+- `make up`: start local Docker Compose stack and remove orphan containers from older service layouts
 - `make down`: stop the local Docker Compose stack
 - `npm run build`: build the NestJS service
 - `npm test`: run unit tests

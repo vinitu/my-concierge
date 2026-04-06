@@ -203,11 +203,18 @@ export class DashboardRootController {
         'memory_fact_write',
         'memory_conversation_search',
         'skill_execute',
+        'directory_list',
+        'directory_create',
+        'directory_delete',
+        'file_delete',
+        'file_write',
+        'file_read',
       ];
       const GATEWAY_WEB_INCOMING_MESSAGE_TYPES = [
         { group: 'Response', value: 'response.message', description: 'Assistant response message' },
         { group: 'Response', value: 'response.error', description: 'Assistant error response' },
         { group: 'Response', value: 'response.thinking', description: 'Thinking progress update' },
+        { group: 'Response', value: 'response.tool', description: 'Tool activity update' },
         { group: 'Fact', value: 'memory.fact.added', description: 'Added fact to memory' },
         { group: 'Fact', value: 'memory.fact.updated', description: 'Updated fact in memory' },
         { group: 'Fact', value: 'memory.fact.deleted', description: 'Deleted fact from memory' },
@@ -759,7 +766,7 @@ export class DashboardRootController {
         let providerStatus = null;
         let models = null;
         try {
-          const statusResponse = await fetch(buildServiceUrl(service, '/provider-status'));
+          const statusResponse = await fetch(buildServiceUrl(service, '/provider'));
           if (statusResponse.ok) {
             providerStatus = await statusResponse.json();
           }
@@ -778,7 +785,7 @@ export class DashboardRootController {
             '<div class="item"><strong>Status endpoint:</strong> <code>' + escapeHtml(service.status_url || 'not exposed') + '</code></div>' +
             '<div class="item"><strong>Menu:</strong> General, Provider, LLMs (Ollama/DeepSeek/XAI)</div>' +
             '<div class="item"><strong>Provider status:</strong> ' + escapeHtml(providerStatus?.status || 'unknown') + '</div>' +
-            '<div class="item"><strong>Reachable:</strong> ' + escapeHtml(String(providerStatus?.reachable ?? false)) + '</div>' +
+            '<div class="item"><strong>Enabled:</strong> ' + escapeHtml(String(providerStatus?.enabled ?? false)) + '</div>' +
             '<div class="item"><strong>Current provider/model:</strong> ' + escapeHtml((providerStatus?.provider || '-') + ' / ' + (providerStatus?.model || '-')) + '</div>' +
             '<div class="actions"><a href="' + escapeHtml(service.prefix || '/') + '">Open service panel via dashboard prefix</a></div>' +
           '</div>' +
@@ -814,7 +821,7 @@ export class DashboardRootController {
         const selectedProvider = providerOptions.includes(config.provider) ? config.provider : 'ollama';
         const initialModels = modelsByProvider && Array.isArray(modelsByProvider[selectedProvider])
           ? modelsByProvider[selectedProvider]
-          : [config.model].filter((entry) => typeof entry === 'string' && entry.length > 0);
+          : [{ enabled: true, name: config.model, status: null }].filter((entry) => typeof entry.name === 'string' && entry.name.length > 0);
 
         content.innerHTML =
           '<form id="assistant-llm-provider-form">' +
@@ -829,9 +836,10 @@ export class DashboardRootController {
               '</select></label>' +
               '<label>Model<select id="assistant-llm-model">' +
                 initialModels.map((model) =>
-                  '<option value="' + escapeHtml(model) + '"' +
-                  (model === config.model ? ' selected' : '') + '>' +
-                  escapeHtml(model) +
+                  '<option value="' + escapeHtml(model.name) + '"' +
+                  (model.name === config.model ? ' selected' : '') +
+                  (model.enabled ? '' : ' disabled') + '>' +
+                  escapeHtml(model.name + (model.enabled ? '' : ' (disabled: ' + (model.status || 'unavailable') + ')')) +
                   '</option>',
                 ).join('') +
               '</select></label>' +
@@ -848,13 +856,20 @@ export class DashboardRootController {
             : [];
           const source = models.length > 0
             ? models
-            : [selectedModel].filter((entry) => typeof entry === 'string' && entry.length > 0);
+            : [{ enabled: true, name: selectedModel, status: null }].filter((entry) => typeof entry.name === 'string' && entry.name.length > 0);
           modelSelect.innerHTML = source.map((model) =>
-            '<option value="' + escapeHtml(model) + '"' +
-            (model === selectedModel ? ' selected' : '') + '>' +
-            escapeHtml(model) +
+            '<option value="' + escapeHtml(model.name) + '"' +
+            (model.name === selectedModel ? ' selected' : '') +
+            (model.enabled ? '' : ' disabled') + '>' +
+            escapeHtml(model.name + (model.enabled ? '' : ' (disabled: ' + (model.status || 'unavailable') + ')')) +
             '</option>',
           ).join('');
+          if (!source.some((model) => model.enabled && model.name === modelSelect.value)) {
+            const firstEnabled = source.find((model) => model.enabled);
+            if (firstEnabled) {
+              modelSelect.value = firstEnabled.name;
+            }
+          }
         };
         providerSelect.addEventListener('change', () => {
           const nextProvider = providerSelect.value;
@@ -880,14 +895,25 @@ export class DashboardRootController {
 
       async function renderAssistantLlmConnections(service) {
         const content = document.getElementById('service-content');
-        content.innerHTML = '<div class="status-line">Loading LLM connection settings...</div>';
+        content.innerHTML = '<div class="status-line">Loading LLM models and connection settings...</div>';
         let config;
+        let modelsByProvider = null;
         try {
           config = await ensureServiceConfig(service);
         } catch {
           content.innerHTML = '<div class="status-line">Failed to load LLM settings</div>';
           return;
         }
+
+        try {
+          const modelsResponse = await fetch(buildServiceUrl(service, '/models'));
+          if (modelsResponse.ok) {
+            const payload = await modelsResponse.json();
+            if (payload && typeof payload === 'object' && payload.models) {
+              modelsByProvider = payload.models;
+            }
+          }
+        } catch {}
 
         const provider = state.assistantLlmTab;
         const fieldsByProvider = {
@@ -914,6 +940,23 @@ export class DashboardRootController {
         const apiKeyInput = spec.api_key_key
           ? '<label>API key<input id="assistant-llm-api-key" type="password" value="' + escapeHtml(config[spec.api_key_key] || '') + '" /></label>'
           : '';
+        const models = modelsByProvider && Array.isArray(modelsByProvider[provider])
+          ? modelsByProvider[provider]
+          : [];
+        const modelCards = models.length > 0
+          ? models.map((model) =>
+              '<div class="item">' +
+                '<div><strong>' + escapeHtml(model.name) + '</strong></div>' +
+                '<div class="meta">Enabled: ' + escapeHtml(String(Boolean(model.enabled))) + '</div>' +
+                '<div class="meta">Status: ' + escapeHtml(model.status || 'ok') + '</div>' +
+                (
+                  provider === 'ollama' && !model.enabled
+                    ? '<div class="actions"><button type="button" data-download-ollama-model="' + escapeHtml(model.name) + '">Download</button></div>'
+                    : ''
+                ) +
+              '</div>'
+            ).join('')
+          : '<div class="item">No models available for this provider.</div>';
 
         content.innerHTML =
           renderAssistantLlmTabs(provider) +
@@ -924,13 +967,49 @@ export class DashboardRootController {
             '<label>Timeout (ms)<input id="assistant-llm-timeout" type="number" value="' + escapeHtml(String(config[spec.timeout_key] ?? '')) + '" /></label>' +
             '<div class="actions"><button type="submit">Save ' + escapeHtml(spec.title) + '</button></div>' +
             '<div id="assistant-llm-connections-status" class="status-line"></div>' +
-          '</form>';
+          '</form>' +
+          '<div class="list" style="margin-top:10px">' +
+            '<div class="item"><strong>Available models</strong></div>' +
+            modelCards +
+            '<div id="assistant-llm-models-status" class="status-line"></div>' +
+          '</div>';
 
         content.querySelectorAll('a[data-llm-tab]').forEach((tabLink) => {
           tabLink.addEventListener('click', (event) => {
             event.preventDefault();
             state.assistantLlmTab = tabLink.dataset.llmTab;
             void renderAssistantLlmConnections(service);
+          });
+        });
+
+        content.querySelectorAll('button[data-download-ollama-model]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const model = button.dataset.downloadOllamaModel;
+            const status = document.getElementById('assistant-llm-models-status');
+            if (!model) {
+              return;
+            }
+            button.disabled = true;
+            status.textContent = 'Downloading ' + model + '...';
+            try {
+              const response = await fetch(
+                buildServiceUrl(service, '/models/ollama/' + encodeURIComponent(model) + '/download'),
+                {
+                  method: 'POST',
+                },
+              );
+              if (!response.ok) {
+                throw new Error(await response.text());
+              }
+              status.textContent = 'Downloaded ' + model;
+              await renderAssistantLlmConnections(service);
+            } catch (error) {
+              button.disabled = false;
+              const message = error instanceof Error ? error.message : 'Failed to download ' + model;
+              status.textContent = message && message.trim().length > 0
+                ? message
+                : 'Failed to download ' + model;
+            }
           });
         });
 

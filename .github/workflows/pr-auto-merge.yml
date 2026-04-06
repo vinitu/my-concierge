@@ -46,7 +46,7 @@ jobs:
         run: docker compose config
 
       - name: Build service images
-        run: docker compose build assistant-api assistant-worker gateway-web
+        run: docker compose build assistant-api assistant-orchestrator gateway-web
 
   determine_version:
     name: Detect version bump

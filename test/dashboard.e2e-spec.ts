@@ -10,6 +10,7 @@ import {
 
 describe('dashboard (e2e)', () => {
   let app: NestExpressApplication;
+  let httpApp: Parameters<typeof request>[0];
   const registryServices = [
     {
       key: 'assistant-api',
@@ -118,6 +119,7 @@ describe('dashboard (e2e)', () => {
 
     app = moduleRef.createNestApplication<NestExpressApplication>();
     await app.init();
+    httpApp = app.getHttpAdapter().getInstance();
   });
 
   afterAll(async () => {
@@ -129,7 +131,7 @@ describe('dashboard (e2e)', () => {
   });
 
   it('renders dashboard page with service menu and status tiles', async () => {
-    const response = await request(app.getHttpServer()).get('/');
+    const response = await request(httpApp).get('/');
     expect(response.status).toBe(200);
     expect(response.text).toContain('dashboard');
     expect(response.text).toContain('Unified panel for all services.');
@@ -138,7 +140,7 @@ describe('dashboard (e2e)', () => {
   });
 
   it('returns aggregated service statuses for polling', async () => {
-    const response = await request(app.getHttpServer()).get('/services/status');
+    const response = await request(httpApp).get('/services/status');
     expect(response.status).toBe(200);
     expect(response.body.refresh_seconds).toBe(5);
     expect(response.body.services).toHaveLength(3);
@@ -146,7 +148,7 @@ describe('dashboard (e2e)', () => {
   });
 
   it('returns service catalog', async () => {
-    const response = await request(app.getHttpServer()).get('/services/catalog');
+    const response = await request(httpApp).get('/services/catalog');
     expect(response.status).toBe(200);
     expect(response.body.refresh_seconds).toBe(5);
     expect(response.body.services).toHaveLength(3);
@@ -154,17 +156,17 @@ describe('dashboard (e2e)', () => {
   });
 
   it('returns dashboard status', async () => {
-    const response = await request(app.getHttpServer()).get('/status');
+    const response = await request(httpApp).get('/status');
     expect(response.status).toBe(200);
     expect(response.body.service).toBe('dashboard');
   });
 
   it('returns dashboard metrics and openapi schema', async () => {
-    const metrics = await request(app.getHttpServer()).get('/metrics');
+    const metrics = await request(httpApp).get('/metrics');
     expect(metrics.status).toBe(200);
     expect(metrics.text).toContain('endpoint_requests_total');
 
-    const openapi = await request(app.getHttpServer()).get('/openapi.json');
+    const openapi = await request(httpApp).get('/openapi.json');
     expect(openapi.status).toBe(200);
     expect(openapi.body.info.title).toBe('dashboard');
     expect(openapi.body.paths['/']).toBeDefined();

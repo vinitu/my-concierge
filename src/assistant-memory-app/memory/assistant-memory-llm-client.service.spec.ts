@@ -88,4 +88,33 @@ describe("AssistantMemoryLlmClientService", () => {
       }),
     );
   });
+
+  it("calls assistant-llm summary endpoint and returns trimmed summary", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      json: async () => ({
+        summary: "  Rolling summary updated.  ",
+      }),
+      ok: true,
+    }) as unknown as typeof fetch;
+
+    const service = new AssistantMemoryLlmClientService(
+      new ConfigService({
+        ASSISTANT_LLM_URL: "http://assistant-llm:3000",
+      }),
+    );
+
+    const result = await service.summarizeConversation(
+      "conv-3",
+      [{ content: "hello", role: "user" }],
+      "Previous summary.",
+    );
+
+    expect(result).toBe("Rolling summary updated.");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "http://assistant-llm:3000/v1/conversation/summarize",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+  });
 });

@@ -1,18 +1,29 @@
-import { Body, Controller, Get, Post, Put } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Put,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import type {
   AssistantLlmConfig,
   AssistantLlmConversationRespondRequest,
   AssistantLlmConversationRespondResponse,
   AssistantLlmMemoryByKindRequest,
   AssistantLlmMemoryFactResponse,
+  AssistantLlmModelsResponse,
   AssistantLlmMemoryProfileResponse,
+  AssistantLlmOllamaModelDownloadResponse,
   AssistantLlmProvider,
   AssistantLlmProviderStatus,
   AssistantLlmSummarizeRequest,
   AssistantLlmSummarizeResponse,
 } from "../contracts/assistant-llm";
+import { defaultModelForProvider } from "../contracts/assistant-llm-model-catalog";
 import { AssistantLlmService } from "./assistant-llm.service";
-import { defaultModelForProvider } from "./assistant-llm-model-catalog";
 
 interface UpdateLlmConfigBody {
   deepseek_api_key?: string;
@@ -80,21 +91,34 @@ export class AssistantLlmController {
     });
   }
 
-  @Get("provider-status")
+  @Get("provider")
   getProviderStatus(): Promise<AssistantLlmProviderStatus> {
     return this.assistantLlmService.providerStatus();
   }
 
   @Get("models")
-  async getModels(): Promise<{
-    models: Record<AssistantLlmProvider, string[]>;
-  }> {
+  async getModels(): Promise<AssistantLlmModelsResponse> {
     return {
       models: await this.assistantLlmService.models(),
     };
   }
 
-  @Post("v1/conversation/respond")
+  @Post("models/ollama/:model/download")
+  async downloadOllamaModel(
+    @Param("model") model: string,
+  ): Promise<AssistantLlmOllamaModelDownloadResponse> {
+    try {
+      return await this.assistantLlmService.downloadOllamaModel(model);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.startsWith("Unsupported Ollama model:")) {
+        throw new BadRequestException(message);
+      }
+      throw new ServiceUnavailableException(message);
+    }
+  }
+
+  @Post("v1/conversation")
   async conversationRespond(
     @Body() body: AssistantLlmConversationRespondRequest,
   ): Promise<AssistantLlmConversationRespondResponse> {
@@ -242,10 +266,37 @@ export class AssistantLlmController {
       };
     }
 
+    const messageCandidates = [
+      parsed.message,
+      parsed.response,
+      parsed.reply,
+      parsed.answer,
+      parsed.text,
+      parsed.content,
+    ];
+    const directMessage =
+      messageCandidates.find(
+        (entry): entry is string =>
+          typeof entry === "string" && entry.trim().length > 0,
+      ) ?? null;
+    if (directMessage) {
+      return {
+        context: typeof parsed.context === "string" ? parsed.context : undefined,
+        memory_writes: Array.isArray(parsed.memory_writes)
+          ? (parsed.memory_writes as Record<string, unknown>[])
+          : undefined,
+        message: directMessage.trim(),
+        tool_observations: Array.isArray(parsed.tool_observations)
+          ? (parsed.tool_observations as Record<string, unknown>[])
+          : undefined,
+        type: "final",
+      };
+    }
+
     const finalRaw = parsed.final;
     if (typeof finalRaw === "object" && finalRaw !== null && !Array.isArray(finalRaw)) {
       const final = finalRaw as Record<string, unknown>;
-      const messageCandidates = [
+      const nestedMessageCandidates = [
         final.message,
         final.response,
         final.reply,
@@ -254,7 +305,7 @@ export class AssistantLlmController {
         final.content,
       ];
       const message =
-        messageCandidates.find((entry): entry is string => typeof entry === "string") ??
+        nestedMessageCandidates.find((entry): entry is string => typeof entry === "string") ??
         "No response from model";
       return {
         context: typeof final.context === "string" ? final.context : undefined,

@@ -35,6 +35,7 @@ flowchart LR
 | `POST /inbound/telegram` | Receive inbound Telegram webhook or polling payloads |
 | `POST /response/:conversationId` | Receive the final assistant response and send it as a Telegram reply |
 | `POST /thinking/:conversationId` | Receive a transient thinking callback and acknowledge it for Telegram |
+| `POST /tool/:conversationId` | Receive tool activity callbacks and acknowledge them for Telegram |
 | `GET /status` | Service readiness |
 | `GET /metrics` | Prometheus metrics |
 | `GET /openapi.json` | OpenAPI schema |

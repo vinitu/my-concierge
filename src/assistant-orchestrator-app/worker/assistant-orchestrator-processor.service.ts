@@ -30,6 +30,8 @@ import type {
   AssistantConversationState,
 } from './assistant-orchestrator-conversation.service';
 import type { AssistantLlmGenerateInput } from './assistant-llm-provider';
+import type { AssistantToolObservation } from './assistant-tool-dispatcher.service';
+import { SUPPORTED_ASSISTANT_TOOL_NAMES } from './assistant-tool-catalog.service';
 
 @Injectable()
 export class AssistantOrchestratorProcessorService
@@ -127,13 +129,13 @@ export class AssistantOrchestratorProcessorService
       const providerStatus = await this.assistantLlmProviderStatusService.getStatus();
       currentProvider = providerStatus.provider;
       this.logger.log(
-        `Provider preflight requestId=${requestId} status=${providerStatus.status} provider=${providerStatus.provider} reachable=${String(providerStatus.reachable)}`,
+        `Provider preflight requestId=${requestId} status=${providerStatus.status} provider=${providerStatus.provider} enabled=${String(providerStatus.enabled)}`,
       );
 
-      if (providerStatus.status !== 'ready') {
+      if (!providerStatus.enabled) {
         throw new AssistantRuntimeError(
           'PROVIDER_ERROR',
-          `assistant-orchestrator is not ready: ${providerStatus.message}. Open the assistant-llm web panel and fix the AI settings.`,
+          `assistant-orchestrator is not ready: ${providerStatus.status}. Open the assistant-llm web panel and fix the AI settings.`,
         );
       }
 
@@ -186,19 +188,7 @@ export class AssistantOrchestratorProcessorService
         }, enabledTools),
         workerConfig.run_timeout_seconds,
       );
-      const summaryContext = await this.safeSummarizeConversation(
-        {
-          conversation: effectiveConversation,
-          message: item,
-          retrieved_memory: memorySearch.entries,
-        },
-        runtimeResult.message,
-        requestId,
-      );
-      const result = {
-        ...runtimeResult,
-        context: summaryContext,
-      };
+      const result = runtimeResult;
 
       stopThinking();
       stopThinking = null;
@@ -206,6 +196,14 @@ export class AssistantOrchestratorProcessorService
       await this.assistantMemoryClientService.safeWrite(
         this.buildMemoryCandidates(item, effectiveConversation.context, result.context),
       );
+      for (const observation of this.toolObservationsFromResult(result.tool_observations)) {
+        await this.publishRunEvent(item, ++sequence, 'run.tool', {
+          message: this.messageForToolObservation(observation),
+          ok: observation.ok,
+          payload: observation.result,
+          tool_name: observation.tool_name,
+        });
+      }
       await this.publishRunEvent(item, ++sequence, 'run.completed', {
         fallback_reason: result.fallback_reason ?? null,
         message: result.message,
@@ -257,46 +255,6 @@ export class AssistantOrchestratorProcessorService
         )}`,
       );
     }
-  }
-
-  private async safeSummarizeConversation(
-    input: AssistantLlmGenerateInput,
-    assistantMessage: string,
-    requestId: string,
-  ): Promise<string> {
-    try {
-      const summary = await this.assistantRuntimeService.summarizeConversation(
-        input,
-        assistantMessage,
-      );
-
-      if (!this.isUsableSummary(summary)) {
-        return input.conversation.context;
-      }
-
-      return summary.trim();
-    } catch (error) {
-      this.logger.warn(
-        `Summary generation failed requestId=${requestId} conversationId=${input.message.conversation_id}: ${this.unwrapErrorMessage(
-          error,
-        )}`,
-      );
-      return input.conversation.context;
-    }
-  }
-
-  private isUsableSummary(summary: string): boolean {
-    const normalized = summary.trim();
-
-    if (!normalized) {
-      return false;
-    }
-
-    if (normalized.length < 12) {
-      return false;
-    }
-
-    return /[\p{L}\p{N}]/u.test(normalized);
   }
 
   private effectiveEnabledTools(
@@ -515,7 +473,12 @@ export class AssistantOrchestratorProcessorService
   private async publishRunEvent(
     item: ProcessingQueueMessage,
     sequence: number,
-    eventType: 'run.started' | 'run.thinking' | 'run.completed' | 'run.failed',
+    eventType:
+      | 'run.started'
+      | 'run.thinking'
+      | 'run.tool'
+      | 'run.completed'
+      | 'run.failed',
     payload: Record<string, unknown>,
   ): Promise<void> {
     try {
@@ -650,6 +613,42 @@ export class AssistantOrchestratorProcessorService
     }
 
     return String(error);
+  }
+
+  private toolObservationsFromResult(
+    value: Array<Record<string, unknown>> | undefined,
+  ): AssistantToolObservation[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    const observations: AssistantToolObservation[] = [];
+
+    for (const entry of value) {
+      const toolName = entry?.tool_name;
+      if (
+        typeof toolName !== 'string' ||
+        !SUPPORTED_ASSISTANT_TOOL_NAMES.includes(
+          toolName as (typeof SUPPORTED_ASSISTANT_TOOL_NAMES)[number],
+        ) ||
+        typeof entry?.ok !== 'boolean'
+      ) {
+        continue;
+      }
+
+      observations.push({
+        ok: entry.ok,
+        result: entry.result,
+        tool_name: toolName as AssistantToolObservation['tool_name'],
+      });
+    }
+
+    return observations;
+  }
+
+  private messageForToolObservation(observation: AssistantToolObservation): string {
+    const prefix = observation.ok ? 'Executed' : 'Failed';
+    return `${prefix} ${observation.tool_name}.`;
   }
 
   private extractDisabledToolName(message: string): string {

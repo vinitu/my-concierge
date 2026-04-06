@@ -12,6 +12,7 @@ import { GatewayEmailSyncService } from '../src/gateway-email-app/gateway-email-
 
 describe('gateway-email (e2e)', () => {
   let app: NestExpressApplication;
+  let httpApp: Parameters<typeof request>[0];
   const assistantApiClient = {
     sendConversation: jest.fn().mockResolvedValue(undefined),
   };
@@ -53,6 +54,7 @@ describe('gateway-email (e2e)', () => {
 
     app = moduleRef.createNestApplication<NestExpressApplication>();
     await app.init();
+    httpApp = app.getHttpAdapter().getInstance();
   });
 
   afterAll(async () => {
@@ -64,18 +66,18 @@ describe('gateway-email (e2e)', () => {
   });
 
   it('returns root page and status', async () => {
-    const root = await request(app.getHttpServer()).get('/');
+    const root = await request(httpApp).get('/');
     expect(root.status).toBe(200);
     expect(root.text).toContain('gateway-email');
     expect(root.text).toContain('Sync now');
 
-    const status = await request(app.getHttpServer()).get('/status');
+    const status = await request(httpApp).get('/status');
     expect(status.status).toBe(200);
     expect(status.body.service).toBe('gateway-email');
   });
 
   it('stores config, accepts inbound email, and replies through the callback path', async () => {
-    const configResponse = await request(app.getHttpServer()).put('/config').send({
+    const configResponse = await request(httpApp).put('/config').send({
       email: 'assistant@example.com',
       password: 'secret',
       imap_host: 'imap.example.com',
@@ -89,7 +91,7 @@ describe('gateway-email (e2e)', () => {
     expect(configResponse.status).toBe(200);
     expect(configResponse.body.email).toBe('assistant@example.com');
 
-    const inboundResponse = await request(app.getHttpServer())
+    const inboundResponse = await request(httpApp)
       .post('/inbound/email')
       .send({
         from: 'alice@example.com',
@@ -115,7 +117,7 @@ describe('gateway-email (e2e)', () => {
     );
 
     const conversationId = inboundResponse.body.conversation_id as string;
-    const callbackResponse = await request(app.getHttpServer())
+    const callbackResponse = await request(httpApp)
       .post(`/response/${conversationId}`)
       .send({ message: 'Yes, let us make pasta.' });
 
@@ -133,25 +135,25 @@ describe('gateway-email (e2e)', () => {
       }),
     );
 
-    const threadResponse = await request(app.getHttpServer()).get(`/threads/${conversationId}`);
+    const threadResponse = await request(httpApp).get(`/threads/${conversationId}`);
     expect(threadResponse.status).toBe(200);
     expect(threadResponse.body.thread.conversation_id).toBe(conversationId);
     expect(threadResponse.body.messages).toHaveLength(2);
   });
 
   it('returns gateway-email metrics and sync endpoint', async () => {
-    const syncResponse = await request(app.getHttpServer()).post('/sync');
+    const syncResponse = await request(httpApp).post('/sync');
     expect(syncResponse.status).toBe(200);
     expect(syncService.triggerSync).toHaveBeenCalled();
 
-    const metricsResponse = await request(app.getHttpServer()).get('/metrics');
+    const metricsResponse = await request(httpApp).get('/metrics');
     expect(metricsResponse.status).toBe(200);
     expect(metricsResponse.text).toContain('incoming_messages_total');
     expect(metricsResponse.text).toContain('email_sync_runs_total');
   });
 
   it('returns gateway-email OpenAPI schema', async () => {
-    const response = await request(app.getHttpServer()).get('/openapi.json');
+    const response = await request(httpApp).get('/openapi.json');
     expect(response.status).toBe(200);
     expect(response.body.info.title).toBe('gateway-email');
     expect(response.body.paths['/inbound/email']).toBeDefined();

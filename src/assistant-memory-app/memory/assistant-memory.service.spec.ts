@@ -140,4 +140,45 @@ describe('AssistantMemoryService', () => {
     expect(profile.preferences).toEqual({});
     expect(profile.constraints).toEqual({});
   });
+
+  it('appends conversation without replacing existing context synchronously', async () => {
+    const service = await createService();
+
+    await service.appendConversation({
+      chat: 'direct',
+      conversation_id: 'thread-1',
+      direction: 'web',
+      message: 'раньше',
+      reply: {
+        message: 'Было раньше.',
+      },
+      request_id: 'req-seed-1',
+      user_id: 'alex',
+    });
+    await service.updateConversationSummary('thread-1', 'Existing rolling context.');
+
+    const state = await service.appendConversation({
+      chat: 'direct',
+      conversation_id: 'thread-1',
+      direction: 'web',
+      message: 'привет',
+      reply: {
+        message: 'Привет!',
+      },
+      request_id: 'req-append-1',
+      user_id: 'alex',
+    });
+
+    expect(state.context).toBe('Existing rolling context.');
+    expect(state.messages).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        content: 'привет',
+        role: 'user',
+      }),
+      expect.objectContaining({
+        content: 'Привет!',
+        role: 'assistant',
+      }),
+    ]));
+  });
 });

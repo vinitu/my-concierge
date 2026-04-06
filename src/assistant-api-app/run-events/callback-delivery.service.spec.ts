@@ -59,4 +59,27 @@ describe("CallbackDeliveryService", () => {
     expect(typeof request.body).toBe("string");
     expect(request.body).toContain('"type":"memory.fact.updated"');
   });
+
+  it("delivers tool events", async () => {
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const delivered = await service().deliver({
+      ...baseEvent("run.tool"),
+      payload: {
+        message: "Executed web_search successfully.",
+        ok: true,
+        payload: { result_count: 3 },
+        tool_name: "web_search",
+      },
+    });
+
+    expect(delivered).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, request] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("http://gateway-web:3000/tool/conv_1");
+    expect(typeof request.body).toBe("string");
+    expect(request.body).toContain('"tool_name":"web_search"');
+    expect(request.body).toContain('"ok":true');
+  });
 });

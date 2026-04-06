@@ -1,4 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import {
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
+import { dirname, extname, join, relative, resolve } from 'node:path';
 import { AssistantMemoryClientService } from './assistant-memory-client.service';
 import { AssistantOrchestratorConversationService } from './assistant-orchestrator-conversation.service';
 import type {
@@ -9,6 +19,7 @@ import type {
 import { AssistantRuntimeError } from './assistant-runtime-error';
 import type { AssistantToolName } from './assistant-tool-catalog.service';
 import { BraveSearchService } from './brave-search.service';
+import { AssistantOrchestratorConfigService } from './assistant-orchestrator-config.service';
 
 export interface AssistantToolCall {
   arguments: Record<string, unknown>;
@@ -26,6 +37,7 @@ export class AssistantToolDispatcherService {
   constructor(
     private readonly assistantMemoryClientService: AssistantMemoryClientService,
     private readonly braveSearchService: BraveSearchService,
+    private readonly assistantOrchestratorConfigService: AssistantOrchestratorConfigService,
     private readonly conversationService: AssistantOrchestratorConversationService,
   ) {}
 
@@ -125,14 +137,65 @@ export class AssistantToolDispatcherService {
           };
         }
         case 'skill_execute':
+        {
+          const result = await this.executeLocalSkill(toolCall.arguments);
           return {
             ok: true,
-            result: {
-              reason: 'assistant-skills service is not implemented yet',
-              status: 'not_implemented',
-            },
+            result,
             tool_name: toolCall.name,
           };
+        }
+        case 'directory_list': {
+          const result = await this.listDirectory(toolCall.arguments.path);
+          return {
+            ok: true,
+            result,
+            tool_name: toolCall.name,
+          };
+        }
+        case 'directory_create': {
+          const result = await this.createDirectory(toolCall.arguments.path);
+          return {
+            ok: true,
+            result,
+            tool_name: toolCall.name,
+          };
+        }
+        case 'directory_delete': {
+          const result = await this.deleteDirectory(toolCall.arguments.path);
+          return {
+            ok: true,
+            result,
+            tool_name: toolCall.name,
+          };
+        }
+        case 'file_read': {
+          const result = await this.readTextFile(toolCall.arguments.path);
+          return {
+            ok: true,
+            result,
+            tool_name: toolCall.name,
+          };
+        }
+        case 'file_write': {
+          const result = await this.writeTextFile(
+            toolCall.arguments.path,
+            toolCall.arguments.content,
+          );
+          return {
+            ok: true,
+            result,
+            tool_name: toolCall.name,
+          };
+        }
+        case 'file_delete': {
+          const result = await this.deleteFile(toolCall.arguments.path);
+          return {
+            ok: true,
+            result,
+            tool_name: toolCall.name,
+          };
+        }
         default:
           throw new AssistantRuntimeError('TOOL_ERROR', `Unsupported tool: ${String(toolCall)}`);
       }
@@ -207,5 +270,272 @@ export class AssistantToolDispatcherService {
               .filter((tag) => tag.length > 0)
           : [],
       }));
+  }
+
+  private async executeLocalSkill(
+    value: Record<string, unknown>,
+  ): Promise<{
+    content: string;
+    file_name: string;
+    format: 'markdown';
+    skill_name: string;
+    status: 'loaded';
+  }> {
+    const requestedName = this.normalizeSkillName(
+      value.skill_name ?? value.skill ?? value.name,
+    );
+    if (!requestedName) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        'skill_execute requires skill_name, skill, or name',
+      );
+    }
+
+    const skillsDirectory = join(
+      dirname(this.assistantOrchestratorConfigService.configPath()),
+      '..',
+      'skills',
+    );
+
+    const entries = await readdir(skillsDirectory, { withFileTypes: true }).catch(() => []);
+    const files = entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
+    const match = files.find((fileName) => this.matchesSkillName(fileName, requestedName));
+
+    if (!match) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        `Local skill not found: ${requestedName}`,
+      );
+    }
+
+    const content = (await readFile(join(skillsDirectory, match), 'utf8')).trim();
+    if (!content) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        `Local skill is empty: ${match}`,
+      );
+    }
+
+    return {
+      content,
+      file_name: match,
+      format: 'markdown',
+      skill_name: requestedName,
+      status: 'loaded',
+    };
+  }
+
+  private matchesSkillName(fileName: string, requestedName: string): boolean {
+    const normalizedFileName = fileName.toLowerCase();
+    const normalizedBaseName = fileName.slice(0, Math.max(0, fileName.length - extname(fileName).length)).toLowerCase();
+    return (
+      normalizedFileName === requestedName ||
+      normalizedBaseName === requestedName ||
+      `${normalizedBaseName}.md` === requestedName
+    );
+  }
+
+  private normalizeSkillName(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const normalized = value.trim().toLowerCase().replaceAll('\\', '/').split('/').pop() ?? '';
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private async listDirectory(pathValue: unknown): Promise<{
+    entries: Array<{ name: string; path: string; type: 'directory' | 'file' | 'other' }>;
+    path: string;
+  }> {
+    const target = this.resolveSandboxPath(pathValue, '.');
+    const targetStat = await stat(target.absolutePath).catch(() => null);
+
+    if (!targetStat || !targetStat.isDirectory()) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        `Directory does not exist inside assistant home: ${target.relativePath}`,
+      );
+    }
+
+    const entries = await readdir(target.absolutePath, { withFileTypes: true });
+    const normalizedEntries: Array<{
+      name: string;
+      path: string;
+      type: 'directory' | 'file' | 'other';
+    }> = entries.map((entry) => ({
+      name: entry.name,
+      path:
+        target.relativePath === '.'
+          ? entry.name
+          : `${target.relativePath}/${entry.name}`,
+      type: entry.isDirectory()
+        ? 'directory'
+        : entry.isFile()
+          ? 'file'
+          : 'other',
+    }));
+    return {
+      entries: normalizedEntries.sort((left, right) => left.path.localeCompare(right.path)),
+      path: target.relativePath,
+    };
+  }
+
+  private async createDirectory(pathValue: unknown): Promise<{
+    created: true;
+    path: string;
+  }> {
+    const target = this.resolveSandboxRequiredPath(pathValue);
+    await mkdir(target.absolutePath, { recursive: true });
+    return {
+      created: true,
+      path: target.relativePath,
+    };
+  }
+
+  private async deleteDirectory(pathValue: unknown): Promise<{
+    deleted: true;
+    path: string;
+  }> {
+    const target = this.resolveSandboxRequiredPath(pathValue);
+
+    if (target.relativePath === '.') {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        'directory_delete cannot remove the assistant home root',
+      );
+    }
+
+    const targetStat = await stat(target.absolutePath).catch(() => null);
+    if (!targetStat || !targetStat.isDirectory()) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        `Directory does not exist inside assistant home: ${target.relativePath}`,
+      );
+    }
+
+    await rm(target.absolutePath, { force: false, recursive: true });
+    return {
+      deleted: true,
+      path: target.relativePath,
+    };
+  }
+
+  private async readTextFile(pathValue: unknown): Promise<{
+    content: string;
+    path: string;
+  }> {
+    const target = this.resolveSandboxRequiredPath(pathValue);
+    const targetStat = await stat(target.absolutePath).catch(() => null);
+
+    if (!targetStat || !targetStat.isFile()) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        `File does not exist inside assistant home: ${target.relativePath}`,
+      );
+    }
+
+    return {
+      content: await readFile(target.absolutePath, 'utf8'),
+      path: target.relativePath,
+    };
+  }
+
+  private async writeTextFile(
+    pathValue: unknown,
+    contentValue: unknown,
+  ): Promise<{
+    bytes: number;
+    path: string;
+    written: true;
+  }> {
+    const target = this.resolveSandboxRequiredPath(pathValue);
+    const content = this.requireStringArgument('content', contentValue, true);
+    await mkdir(dirname(target.absolutePath), { recursive: true });
+    await writeFile(target.absolutePath, content, 'utf8');
+    return {
+      bytes: Buffer.byteLength(content, 'utf8'),
+      path: target.relativePath,
+      written: true,
+    };
+  }
+
+  private async deleteFile(pathValue: unknown): Promise<{
+    deleted: true;
+    path: string;
+  }> {
+    const target = this.resolveSandboxRequiredPath(pathValue);
+    const targetStat = await stat(target.absolutePath).catch(() => null);
+
+    if (!targetStat || !targetStat.isFile()) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        `File does not exist inside assistant home: ${target.relativePath}`,
+      );
+    }
+
+    await unlink(target.absolutePath);
+    return {
+      deleted: true,
+      path: target.relativePath,
+    };
+  }
+
+  private resolveSandboxPath(
+    value: unknown,
+    fallback: string,
+  ): { absolutePath: string; relativePath: string } {
+    const raw =
+      typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+    const homePath = resolve(this.assistantOrchestratorConfigService.homePath());
+    const absolutePath = resolve(homePath, raw);
+    const relativePath = relative(homePath, absolutePath).replaceAll('\\', '/');
+
+    if (relativePath === '..' || relativePath.startsWith('../')) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        'Filesystem tool path escapes assistant home',
+      );
+    }
+
+    return {
+      absolutePath,
+      relativePath: relativePath || '.',
+    };
+  }
+
+  private resolveSandboxRequiredPath(
+    value: unknown,
+  ): { absolutePath: string; relativePath: string } {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        'Filesystem tool requires a non-empty path',
+      );
+    }
+
+    return this.resolveSandboxPath(value, value.trim());
+  }
+
+  private requireStringArgument(
+    field: string,
+    value: unknown,
+    allowEmpty: boolean,
+  ): string {
+    if (typeof value !== 'string') {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        `Filesystem tool requires string argument: ${field}`,
+      );
+    }
+
+    if (!allowEmpty && value.length === 0) {
+      throw new AssistantRuntimeError(
+        'TOOL_ERROR',
+        `Filesystem tool requires non-empty string argument: ${field}`,
+      );
+    }
+
+    return value;
   }
 }

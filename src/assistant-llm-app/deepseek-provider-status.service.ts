@@ -13,12 +13,10 @@ export class DeepseekProviderStatusService {
 
     if (!apiKey) {
       return {
-        apiKeyConfigured: false,
-        message: 'DeepSeek API key is not configured in assistant-llm settings',
+        enabled: false,
         model,
         provider: 'deepseek',
-        reachable: false,
-        status: 'missing_key',
+        status: 'DeepSeek API key is not configured in assistant-llm settings',
       };
     }
 
@@ -32,31 +30,25 @@ export class DeepseekProviderStatusService {
       if (!response.ok) {
         const body = await response.text();
         return {
-          apiKeyConfigured: true,
-          message: `DeepSeek check failed with ${response.status}: ${body}`,
+          enabled: false,
           model,
           provider: 'deepseek',
-          reachable: false,
-          status: 'error',
+          status: `DeepSeek check failed with ${response.status}: ${body}`,
         };
       }
 
       return {
-        apiKeyConfigured: true,
-        message: 'DeepSeek API is reachable',
+        enabled: true,
         model,
         provider: 'deepseek',
-        reachable: true,
-        status: 'ready',
+        status: 'ok',
       };
     } catch (error) {
       return {
-        apiKeyConfigured: true,
-        message: `DeepSeek check failed: ${error instanceof Error ? error.message : String(error)}`,
+        enabled: false,
         model,
         provider: 'deepseek',
-        reachable: false,
-        status: 'error',
+        status: `DeepSeek check failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }

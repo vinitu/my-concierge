@@ -8,6 +8,12 @@ export const SUPPORTED_ASSISTANT_TOOL_NAMES = [
   'memory_fact_write',
   'memory_conversation_search',
   'skill_execute',
+  'directory_list',
+  'directory_create',
+  'directory_delete',
+  'file_delete',
+  'file_write',
+  'file_read',
 ] as const;
 
 export type AssistantToolName = (typeof SUPPORTED_ASSISTANT_TOOL_NAMES)[number];
@@ -56,6 +62,36 @@ export class AssistantToolCatalogService {
       description: 'Execute a registered assistant skill or integration action.',
       name: 'skill_execute',
       use_when: 'The assistant must call a skill or integration to complete the task.',
+    },
+    {
+      description: 'List files and directories inside the sandboxed assistant home directory.',
+      name: 'directory_list',
+      use_when: 'You need to inspect filesystem state inside the assistant sandbox.',
+    },
+    {
+      description: 'Create one directory inside the sandboxed assistant home directory.',
+      name: 'directory_create',
+      use_when: 'A target directory inside the assistant sandbox must be created.',
+    },
+    {
+      description: 'Delete one directory inside the sandboxed assistant home directory.',
+      name: 'directory_delete',
+      use_when: 'A directory inside the assistant sandbox should be removed.',
+    },
+    {
+      description: 'Delete one file inside the sandboxed assistant home directory.',
+      name: 'file_delete',
+      use_when: 'A sandboxed file should be removed.',
+    },
+    {
+      description: 'Write full text content to one file inside the sandboxed assistant home directory.',
+      name: 'file_write',
+      use_when: 'A file must be created or fully rewritten in the sandbox.',
+    },
+    {
+      description: 'Read one text file inside the sandboxed assistant home directory.',
+      name: 'file_read',
+      use_when: 'You need the contents of an existing sandboxed file.',
     },
   ];
 

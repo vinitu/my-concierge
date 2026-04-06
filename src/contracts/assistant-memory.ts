@@ -152,7 +152,6 @@ export interface ConversationReadRequest {
 export type ConversationAppendRequest = ConversationReadRequest & {
   message: string;
   reply: {
-    context: string;
     message: string;
   };
   request_id?: string;

@@ -25,8 +25,9 @@ export class AssistantLlmRootController {
     <p>Centralized LLM configuration and generation service.</p>
     <ul>
       <li><a href="/config">/config</a></li>
-      <li><a href="/provider-status">/provider-status</a></li>
+      <li><a href="/provider">/provider</a></li>
       <li><a href="/models">/models</a></li>
+      <li><code>POST /models/ollama/:model/download</code></li>
       <li><a href="/status">/status</a></li>
       <li><a href="/openapi.json">/openapi.json</a></li>
     </ul>

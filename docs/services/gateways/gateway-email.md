@@ -37,6 +37,7 @@ flowchart LR
 | `POST /inbound/email` | Receive inbound Email webhook or polling payloads |
 | `POST /response/:conversationId` | Receive the final assistant response and send it as an email reply |
 | `POST /thinking/:conversationId` | Receive a transient thinking callback and acknowledge it for email |
+| `POST /tool/:conversationId` | Receive tool activity callbacks and acknowledge them for email |
 | `GET /status` | Service readiness |
 | `GET /metrics` | Prometheus metrics |
 | `GET /openapi.json` | OpenAPI schema |

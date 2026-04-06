@@ -41,7 +41,6 @@ describe("AssistantOrchestratorProcessorService", () => {
         memory_writes: [],
         tool_observations: [],
       }),
-      summarizeConversation: jest.fn().mockResolvedValue("Summary confirmed."),
     } as unknown as AssistantRuntimeService;
     const conversationService = {
       appendExchange: jest.fn().mockResolvedValue(undefined),
@@ -108,12 +107,10 @@ describe("AssistantOrchestratorProcessorService", () => {
       langchainRuntime,
       {
         getStatus: jest.fn().mockResolvedValue({
-          apiKeyConfigured: true,
-          message: "xAI API is reachable",
+          enabled: true,
           model: "grok-4",
           provider: "xai",
-          reachable: true,
-          status: "ready",
+          status: "ok",
         }),
       } as never,
       {
@@ -217,7 +214,6 @@ describe("AssistantOrchestratorProcessorService", () => {
         memory_writes: [],
         tool_observations: [],
       }),
-      summarizeConversation: jest.fn().mockResolvedValue("Greeting completed."),
     } as unknown as AssistantRuntimeService;
     const configService = new ConfigService({
       FILE_QUEUE_DIR: queueDir,
@@ -248,12 +244,10 @@ describe("AssistantOrchestratorProcessorService", () => {
       langchainRuntime,
       {
         getStatus: jest.fn().mockResolvedValue({
-          apiKeyConfigured: true,
-          message: "xAI API is reachable",
+          enabled: true,
           model: "grok-4",
           provider: "xai",
-          reachable: true,
-          status: "ready",
+          status: "ok",
         }),
       } as never,
       assistantMemoryClientService,
@@ -295,6 +289,128 @@ describe("AssistantOrchestratorProcessorService", () => {
       expect.any(String),
     );
     expect(await fileQueueConsumerService.depth()).toBe(0);
+  });
+
+  it("publishes one run.tool event for each tool observation before run.completed", async () => {
+    const queueDir = await mkdtemp(
+      join(tmpdir(), "assistant-orchestrator-queue-"),
+    );
+    await writeFile(
+      join(queueDir, "001.json"),
+      JSON.stringify({
+        accepted_at: new Date().toISOString(),
+        chat: "direct",
+        conversation_id: "alex",
+        contact: "alex",
+        user_id: "alex",
+        direction: "api",
+        message: "search it",
+        request_id: "req-tools-1",
+      }),
+      "utf8",
+    );
+
+    const runEventPublisher = {
+      publish: jest.fn().mockResolvedValue(undefined),
+    } as unknown as RunEventPublisher;
+
+    const service = new AssistantOrchestratorProcessorService(
+      {
+        read: jest.fn().mockResolvedValue({
+          deepseek_api_key: "",
+          deepseek_base_url: "https://api.deepseek.com",
+          deepseek_timeout_ms: 360000,
+          memory_window: 3,
+          model: "grok-4",
+          ollama_base_url: "http://host.docker.internal:11434",
+          ollama_timeout_ms: 360000,
+          provider: "xai",
+          run_timeout_seconds: 30,
+          thinking_interval_seconds: 2,
+          xai_api_key: "",
+          xai_base_url: "https://api.x.ai/v1",
+          xai_timeout_ms: 360000,
+        }),
+      } as never,
+      {
+        run: jest.fn().mockResolvedValue({
+          context: "Search completed.",
+          message: "Found it.",
+          memory_writes: [],
+          tool_observations: [
+            {
+              ok: true,
+              result: { result_count: 3 },
+              tool_name: "web_search",
+            },
+          ],
+        }),
+      } as unknown as AssistantRuntimeService,
+      {
+        getStatus: jest.fn().mockResolvedValue({
+          enabled: true,
+          model: "grok-4",
+          provider: "xai",
+          status: "ok",
+        }),
+      } as never,
+      {
+        safeSearch: jest.fn().mockResolvedValue({ count: 0, entries: [] }),
+        safeWrite: jest.fn().mockResolvedValue(undefined),
+      } as unknown as AssistantMemoryClientService,
+      {
+        appendExchange: jest.fn().mockResolvedValue(undefined),
+        read: jest.fn().mockResolvedValue({
+          chat: "direct",
+          contact: "alex",
+          context: "",
+          direction: "api",
+          messages: [],
+          updated_at: null,
+        }),
+      } as unknown as AssistantOrchestratorConversationService,
+      new ConfigService({
+        FILE_QUEUE_DIR: queueDir,
+        WORKER_POLL_INTERVAL_MS: "1000",
+      }),
+      new AssistantOrchestratorMetricsService(),
+      new FileQueueConsumerService(
+        new ConfigService({
+          FILE_QUEUE_DIR: queueDir,
+        }),
+      ),
+      runEventPublisher,
+    );
+
+    await service.processOnce();
+
+    expect(runEventPublisher.publish).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        eventType: "run.started",
+        sequence: 1,
+      }),
+    );
+    expect(runEventPublisher.publish).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        eventType: "run.tool",
+        payload: {
+          message: "Executed web_search.",
+          ok: true,
+          payload: { result_count: 3 },
+          tool_name: "web_search",
+        },
+        sequence: 2,
+      }),
+    );
+    expect(runEventPublisher.publish).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        eventType: "run.completed",
+        sequence: 3,
+      }),
+    );
   });
 
   it("stores meaningful conversation context in durable memory", async () => {
@@ -349,20 +465,13 @@ describe("AssistantOrchestratorProcessorService", () => {
           memory_writes: [],
           tool_observations: [],
         }),
-        summarizeConversation: jest
-          .fn()
-          .mockResolvedValue(
-            "The user wants concise Russian greetings and quick status updates.",
-          ),
       } as unknown as AssistantRuntimeService,
       {
         getStatus: jest.fn().mockResolvedValue({
-          apiKeyConfigured: true,
-          message: "xAI API is reachable",
+          enabled: true,
           model: "grok-4",
           provider: "xai",
-          reachable: true,
-          status: "ready",
+          status: "ok",
         }),
       } as never,
       assistantMemoryClientService,
@@ -404,108 +513,6 @@ describe("AssistantOrchestratorProcessorService", () => {
         tags: ["api", "direct"],
       },
     ]);
-  });
-
-  it("keeps previous context when summary output is trivial punctuation", async () => {
-    const queueDir = await mkdtemp(
-      join(tmpdir(), "assistant-orchestrator-queue-"),
-    );
-    await writeFile(
-      join(queueDir, "001.json"),
-      JSON.stringify({
-        accepted_at: new Date().toISOString(),
-        chat: "direct",
-        conversation_id: "alex",
-        contact: "alex",
-        user_id: "alex",
-        direction: "api",
-        message: "привет",
-        request_id: "req-summary-trivial",
-      }),
-      "utf8",
-    );
-
-    const runEventPublisher = {
-      publish: jest.fn().mockResolvedValue(undefined),
-    } as unknown as RunEventPublisher;
-    const conversationService = {
-      appendExchange: jest.fn().mockResolvedValue(undefined),
-      read: jest.fn().mockResolvedValue({
-        chat: "direct",
-        contact: "alex",
-        context: "Existing useful summary.",
-        direction: "api",
-        messages: [],
-        updated_at: null,
-      }),
-    } as unknown as AssistantOrchestratorConversationService;
-
-    const service = new AssistantOrchestratorProcessorService(
-      {
-        read: jest.fn().mockResolvedValue({
-          deepseek_api_key: "",
-          deepseek_base_url: "https://api.deepseek.com",
-          deepseek_timeout_ms: 360000,
-          memory_window: 3,
-          model: "grok-4",
-          ollama_base_url: "http://host.docker.internal:11434",
-          ollama_timeout_ms: 360000,
-          provider: "xai",
-          run_timeout_seconds: 30,
-          thinking_interval_seconds: 2,
-          xai_api_key: "",
-          xai_base_url: "https://api.x.ai/v1",
-          xai_timeout_ms: 360000,
-        }),
-      } as never,
-      {
-        run: jest.fn().mockResolvedValue({
-          context: "",
-          message: "Привет!",
-          memory_writes: [],
-          tool_observations: [],
-        }),
-        summarizeConversation: jest.fn().mockResolvedValue("!"),
-      } as unknown as AssistantRuntimeService,
-      {
-        getStatus: jest.fn().mockResolvedValue({
-          apiKeyConfigured: true,
-          message: "xAI API is reachable",
-          model: "grok-4",
-          provider: "xai",
-          reachable: true,
-          status: "ready",
-        }),
-      } as never,
-      {
-        safeSearch: jest.fn().mockResolvedValue({ count: 0, entries: [] }),
-        safeWrite: jest.fn().mockResolvedValue(undefined),
-      } as unknown as AssistantMemoryClientService,
-      conversationService,
-      new ConfigService({
-        FILE_QUEUE_DIR: queueDir,
-        WORKER_POLL_INTERVAL_MS: "1000",
-      }),
-      new AssistantOrchestratorMetricsService(),
-      new FileQueueConsumerService(
-        new ConfigService({
-          FILE_QUEUE_DIR: queueDir,
-        }),
-      ),
-      runEventPublisher,
-    );
-
-    await service.processOnce();
-
-    expect(conversationService.appendExchange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        conversation_id: "alex",
-      }),
-      expect.objectContaining({
-        context: "Existing useful summary.",
-      }),
-      expect.any(String),
-    );
   });
 
   it("publishes a descriptive run.failed event when provider settings are missing", async () => {
@@ -560,16 +567,13 @@ describe("AssistantOrchestratorProcessorService", () => {
               ),
             ),
           ),
-        summarizeConversation: jest.fn().mockResolvedValue(""),
       } as unknown as AssistantRuntimeService,
       {
         getStatus: jest.fn().mockResolvedValue({
-          apiKeyConfigured: true,
-          message: "xAI API is reachable",
+          enabled: true,
           model: "grok-4",
           provider: "xai",
-          reachable: true,
-          status: "ready",
+          status: "ok",
         }),
       } as never,
       {
@@ -638,7 +642,6 @@ describe("AssistantOrchestratorProcessorService", () => {
     } as unknown as RunEventPublisher;
     const langchainRuntime = {
       run: jest.fn(),
-      summarizeConversation: jest.fn(),
     } as unknown as AssistantRuntimeService;
     const service = new AssistantOrchestratorProcessorService(
       {
@@ -661,12 +664,10 @@ describe("AssistantOrchestratorProcessorService", () => {
       langchainRuntime,
       {
         getStatus: jest.fn().mockResolvedValue({
-          apiKeyConfigured: true,
-          message: "DeepSeek API is reachable",
+          enabled: true,
           model: "deepseek-chat",
           provider: "deepseek",
-          reachable: true,
-          status: "ready",
+          status: "ok",
         }),
       } as never,
       {
@@ -762,16 +763,13 @@ describe("AssistantOrchestratorProcessorService", () => {
               "Tool is disabled in assistant-orchestrator settings: time_current",
             ),
           ),
-        summarizeConversation: jest.fn().mockResolvedValue(""),
       } as unknown as AssistantRuntimeService,
       {
         getStatus: jest.fn().mockResolvedValue({
-          apiKeyConfigured: true,
-          message: "DeepSeek API is reachable",
+          enabled: true,
           model: "deepseek-chat",
           provider: "deepseek",
-          reachable: true,
-          status: "ready",
+          status: "ok",
         }),
       } as never,
       {
@@ -849,7 +847,6 @@ describe("AssistantOrchestratorProcessorService", () => {
       } as never,
       {
         run: jest.fn(),
-        summarizeConversation: jest.fn(),
       } as unknown as AssistantRuntimeService,
       {
         getStatus: jest.fn(),

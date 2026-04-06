@@ -2,5 +2,5 @@
 
 Store local runtime skill definitions in this directory.
 
-The first worker version does not execute local skills yet.
-This directory is prepared for future worker versions.
+`assistant-orchestrator` can load local skill files from this directory through `skill_execute`.
+Use Markdown files with short, direct instructions that the model can read during a run.

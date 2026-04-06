@@ -13,12 +13,10 @@ export class XaiProviderStatusService {
 
     if (!apiKey) {
       return {
-        apiKeyConfigured: false,
-        message: 'xAI API key is not configured in assistant-llm settings',
+        enabled: false,
         model,
         provider: 'xai',
-        reachable: false,
-        status: 'missing_key',
+        status: 'xAI API key is not configured in assistant-llm settings',
       };
     }
 
@@ -32,31 +30,25 @@ export class XaiProviderStatusService {
       if (!response.ok) {
         const body = await response.text();
         return {
-          apiKeyConfigured: true,
-          message: `xAI check failed with ${response.status}: ${body}`,
+          enabled: false,
           model,
           provider: 'xai',
-          reachable: false,
-          status: 'error',
+          status: `xAI check failed with ${response.status}: ${body}`,
         };
       }
 
       return {
-        apiKeyConfigured: true,
-        message: 'xAI API is reachable',
+        enabled: true,
         model,
         provider: 'xai',
-        reachable: true,
-        status: 'ready',
+        status: 'ok',
       };
     } catch (error) {
       return {
-        apiKeyConfigured: true,
-        message: `xAI check failed: ${error instanceof Error ? error.message : String(error)}`,
+        enabled: false,
         model,
         provider: 'xai',
-        reachable: false,
-        status: 'error',
+        status: `xAI check failed: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }

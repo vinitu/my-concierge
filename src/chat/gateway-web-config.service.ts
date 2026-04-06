@@ -25,6 +25,7 @@ export const GATEWAY_WEB_INCOMING_MESSAGE_TYPES = [
   'response.message',
   'response.error',
   'response.thinking',
+  'response.tool',
 ] as const;
 
 const MEMORY_EVENT_KINDS = [

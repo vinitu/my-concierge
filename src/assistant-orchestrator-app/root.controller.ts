@@ -64,13 +64,13 @@ export class AssistantOrchestratorRootController {
   <body>
     <h1>assistant-orchestrator</h1>
     <p>Runtime orchestration service (queue, tools, callbacks).</p>
-    <p><strong>Provider status:</strong> ${this.escapeHtml(providerStatus.status)} (${this.escapeHtml(providerStatus.message)})</p>
+    <p><strong>Provider status:</strong> ${this.escapeHtml(providerStatus.status)}</p>
     <p><strong>Memory window:</strong> ${String(config.memory_window)}</p>
     <p><strong>Enabled tools:</strong> ${this.escapeHtml(config.enabled_tools.join(', '))}</p>
     <h3>Endpoints</h3>
     <ul>
       <li><a href="/config">/config</a></li>
-      <li><a href="/provider-status">/provider-status</a></li>
+      <li><a href="/provider">/provider</a></li>
       <li><a href="/models">/models</a></li>
       <li><a href="/skills">/skills</a></li>
       <li><a href="/conversations">/conversations</a></li>
@@ -125,7 +125,7 @@ export class AssistantOrchestratorRootController {
     });
   }
 
-  @Get('provider-status')
+  @Get('provider')
   getProviderStatus(): Promise<AssistantLlmProviderStatus> {
     return this.assistantLlmClientService.providerStatus();
   }
@@ -182,12 +182,10 @@ export class AssistantOrchestratorRootController {
       return await this.assistantLlmClientService.providerStatus();
     } catch (error) {
       return {
-        apiKeyConfigured: null,
-        message: error instanceof Error ? error.message : String(error),
+        enabled: false,
         model: '',
         provider: 'ollama',
-        reachable: false,
-        status: 'error',
+        status: error instanceof Error ? error.message : String(error),
       };
     }
   }

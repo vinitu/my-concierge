@@ -2,14 +2,13 @@ import { Injectable, Logger } from "@nestjs/common";
 import type {
   AssistantLlmAvailableTool,
   AssistantLlmConfig,
+  AssistantLlmModelCatalogEntry,
   AssistantLlmMessage,
+  AssistantLlmOllamaModelDownloadResponse,
   AssistantLlmProvider,
   AssistantLlmProviderStatus,
 } from "../contracts/assistant-llm";
-import {
-  defaultModelForProvider,
-  STATIC_PROVIDER_MODELS,
-} from "./assistant-llm-model-catalog";
+import { STATIC_PROVIDER_MODELS } from "../contracts/assistant-llm-model-catalog";
 import { AssistantLlmConfigService } from "./assistant-llm-config.service";
 import { DeepseekChatService } from "./deepseek-chat.service";
 import { DeepseekProviderStatusService } from "./deepseek-provider-status.service";
@@ -46,22 +45,42 @@ export class AssistantLlmService {
     return this.selectStatusProvider(config.provider).getStatus();
   }
 
-  async models(): Promise<Record<AssistantLlmProvider, string[]>> {
+  async models(): Promise<Record<AssistantLlmProvider, AssistantLlmModelCatalogEntry[]>> {
     const config = await this.assistantLlmConfigService.read();
-    const ollamaModels =
-      await this.ollamaProviderStatusService.listAvailableModels();
     return {
-      deepseek: this.mergeModels(
+      deepseek: this.buildStaticModelCatalog(
         STATIC_PROVIDER_MODELS.deepseek,
-        config,
-        "deepseek",
+        Boolean(config.deepseek_api_key.trim()),
       ),
-      ollama: this.mergeModels(
-        [...STATIC_PROVIDER_MODELS.ollama, ...ollamaModels],
-        config,
-        "ollama",
+      ollama: this.buildOllamaModelCatalog(
+        STATIC_PROVIDER_MODELS.ollama,
       ),
-      xai: this.mergeModels(STATIC_PROVIDER_MODELS.xai, config, "xai"),
+      xai: this.buildStaticModelCatalog(
+        STATIC_PROVIDER_MODELS.xai,
+        Boolean(config.xai_api_key.trim()),
+      ),
+    };
+  }
+
+  async downloadOllamaModel(model: string): Promise<AssistantLlmOllamaModelDownloadResponse> {
+    const normalizedModel = typeof model === "string" ? model.trim() : "";
+    if (!STATIC_PROVIDER_MODELS.ollama.includes(normalizedModel)) {
+      throw new Error(`Unsupported Ollama model: ${normalizedModel || "unknown"}`);
+    }
+
+    const enabled = new Set(this.ollamaProviderStatusService.getEnabledModelsSnapshot());
+    if (!enabled.has(normalizedModel)) {
+      await this.ollamaProviderStatusService.downloadModel(normalizedModel);
+    }
+
+    const refreshed = new Set(this.ollamaProviderStatusService.getEnabledModelsSnapshot());
+    return {
+      enabled: refreshed.has(normalizedModel),
+      model: normalizedModel,
+      provider: "ollama",
+      status: refreshed.has(normalizedModel)
+        ? "ok"
+        : "Model is not available locally",
     };
   }
 
@@ -187,19 +206,27 @@ export class AssistantLlmService {
     return this.ollamaProviderStatusService;
   }
 
-  private mergeModels(
+  private buildStaticModelCatalog(
     models: string[],
-    config: AssistantLlmConfig,
-    provider: AssistantLlmProvider,
-  ): string[] {
-    const next = [...new Set(models)];
-    if (config.provider === provider && !next.includes(config.model)) {
-      next.unshift(config.model);
-    }
-    if (next.length === 0) {
-      next.push(defaultModelForProvider(provider));
-    }
-    return next;
+    enabled: boolean,
+  ): AssistantLlmModelCatalogEntry[] {
+    const status = enabled ? null : "API key is missing";
+    return [...new Set(models)].map((name) => ({
+      enabled,
+      name,
+      status,
+    }));
+  }
+
+  private buildOllamaModelCatalog(
+    models: string[],
+  ): AssistantLlmModelCatalogEntry[] {
+    const enabled = new Set(this.ollamaProviderStatusService.getEnabledModelsSnapshot());
+    return [...new Set(models)].map((name) => ({
+      enabled: enabled.has(name),
+      name,
+      status: enabled.has(name) ? null : "Model is not available locally",
+    }));
   }
 
   private buildFactsExtractPrompt(conversationId: string): string {

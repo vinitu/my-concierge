@@ -6,7 +6,7 @@ Define what `assistant-orchestrator` sends to `assistant-llm` during runtime exe
 
 ## Main Request Model
 
-`assistant-orchestrator` sends `messages[]` (role-based chat format) to `assistant-llm /v1/conversation/respond`.
+`assistant-orchestrator` sends `messages[]` (role-based chat format) to `assistant-llm /v1/conversation`.
 
 Message composition order:
 
@@ -38,7 +38,7 @@ The payload is message-first, not one giant concatenated prompt string.
 ```json
 {
   "tool_call": {
-    "name": "time_current|web_search|memory_search|memory_preference_search|memory_fact_search|memory_routine_search|memory_project_search|memory_episode_search|memory_rule_search|memory_preference_write|memory_fact_write|memory_routine_write|memory_project_write|memory_episode_write|memory_rule_write|memory_conversation_search|skill_execute",
+    "name": "time_current|web_search|memory_search|memory_fact_search|memory_fact_write|memory_conversation_search|skill_execute|directory_list|directory_create|directory_delete|file_delete|file_write|file_read",
     "arguments": {}
   }
 }

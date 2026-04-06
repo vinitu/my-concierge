@@ -55,6 +55,7 @@ services:
     environment:
       APP_ROLE: assistant-orchestrator
       ASSISTANT_DATADIR: ${ASSISTANT_DATADIR:-/app/runtime}
+      ASSISTANT_ORCHESTRATOR_HOME: ${ASSISTANT_ORCHESTRATOR_HOME:-/app/runtime/data}
       ASSISTANT_LLM_URL: http://assistant-llm:3000
       ASSISTANT_MEMORY_URL: http://assistant-memory:3000
       MYSQL_DATABASE: ${MYSQL_DATABASE:-my_concierge}

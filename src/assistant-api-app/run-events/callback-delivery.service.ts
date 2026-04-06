@@ -42,6 +42,22 @@ export class CallbackDeliveryService {
       );
     }
 
+    if (event.eventType === "run.tool") {
+      return this.send(this.callbackUrl(baseUrl, "tool", event.conversationId), {
+        conversation_id: event.conversationId,
+        direction: event.direction,
+        message:
+          typeof event.payload.message === "string" ? event.payload.message : "",
+        ok: event.payload.ok === true,
+        payload: event.payload.payload,
+        tool_name:
+          typeof event.payload.tool_name === "string"
+            ? event.payload.tool_name
+            : "unknown_tool",
+        user_id: event.userId,
+      });
+    }
+
     const message =
       typeof event.payload.message === "string" &&
       event.payload.message.trim().length > 0
@@ -79,7 +95,7 @@ export class CallbackDeliveryService {
 
   private callbackUrl(
     baseUrl: string,
-    kind: "event" | "response" | "thinking",
+    kind: "event" | "response" | "thinking" | "tool",
     conversationId: string,
   ): string {
     return `${trimTrailingSlash(baseUrl)}/${kind}/${encodeURIComponent(conversationId)}`;

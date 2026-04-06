@@ -12,6 +12,7 @@ export interface ExecutionJob {
 export type RunEventType =
   | "run.started"
   | "run.thinking"
+  | "run.tool"
   | "run.completed"
   | "run.failed"
   | `memory.${string}`;

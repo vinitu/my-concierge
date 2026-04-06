@@ -38,16 +38,19 @@ flowchart LR
 ### `gateway-web`
 
 - `POST /thinking/:conversationId`
+- `POST /tool/:conversationId`
 - `POST /response/:conversationId`
 
 ### `gateway-telegram`
 
 - `POST /thinking/:conversationId`
+- `POST /tool/:conversationId`
 - `POST /response/:conversationId`
 
 ### `gateway-email`
 
 - `POST /thinking/:conversationId`
+- `POST /tool/:conversationId`
 - `POST /response/:conversationId`
 
 ## Callback Payload Types

@@ -14,6 +14,12 @@ interface OllamaChatResponse {
   message?: {
     content?: string;
     thinking?: string;
+    tool_calls?: Array<{
+      function?: {
+        arguments?: Record<string, unknown> | string;
+        name?: string;
+      };
+    }>;
   };
 }
 
@@ -113,11 +119,26 @@ export class OllamaChatService implements AssistantLlmProviderPort {
 
     if (!response.ok) {
       const errorBody = await response.text();
+      if (Array.isArray(requestBody.tools) && requestBody.tools.length > 0) {
+        const unsupportedToolsError = this.buildToolsUnsupportedError(
+          response.status,
+          errorBody,
+          requestBody.model,
+        );
+        if (unsupportedToolsError) {
+          throw unsupportedToolsError;
+        }
+      }
       throw new Error(`Ollama API returned ${response.status}: ${errorBody}`);
     }
 
     const body = (await response.json()) as OllamaChatResponse;
     this.logger.debug(`Ollama reply response: ${this.preview(body)}`);
+    const toolCallPayload = this.extractToolCallPayload(body);
+    if (toolCallPayload) {
+      this.logExtractedOutput(toolCallPayload);
+      return toolCallPayload;
+    }
     const content = body.message?.content?.trim();
 
     if (content && content.length > 0) {
@@ -171,6 +192,50 @@ export class OllamaChatService implements AssistantLlmProviderPort {
       return previousContext.trim();
     }
     return normalized.length > 1200 ? `${normalized.slice(0, 1200)}…` : normalized;
+  }
+
+  private extractToolCallPayload(body: OllamaChatResponse): string | null {
+    const toolCall = Array.isArray(body.message?.tool_calls)
+      ? body.message?.tool_calls[0]
+      : undefined;
+    const functionPayload =
+      typeof toolCall?.function === 'object' && toolCall.function !== null
+        ? toolCall.function
+        : null;
+    const name =
+      typeof functionPayload?.name === 'string' ? functionPayload.name.trim() : '';
+
+    if (!name) {
+      return null;
+    }
+
+    return JSON.stringify({
+      message: '',
+      tool_arguments: this.normalizeToolArguments(functionPayload?.arguments),
+      tool_name: name,
+      type: 'tool_call',
+    });
+  }
+
+  private normalizeToolArguments(
+    value: Record<string, unknown> | string | undefined,
+  ): Record<string, unknown> {
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return value;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      try {
+        const parsed = JSON.parse(value);
+        if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        return {};
+      }
+    }
+
+    return {};
   }
 
   private preview(value: unknown): string {
@@ -230,6 +295,21 @@ export class OllamaChatService implements AssistantLlmProviderPort {
       });
     }
     return tools;
+  }
+
+  private buildToolsUnsupportedError(
+    status: number,
+    errorBody: string,
+    model: unknown,
+  ): Error | null {
+    if (status !== 400 || !/does not support tools/i.test(errorBody)) {
+      return null;
+    }
+
+    const modelName = typeof model === 'string' && model.trim() ? model.trim() : 'selected model';
+    return new Error(
+      `Ollama model ${modelName} does not support native tool calling. Choose a tools-capable model in assistant-llm settings, for example qwen3:1.7b, llama3.2:3b, or hermes3:3b.`,
+    );
   }
 
   private async tryGenerateFallback(

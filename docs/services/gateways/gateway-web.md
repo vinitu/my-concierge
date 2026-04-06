@@ -35,6 +35,7 @@ flowchart LR
 | `WS /ws` | Browser WebSocket transport |
 | `POST /response/:conversationId` | Receive the final assistant response for a browser session |
 | `POST /thinking/:conversationId` | Receive a transient thinking signal for a browser session |
+| `POST /tool/:conversationId` | Receive tool activity for a browser session and forward it through the shared WebSocket event stream |
 | `POST /event/:conversationId` | Receive run and memory events for a browser session |
 | `GET /status` | Service readiness |
 | `GET /metrics` | Prometheus metrics |
@@ -64,11 +65,13 @@ flowchart LR
 8. While the worker run is active, `assistant-orchestrator` may publish `thinking` run events.
 9. `assistant-api` consumes those events and may send `POST /thinking/:conversationId`.
 10. `gateway-web` forwards the thinking state to the active browser session for the requested number of seconds.
-11. `assistant-api` sends the final callback to `POST /response/:conversationId`.
-12. `assistant-api` sends run and memory event callbacks to `POST /event/:conversationId`.
-13. `assistant-orchestrator` appends the user/assistant exchange to canonical conversation state in `assistant-memory`.
-14. `gateway-web` finds the right WebSocket session.
-15. `gateway-web` sends the assistant message and selected events back to the browser.
+11. `assistant-api` sends tool callbacks to `POST /tool/:conversationId` after each executed tool.
+12. `gateway-web` forwards tool activity to the shared browser event stream in the active browser session.
+13. `assistant-api` sends the final callback to `POST /response/:conversationId`.
+14. `assistant-api` sends run and memory event callbacks to `POST /event/:conversationId`.
+15. `assistant-orchestrator` appends the user/assistant exchange to canonical conversation state in `assistant-memory`.
+16. `gateway-web` finds the right WebSocket session.
+17. `gateway-web` sends the assistant message and selected events back to the browser.
 
 ## State Rules
 

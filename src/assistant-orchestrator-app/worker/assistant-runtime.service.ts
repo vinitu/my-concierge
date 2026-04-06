@@ -169,31 +169,6 @@ export class AssistantRuntimeService {
     }
   }
 
-  async summarizeConversation(
-    input: AssistantLlmGenerateInput,
-    assistantMessage: string,
-  ): Promise<string> {
-    const messages = this.buildSummaryMessages(input, assistantMessage);
-    const startedAt = Date.now();
-
-    try {
-      const summary = await this.llmProvider.summarizeConversation(
-        messages,
-        input.conversation.context,
-      );
-      this.metricsService.recordLlmSummaryRequest(true);
-      this.metricsService.recordLlmSummaryDurationMs(Date.now() - startedAt, true);
-      return summary.trim() || input.conversation.context;
-    } catch (error) {
-      this.metricsService.recordLlmSummaryRequest(false);
-      this.metricsService.recordLlmSummaryDurationMs(
-        Date.now() - startedAt,
-        false,
-      );
-      throw error;
-    }
-  }
-
   private async planWithDisabledToolRetry(
     input: AssistantLlmGenerateInput,
     runtimeContext: AssistantOrchestratorRuntimeContext,

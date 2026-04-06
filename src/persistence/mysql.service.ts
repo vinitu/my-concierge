@@ -10,6 +10,7 @@ import {
 
 @Injectable()
 export class MysqlService implements OnModuleDestroy {
+  private closingPool: Promise<void> | null = null;
   private pool: Pool | null = null;
 
   constructor(private readonly configService: ConfigService) {}
@@ -42,9 +43,30 @@ export class MysqlService implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.pool) {
-      await this.pool.end();
-      this.pool = null;
+    if (this.closingPool) {
+      await this.closingPool;
+      return;
     }
+
+    const pool = this.pool;
+    if (!pool) {
+      return;
+    }
+
+    this.pool = null;
+    this.closingPool = pool
+      .end()
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('closed state')) {
+          return;
+        }
+        throw error;
+      })
+      .finally(() => {
+        this.closingPool = null;
+      });
+
+    await this.closingPool;
   }
 }

@@ -29,10 +29,6 @@ export interface AssistantLlmProvider {
     messages: AssistantLlmMessage[],
     availableTools?: AssistantLlmAvailableTool[],
   ): Promise<AssistantLlmConversationRespondResponse>;
-  summarizeConversation(
-    messages: AssistantLlmMessage[],
-    previousContext: string,
-  ): Promise<string>;
 }
 
 export const ASSISTANT_LLM_PROVIDER = Symbol('ASSISTANT_LLM_PROVIDER');

@@ -20,10 +20,11 @@ Describe what `assistant-api` sends to callback targets after consuming run even
 - One accepted request produces one final callback message.
 - `thinking` callbacks are transient and may happen every `N` seconds while the worker run is in progress.
 - `response` callbacks contain the final assistant message.
-- For `gateway-web`, callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
+- For `gateway-web`, callback targets are `POST /thinking/<conversation_id>`, `POST /tool/<conversation_id>`, and `POST /response/<conversation_id>`.
 - For `gateway-web`, event callbacks are sent to `POST /event/<conversation_id>`.
 - For `gateway-web`, `<conversation_id>` is the stable browser `conversation_id` stored in the `myconcierge_conversation_id` cookie.
 - `gateway-web` should forward `thinking` callbacks to the browser through WebSocket without persisting them.
+- `gateway-web` should forward `tool` callbacks to the browser through the same WebSocket event stream used for other assistant events.
 - `gateway-web` should forward final `response` callbacks to the browser through WebSocket.
 - `gateway-web` should not persist final callbacks locally; canonical conversation state is stored by `assistant-orchestrator` in `assistant-memory`.
 - `gateway-email` callback targets are `POST /thinking/<conversation_id>` and `POST /response/<conversation_id>`.
@@ -66,6 +67,33 @@ Describe what `assistant-api` sends to callback targets after consuming run even
 ```json
 {
   "message": "I received your message: Turn on the kitchen lights"
+}
+```
+
+## Tool Callback Request
+
+### Endpoint
+
+`POST /tool/<conversation_id>`
+
+### Body
+
+| Field | Type | Required | Description |
+|---------|---------|---------|-------------|
+| `tool_name` | `string` | yes | Canonical assistant tool name |
+| `ok` | `boolean` | yes | Whether the tool execution succeeded |
+| `message` | `string` | yes | Human-readable summary of the tool execution |
+| `payload` | `object` | no | Raw tool observation payload |
+
+```json
+{
+  "tool_name": "time_current",
+  "ok": true,
+  "message": "Tool time_current completed successfully",
+  "payload": {
+    "iso": "2026-04-06T18:00:00.000Z",
+    "timezone": "Europe/Warsaw"
+  }
 }
 ```
 
@@ -158,10 +186,11 @@ For the browser flow:
 - the browser WebSocket authenticates with that `conversation_id`
 - `gateway-web` sends configured `user_id` as `contact` and cookie-backed `conversation_id` to `assistant-api`
 - `assistant-api` stores the callback routing metadata for that session
-- `assistant-orchestrator` publishes `thinking` and `completed` run events to Redis
+- `assistant-orchestrator` publishes `thinking`, `tool`, and `completed` run events to Redis
 - `assistant-api` calls back to `POST /thinking/{conversation_id}` while the worker run is active
+- `assistant-api` calls back to `POST /tool/{conversation_id}` after each tool execution
 - `assistant-api` calls back to `POST /response/{conversation_id}` when the final reply is ready
-- `gateway-web` forwards both thinking and final response events to the active WebSocket session for that `conversation_id`
+- `gateway-web` forwards thinking, tool, and final response events to the active WebSocket session for that `conversation_id`
 
 ## `gateway-email` Mapping
 
