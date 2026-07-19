@@ -48,7 +48,7 @@ jobs:
     if: |
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main'
-    uses: vinitu/github-workflows/.github/workflows/workflow-determine-version-bump.yml@v0.1.10
+    uses: vinitu/github-workflows/.github/workflows/workflow-determine-version-bump.yml@v0.1.12
     with:
       target-branch: main
       major-branch-prefixes: |
