@@ -74,7 +74,7 @@ jobs:
       - validate
       - determine_version
     if: ${{ needs.determine_version.result == 'success' && needs.determine_version.outputs.matching_pr == 'true' && needs.validate.result == 'success' }}
-    uses: vinitu/github-workflows/.github/workflows/workflow-merge-pull-requests.yml@v0.1.10
+    uses: vinitu/github-workflows/.github/workflows/workflow-merge-pull-requests.yml@v0.1.12
     with:
       target-branch: main
       merge-method: squash
