@@ -134,7 +134,7 @@ jobs:
     needs:
       - create_tag
     if: ${{ needs.create_tag.result == 'success' }}
-    uses: vinitu/github-workflows/.github/workflows/workflow-create-release.yml@v0.1.10
+    uses: vinitu/github-workflows/.github/workflows/workflow-create-release.yml@v0.1.12
     with:
       tag-name: ${{ needs.create_tag.outputs['new-tag'] }}
       previous-tag: ${{ needs.create_tag.outputs['previous-tag'] }}
