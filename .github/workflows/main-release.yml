@@ -74,7 +74,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       needs.validate.result == 'success' &&
       needs.determine_version.result == 'success'
-    uses: vinitu/github-workflows/.github/workflows/workflow-compute-next-tag.yml@v0.1.10
+    uses: vinitu/github-workflows/.github/workflows/workflow-compute-next-tag.yml@v0.1.12
     with:
       target-branch: main
       version-bump: ${{ needs.determine_version.outputs['version-bump'] }}
