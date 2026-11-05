@@ -62,7 +62,7 @@ jobs:
         fixes/
       default: patch
     secrets:
-      gh_token: ${{ secrets.TOKEN }}
+      gh_token: ${{ secrets.GHA_RELEASE_TOKEN }}
 
   calculate_tag:
     name: Compute next tag
@@ -79,7 +79,7 @@ jobs:
       target-branch: main
       version-bump: ${{ needs.determine_version.outputs['version-bump'] }}
     secrets:
-      gh_token: ${{ secrets.TOKEN }}
+      gh_token: ${{ secrets.GHA_RELEASE_TOKEN }}
 
   create_tag:
     name: Create git tag
@@ -98,7 +98,7 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-          token: ${{ secrets.TOKEN }}
+          token: ${{ secrets.GHA_RELEASE_TOKEN }}
 
       - name: Create and push tag
         id: create
@@ -140,4 +140,4 @@ jobs:
       previous-tag: ${{ needs.create_tag.outputs['previous-tag'] }}
       merged-prs: "[]"
     secrets:
-      gh_token: ${{ secrets.TOKEN }}
+      gh_token: ${{ secrets.GHA_RELEASE_TOKEN }}
